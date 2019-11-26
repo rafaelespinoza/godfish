@@ -14,7 +14,8 @@ import (
 
 // Args describes the CLI inputs.
 type Args struct {
-	Command    string
+	Cmd        string
+	Help       bool
 	Name       string
 	Reversible bool
 	Version    string
@@ -31,7 +32,7 @@ type command struct {
 	mapper      argsToCommand
 }
 
-// commands registers any operation by name to a Command.
+// commands registers any operation by name to a command.
 var commands = map[string]command{
 	"generate-migration": command{
 		description: "create migration files",
@@ -109,9 +110,7 @@ func init() {
 		}
 		sort.Strings(cmds)
 		fmt.Fprintf(
-			flag.CommandLine.Output(), `Usage: %s
-
-command [arguments]
+			flag.CommandLine.Output(), `Usage: %s <command> [arguments]
 
 Commands:
 
@@ -121,7 +120,7 @@ Commands:
 		flag.PrintDefaults()
 	}
 
-	flag.StringVar(&args.Command, "cmd", "", "name of command to execute")
+	flag.StringVar(&args.Cmd, "cmd", "", "name of command to execute")
 	flag.StringVar(&args.Name, "name", "", "generate a migration with a name, ie: foo")
 	flag.StringVar(
 		&args.Version,
@@ -131,19 +130,28 @@ Commands:
 	)
 	flag.StringVar(
 		&args.Direction,
-		"dir",
+		"direction",
 		"forward",
 		"direction of migration to run. [forward | reverse]",
 	)
-	flag.BoolVar(&args.Reversible, "rev", true, "generate a reversible migration?")
+	flag.BoolVar(&args.Reversible, "reversible", true, "generate a reversible migration?")
+	flag.BoolVar(&args.Help, "h", false, "show help menu")
+	flag.BoolVar(&args.Help, "help", false, "show help menu")
 	flag.Parse()
 }
 
 func main() {
 	var err error
-	if cmd, ok := commands[args.Command]; !ok {
+	if cmd, ok := commands[args.Cmd]; !ok {
 		flag.Usage()
-		err = fmt.Errorf("unknown command %q\n", args.Command)
+		err = fmt.Errorf("unknown command %q\n", args.Cmd)
+	} else if args.Help {
+		flag.Usage()
+		fmt.Fprint(
+			flag.CommandLine.Output(),
+			cmd.help(),
+		)
+		fmt.Println()
 	} else {
 		err = cmd.mapper(args)
 	}
