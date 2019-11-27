@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 
@@ -261,22 +262,181 @@ type DSNParams interface {
 	String() string
 }
 
-// PGParams defines keys, values needed to connect to a postgres database.
-type PGParams struct {
-	Encoding string // Encoding is the client encoding for the connection.
-	Host     string // Host is the name of the host to connect to.
-	Name     string // Name is the database name.
-	Pass     string // Pass is the password to use for the connection.
-	Port     string // Port is the connection port.
-	User     string // User is the name of the user to connect as.
+type Driver interface {
+	Name() string
+	DSNParams() DSNParams
+	CreateSchemaMigrationsTable(conn *sql.DB) error
+	DumpSchema() error
+	AppliedVersions(conn *sql.DB) (*sql.Rows, error)
+	ApplyMigration(conn *sql.DB, version string, dir Direction) error
 }
 
-var _ DSNParams = (*PGParams)(nil)
+func MakeDriver(driverName string) (driver Driver, err error) {
+	switch driverName {
+	case "postgres":
+		driver, err = NewPostgres()
+	default:
+		err = fmt.Errorf("unknown driver %q", driverName)
+	}
+	return
+}
 
-// String generates a data source name (or connection URL) based on the fields.
-func (p PGParams) String() string {
-	return fmt.Sprintf(
-		"postgresql://%s:%s/%s?client_encoding=%s&sslmode=require",
-		p.Host, p.Port, p.Name, p.Encoding,
-	)
+type MigrationsConf struct {
+	Table       string
+	IDColumn    string
+	PathToFiles string
+}
+
+func CreateSchemaMigrationsTable(driver Driver) error {
+	conn, err := Connect(driver.Name(), driver.DSNParams())
+	if err != nil {
+		return err
+	}
+	return driver.CreateSchemaMigrationsTable(conn)
+}
+
+func DumpSchema(driver Driver) error {
+	return driver.DumpSchema()
+}
+
+// Info displays the outputs of various helper functions.
+func Info(driver Driver, direction Direction, path string) (err error) {
+	var muts []Mutation
+	var appliedVersions, availableVersions, versionsToApply []string
+	if muts, err = AllAvailableMutations(direction, path); err != nil {
+		return
+	}
+	fmt.Println("-- all available mutations")
+	for _, mut := range muts {
+		fmt.Printf("%#v\n", mut)
+	}
+	if appliedVersions, err = listAppliedVersions(driver); err != nil {
+		return
+	}
+	fmt.Println("-- applied versions")
+	for _, version := range appliedVersions {
+		fmt.Println(version)
+	}
+	availableVersions = listAvailableVersions(muts)
+	fmt.Println("-- available versions")
+	for _, version := range availableVersions {
+		fmt.Println(version)
+	}
+	if versionsToApply, err = ListVersionsToApply(
+		direction,
+		appliedVersions,
+		availableVersions,
+	); err != nil {
+		return
+	}
+	fmt.Println("-- versions to apply")
+	for _, version := range versionsToApply {
+		fmt.Println(version)
+	}
+	return
+}
+
+// AllAvailableMutations returns a list of Mutation values at path in a
+// specified direction.
+func AllAvailableMutations(direction Direction, path string) (out []Mutation, err error) {
+	if direction == DirUnknown {
+		err = fmt.Errorf("unknown Direction %q", direction)
+		return
+	}
+	var fileDir *os.File
+	var filenames []string
+	if fileDir, err = os.Open(path); err != nil {
+		return
+	}
+	defer fileDir.Close()
+	if filenames, err = fileDir.Readdirnames(0); err != nil {
+		return
+	}
+	sort.Strings(filenames)
+	for _, filename := range filenames {
+		var mut Mutation
+		if mut, err = ParseMutation(Filename(filename)); err != nil {
+			return
+		}
+		if mut.Direction() != direction {
+			continue
+		}
+		out = append(out, mut)
+	}
+	return
+}
+
+func listAppliedVersions(driver Driver) (out []string, err error) {
+	var conn *sql.DB
+	var rows *sql.Rows
+	if conn, err = Connect(driver.Name(), driver.DSNParams()); err != nil {
+		return
+	}
+	if rows, err = driver.AppliedVersions(conn); err != nil {
+		return
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var version string
+		if err = rows.Scan(&version); err != nil {
+			return
+		}
+		out = append(out, version)
+	}
+	return
+}
+
+// listAvailableVersions extracts the versions from mutation files and formats
+// them to TimeFormat.
+func listAvailableVersions(mutations []Mutation) []string {
+	out := make([]string, len(mutations))
+	for i, mut := range mutations {
+		out[i] = mut.Timestamp().Format(TimeFormat)
+	}
+	return out
+}
+
+func ListVersionsToApply(direction Direction, applied, available []string) (out []string, err error) {
+	if direction == DirUnknown {
+		err = fmt.Errorf("unknown Direction %q", direction)
+		return
+	}
+
+	// Collect versions in 3 "sets". Using empty struct as value because its
+	// storage size is 0 bytes.
+	allVersions := make(map[string]struct{})
+	uniqueToApplied := make(map[string]struct{})
+	for _, version := range applied {
+		uniqueToApplied[version] = struct{}{}
+		allVersions[version] = struct{}{}
+	}
+	uniqueToAvailable := make(map[string]struct{})
+	for _, version := range available {
+		if _, ok := uniqueToApplied[version]; ok {
+			delete(uniqueToApplied, version)
+		} else {
+			uniqueToAvailable[version] = struct{}{}
+			allVersions[version] = struct{}{}
+		}
+	}
+
+	if direction == DirForward {
+		for v := range allVersions {
+			_, isApplied := uniqueToApplied[v]
+			_, isAvailable := uniqueToAvailable[v]
+			if !isApplied && isAvailable {
+				out = append(out, v)
+			}
+		}
+	} else {
+		for v := range allVersions {
+			_, appliedOK := uniqueToApplied[v]
+			_, availableOK := uniqueToAvailable[v]
+			if !appliedOK && !availableOK {
+				out = append(out, v)
+			}
+		}
+	}
+	sort.Strings(out)
+	return
 }
