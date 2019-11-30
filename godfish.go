@@ -225,10 +225,71 @@ func PathToMutationFile(dir string, mut Mutation) (string, error) {
 	return dir + "/" + string(filename), nil
 }
 
-// RunMutation executes a migration against the database. It takes in a database
+// Migrate executes all migrations at path in the specified direction.
+func Migrate(driver Driver, direction Direction, path string) (err error) {
+	var mutations []Mutation
+	var dbHandler *sql.DB
+
+	if mutations, err = ListAllAvailableMutations(direction, path); err != nil {
+		return
+	}
+
+	if dbHandler, err = Connect(driver.Name(), driver.DSNParams()); err != nil {
+		return
+	}
+	for _, mut := range mutations {
+		var relPath string
+		if relPath, err = PathToMutationFile(path, mut); err != nil {
+			return
+		}
+		if err = runMutation(dbHandler, relPath); err != nil {
+			return
+		}
+	}
+	return
+}
+
+func MigrateOne(driver Driver, direction Direction, path, version string) (err error) {
+	if direction == DirUnknown {
+		err = fmt.Errorf("unknown Direction %q", direction)
+		return
+	}
+
+	var baseGlob Filename
+	var filenames []string
+	var mut Mutation
+	var dbHandler *sql.DB
+	var pathToMigrationFile string
+
+	if baseGlob, err = MakeFilename(version, direction, "*"); err != nil {
+		return
+	}
+	if filenames, err = filepath.Glob(path + "/" + string(baseGlob)); err != nil {
+		return
+	} else if len(filenames) == 0 {
+		err = fmt.Errorf("could not find matching files")
+		return
+	} else if len(filenames) > 1 {
+		err = fmt.Errorf("need 1 matching filename; got %v", filenames)
+		return
+	}
+	if mut, err = ParseMutation(Filename(filenames[0])); err != nil {
+		return
+	}
+	if dbHandler, err = Connect(driver.Name(), driver.DSNParams()); err != nil {
+		return
+	}
+	if pathToMigrationFile, err = PathToMutationFile(path, mut); err != nil {
+		return
+	}
+
+	return runMutation(dbHandler, pathToMigrationFile)
+}
+
+// runMutation executes a migration against the database. It takes in a database
 // connection handler and a path to the migration file. The pathToMigrationFile
 // should be relative to your current working directory.
-func RunMutation(db *sql.DB, pathToMigrationFile string) (err error) {
+func runMutation(db *sql.DB, pathToMigrationFile string) (err error) {
 	var file *os.File
 	var info os.FileInfo
 	var rows *sql.Rows
