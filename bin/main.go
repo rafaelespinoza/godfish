@@ -1,11 +1,9 @@
 package main
 
 import (
-	"database/sql"
 	"flag"
 	"fmt"
 	"os"
-	"path/filepath"
 	"sort"
 	"strings"
 
@@ -15,11 +13,12 @@ import (
 // Args describes the CLI inputs.
 type Args struct {
 	Cmd        string
+	Direction  string
+	Driver     string
 	Help       bool
 	Name       string
 	Reversible bool
 	Version    string
-	Direction  string
 }
 
 // argsToCommand is a wrapper function that selects and maps command line inputs
@@ -34,32 +33,55 @@ type command struct {
 
 // commands registers any operation by name to a command.
 var commands = map[string]command{
+	"dump-schema": command{
+		description: "generate a sql file describing the db schema",
+		help: func() (out string) {
+			out = fmt.Sprintf(`
+Usage: dump-schema -driver <driverName>
+	`)
+			return
+		},
+		mapper: func(a Args) error {
+			driver, err := newDriver(a.Driver)
+			if err != nil {
+				return err
+			}
+			godfish.DumpSchema(driver)
+			return nil
+		},
+	},
 	"generate-migration": command{
 		description: "create migration files",
 		help: func() (out string) {
 			out = fmt.Sprintf(`
-Usage: generate-migration -name <name> [-rev]
+Usage: generate-migration -name <name> [-reversible]
 
 	Creates migration files at %s: one meant for the "forward" direction,
 	another meant for "reverse". Optionally create a migration in the forward
-	direction only by passing the flag "-rev=false". The "name" flag has no
-	effects other than on the generated filename. The output filename
+	direction only by passing the flag "-reversible=false". The "name" flag has
+	no effects other than on the generated filename. The output filename
 	automatically has a "version", which is a timestamp in the form: %s.`,
 				pathToDBMigrations, godfish.TimeFormat)
 			return
 		},
 		mapper: func(a Args) error {
-			return generateMigration(a.Name, a.Reversible)
+			dir, err := os.Open(pathToDBMigrations)
+			if err != nil {
+				return err
+			}
+			migration, err := godfish.NewMigration(a.Name, a.Reversible, dir)
+			if err != nil {
+				return err
+			}
+			return migration.GenerateFiles()
 		},
 	},
-	"run-all-migrations": command{
-		description: "execute many migration files at once",
+	"info": command{
+		description: "output current state of migrations",
 		help: func() (out string) {
-			out = `
-Usage: run-all-migrations -dir [forward|reverse]
-
-	Execute several migration files in either forward or reverse directions.
-	Specify the direction using the "dir" flag.`
+			out = fmt.Sprintf(`
+Usage: info -direction [forward|reverse] -driver <driverName>
+			`)
 			return
 		},
 		mapper: func(a Args) error {
@@ -67,27 +89,80 @@ Usage: run-all-migrations -dir [forward|reverse]
 			if strings.HasPrefix(a.Direction, "rev") || strings.HasPrefix(a.Direction, "back") {
 				direction = godfish.DirReverse
 			}
-			return runAllMigrations(direction, "", "")
+			driver, err := newDriver(a.Driver)
+			if err != nil {
+				return err
+			}
+			return godfish.Info(driver, direction, pathToDBMigrations)
 		},
 	},
-	"run-migration": command{
-		description: "execute migration files",
+	"init": command{
+		description: "creates schema migrations table",
 		help: func() (out string) {
 			out = fmt.Sprintf(`
-Usage: run-migration -dir [forward|reverse] -version <timestamp>
+Usage: init -driver <driverName>
 
-	Execute migration files. Specify the migration direction with the "dir"
-	flag, which is "forward" by default. The "version" flag is used to specify
-	which migration to run. It should be a timestamp in the form: %s.`,
+Creates the db table to track migrations, unless it already exists.`)
+			return
+		},
+		mapper: func(a Args) error {
+			driver, err := newDriver(a.Driver)
+			if err != nil {
+				return err
+			}
+			return godfish.CreateSchemaMigrationsTable(driver)
+		},
+	},
+	"run-all": command{
+		description: "execute all migration files",
+		help: func() (out string) {
+			out = `
+Usage: run-all -direction [forward|reverse] -driver <driverName>
+
+	Execute all migration files in either forward or reverse directions.
+	Specify the direction using the "direction" flag.`
+			return
+		},
+		mapper: func(a Args) error {
+			driver, err := newDriver(a.Driver)
+			if err != nil {
+				return err
+			}
+			direction := godfish.DirForward
+			if strings.HasPrefix(a.Direction, "rev") || strings.HasPrefix(a.Direction, "back") {
+				direction = godfish.DirReverse
+			}
+			return godfish.Migrate(driver, direction, pathToDBMigrations)
+		},
+	},
+	"run-one": command{
+		description: "execute one migration",
+		help: func() (out string) {
+			out = fmt.Sprintf(`
+Usage: run-one -direction [forward|reverse] -driver <driverName> -version <timestamp>
+
+	Execute just one migration file. Specify the migration direction with the
+	"direction" flag, which is "forward" by default. The "version" flag is used
+	to specify which migration to run. It should be a timestamp in the form:
+	%s.`,
 				godfish.TimeFormat)
 			return
 		},
 		mapper: func(a Args) error {
+			driver, err := newDriver(a.Driver)
+			if err != nil {
+				return err
+			}
 			direction := godfish.DirForward
 			if strings.HasPrefix(a.Direction, "rev") || strings.HasPrefix(a.Direction, "back") {
 				direction = godfish.DirReverse
 			}
-			return runMigration(a.Version, direction)
+			return godfish.MigrateOne(
+				driver,
+				direction,
+				pathToDBMigrations,
+				args.Version,
+			)
 		},
 	},
 }
@@ -110,7 +185,7 @@ func init() {
 		}
 		sort.Strings(cmds)
 		fmt.Fprintf(
-			flag.CommandLine.Output(), `Usage: %s <command> [arguments]
+			flag.CommandLine.Output(), `Usage: %s -cmd command [arguments]
 
 Commands:
 
@@ -134,6 +209,7 @@ Commands:
 		"forward",
 		"direction of migration to run. [forward | reverse]",
 	)
+	flag.StringVar(&args.Driver, "driver", "", "name of database driver, ie: postgres, mysql")
 	flag.BoolVar(&args.Reversible, "reversible", true, "generate a reversible migration?")
 	flag.BoolVar(&args.Help, "h", false, "show help menu")
 	flag.BoolVar(&args.Help, "help", false, "show help menu")
@@ -160,107 +236,18 @@ func main() {
 	}
 }
 
-func generateMigration(name string, reversible bool) error {
-	dir, err := os.Open(pathToDBMigrations)
-	if err != nil {
-		return err
-	}
-	migration, err := godfish.NewMigration(name, reversible, dir)
-	if err != nil {
-		return err
-	}
-	return migration.GenerateFiles()
-}
-
-func runAllMigrations(direction godfish.Direction, versionLo, versionHi string) (err error) {
-	// get all filenames in db migration path that match direction, sort them.
-	var fileDir *os.File
-	var filenames []string
-	var mutations []godfish.Mutation
-	var dbHandler *sql.DB
-
-	if fileDir, err = os.Open(pathToDBMigrations); err != nil {
-		return
-	}
-	defer fileDir.Close()
-	if filenames, err = fileDir.Readdirnames(0); err != nil {
-		return
-	}
-	fmt.Printf("filenames: %#v\n", filenames)
-	for _, filename := range filenames {
-		var mut godfish.Mutation
-		if mut, err = godfish.ParseMutation(godfish.Filename(filename)); err != nil {
-			return
-		}
-		if mut.Direction() != direction {
-			continue
-		}
-		// TODO: make use of the versionLo, versionHi parameters to only run
-		// migrations in a selected datetime range.
-		mutations = append(mutations, mut)
-	}
-	if dbHandler, err = connectToDB(); err != nil {
-		return
-	}
-	for _, mut := range mutations {
-		var relPath string
-		if relPath, err = godfish.PathToMutationFile(pathToDBMigrations, mut); err != nil {
-			return
-		}
-		if err = godfish.RunMutation(dbHandler, relPath); err != nil {
-			return
-		}
-	}
-
-	return
-}
-
-func runMigration(version string, direction godfish.Direction) (err error) {
-	var baseGlob godfish.Filename
-	var filenames []string
-	var mut godfish.Mutation
-	var dbHandler *sql.DB
-	var pathToMigrationFile string
-
-	if direction == godfish.DirUnknown {
-		err = fmt.Errorf("unknown direction")
-		return
-	}
-
-	if baseGlob, err = godfish.MakeFilename(version, direction, "*"); err != nil {
-		return
-	}
-	if filenames, err = filepath.Glob(pathToDBMigrations + "/" + string(baseGlob)); err != nil {
-		return
-	} else if len(filenames) == 0 {
-		err = fmt.Errorf("could not find matching files")
-		return
-	} else if len(filenames) > 1 {
-		err = fmt.Errorf("need 1 matching filename; got %v", filenames)
-		return
-	}
-	if mut, err = godfish.ParseMutation(godfish.Filename(filenames[0])); err != nil {
-		return
-	}
-	if dbHandler, err = connectToDB(); err != nil {
-		return
-	}
-	if pathToMigrationFile, err = godfish.PathToMutationFile(pathToDBMigrations, mut); err != nil {
-		return
-	}
-	return godfish.RunMutation(dbHandler, pathToMigrationFile)
-}
-
-func connectToDB() (dbHandler *sql.DB, err error) {
-	dbHandler, err = godfish.Connect(
-		"postgres",
-		godfish.PGParams{
+func newDriver(driverName string) (driver godfish.Driver, err error) {
+	switch driverName {
+	case "postgres":
+		driver, err = godfish.NewDriver(driverName, godfish.PGParams{
 			Encoding: "UTF8",
 			Host:     "localhost",
 			Name:     os.Getenv("DB_NAME"),
 			Pass:     os.Getenv("DB_PASSWORD"),
 			Port:     "5432",
-		},
-	)
+		})
+	default:
+		err = fmt.Errorf("unsupported db driver %q", driverName)
+	}
 	return
 }
