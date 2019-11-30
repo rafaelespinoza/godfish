@@ -30,9 +30,8 @@ func (p PGParams) String() string {
 }
 
 type Postgres struct {
-	migrationConf MigrationsConf
-	connParams    PGParams
-	name          string
+	MigrationsConf MigrationsConf
+	connParams     PGParams
 }
 
 var _ Driver = (*Postgres)(nil)
@@ -43,11 +42,7 @@ func NewPostgres() (Driver, error) {
 		port = p
 	}
 	driver := Postgres{
-		migrationConf: MigrationsConf{
-			Table:       "schema_migrations",
-			IDColumn:    "migration_id",
-			PathToFiles: "db/migrations",
-		},
+		MigrationsConf: MigrationsConf{"db/migrations"},
 		connParams: PGParams{
 			Encoding: "UTF8",
 			Host:     "localhost",
@@ -63,16 +58,11 @@ func (d *Postgres) Name() string         { return "postgres" }
 func (d *Postgres) DSNParams() DSNParams { return d.connParams }
 
 func (d *Postgres) CreateSchemaMigrationsTable(conn *sql.DB) (err error) {
-	// Cannot use arguments as identifiers in postgres, so we must use golang to
-	// generate a query string before sending it to the DB connection. This is
-	// normally not something we want to do b/c the sql library will escape
-	// inputs when using the (query, ...args) form of Query, Exec, etc.
-	q := fmt.Sprintf(
-		"CREATE TABLE IF NOT EXISTS %s (%s VARCHAR(128) PRIMARY KEY NOT NULL)",
-		d.migrationConf.Table,
-		d.migrationConf.IDColumn,
+	_, err = conn.Query(
+		`CREATE TABLE IF NOT EXISTS schema_migrations (
+			migration_id VARCHAR(128) PRIMARY KEY NOT NULL
+		)`,
 	)
-	_, err = conn.Query(q)
 	return
 }
 
@@ -107,16 +97,12 @@ func (d *Postgres) ApplyMigration(conn *sql.DB, version string, dir Direction) (
 
 	if dir == DirForward {
 		_, err = conn.Exec(
-			`INSERT INTO "$1" ($2) VALUES $3`,
-			d.migrationConf.Table,
-			d.migrationConf.IDColumn,
+			`INSERT INTO "schema_migrations" ("migration_id") VALUES '$1'`,
 			version,
 		)
 	} else {
 		_, err = conn.Exec(
-			`DELETE FROM "$1" WHERE "$2" = '$3'`,
-			d.migrationConf.Table,
-			d.migrationConf.IDColumn,
+			`DELETE FROM "schema_migrations" WHERE "migration_id" = '$1'`,
 			version,
 		)
 	}

@@ -282,8 +282,6 @@ func MakeDriver(driverName string) (driver Driver, err error) {
 }
 
 type MigrationsConf struct {
-	Table       string
-	IDColumn    string
 	PathToFiles string
 }
 
