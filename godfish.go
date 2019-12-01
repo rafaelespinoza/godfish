@@ -226,11 +226,11 @@ func PathToMutationFile(dir string, mut Mutation) (string, error) {
 }
 
 // Migrate executes all migrations at path in the specified direction.
-func Migrate(driver Driver, direction Direction, path string) (err error) {
+func Migrate(driver Driver, direction Direction, directoryPath string) (err error) {
 	var mutations []Mutation
 	var dbHandler *sql.DB
 
-	if mutations, err = ListAllAvailableMutations(direction, path); err != nil {
+	if mutations, err = ListAllAvailableMutations(direction, directoryPath); err != nil {
 		return
 	}
 
@@ -238,18 +238,18 @@ func Migrate(driver Driver, direction Direction, path string) (err error) {
 		return
 	}
 	for _, mut := range mutations {
-		var relPath string
-		if relPath, err = PathToMutationFile(path, mut); err != nil {
+		var pathToMigrationFile string
+		if pathToMigrationFile, err = PathToMutationFile(directoryPath, mut); err != nil {
 			return
 		}
-		if err = runMutation(dbHandler, relPath); err != nil {
+		if err = runMutation(dbHandler, pathToMigrationFile); err != nil {
 			return
 		}
 	}
 	return
 }
 
-func MigrateOne(driver Driver, direction Direction, path, version string) (err error) {
+func MigrateOne(driver Driver, direction Direction, directoryPath, version string) (err error) {
 	if direction == DirUnknown {
 		err = fmt.Errorf("unknown Direction %q", direction)
 		return
@@ -264,7 +264,7 @@ func MigrateOne(driver Driver, direction Direction, path, version string) (err e
 	if baseGlob, err = MakeFilename(version, direction, "*"); err != nil {
 		return
 	}
-	if filenames, err = filepath.Glob(path + "/" + string(baseGlob)); err != nil {
+	if filenames, err = filepath.Glob(directoryPath + "/" + string(baseGlob)); err != nil {
 		return
 	} else if len(filenames) == 0 {
 		err = fmt.Errorf("could not find matching files")
@@ -279,7 +279,7 @@ func MigrateOne(driver Driver, direction Direction, path, version string) (err e
 	if dbHandler, err = Connect(driver.Name(), driver.DSNParams()); err != nil {
 		return
 	}
-	if pathToMigrationFile, err = PathToMutationFile(path, mut); err != nil {
+	if pathToMigrationFile, err = PathToMutationFile(directoryPath, mut); err != nil {
 		return
 	}
 
@@ -332,10 +332,15 @@ type Driver interface {
 	ApplyMigration(conn *sql.DB, version string, dir Direction) error
 }
 
-func MakeDriver(driverName string) (driver Driver, err error) {
+func NewDriver(driverName string, dsnParams DSNParams) (driver Driver, err error) {
 	switch driverName {
 	case "postgres":
-		driver, err = NewPostgres()
+		params, ok := dsnParams.(PGParams)
+		if !ok {
+			err = fmt.Errorf("dsnParams should be a PGParams, got %T", params)
+		} else {
+			driver, err = NewPostgres(params)
+		}
 	default:
 		err = fmt.Errorf("unknown driver %q", driverName)
 	}
@@ -362,14 +367,14 @@ func DumpSchema(driver Driver) error {
 func Info(driver Driver, direction Direction, path string) (err error) {
 	var muts []Mutation
 	var appliedVersions, availableVersions, versionsToApply []string
-	if muts, err = AllAvailableMutations(direction, path); err != nil {
+	if muts, err = ListAllAvailableMutations(direction, path); err != nil {
 		return
 	}
 	fmt.Println("-- all available mutations")
 	for _, mut := range muts {
 		fmt.Printf("%#v\n", mut)
 	}
-	if appliedVersions, err = listAppliedVersions(driver); err != nil {
+	if appliedVersions, err = ListAppliedVersions(driver); err != nil {
 		return
 	}
 	fmt.Println("-- applied versions")
@@ -395,9 +400,9 @@ func Info(driver Driver, direction Direction, path string) (err error) {
 	return
 }
 
-// AllAvailableMutations returns a list of Mutation values at path in a
+// ListAllAvailableMutations returns a list of Mutation values at path in a
 // specified direction.
-func AllAvailableMutations(direction Direction, path string) (out []Mutation, err error) {
+func ListAllAvailableMutations(direction Direction, path string) (out []Mutation, err error) {
 	if direction == DirUnknown {
 		err = fmt.Errorf("unknown Direction %q", direction)
 		return
@@ -425,7 +430,7 @@ func AllAvailableMutations(direction Direction, path string) (out []Mutation, er
 	return
 }
 
-func listAppliedVersions(driver Driver) (out []string, err error) {
+func ListAppliedVersions(driver Driver) (out []string, err error) {
 	var conn *sql.DB
 	var rows *sql.Rows
 	if conn, err = Connect(driver.Name(), driver.DSNParams()); err != nil {

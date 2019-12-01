@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
-	"os"
 	"os/exec"
 )
 
@@ -36,20 +35,13 @@ type Postgres struct {
 
 var _ Driver = (*Postgres)(nil)
 
-func NewPostgres() (Driver, error) {
-	port := "5432"
-	if p := os.Getenv("DB_PORT"); p != "" {
-		port = p
+func NewPostgres(connParams PGParams) (Driver, error) {
+	if connParams.Port == "" {
+		connParams.Port = "5432"
 	}
 	driver := Postgres{
 		MigrationsConf: MigrationsConf{"db/migrations"},
-		connParams: PGParams{
-			Encoding: "UTF8",
-			Host:     "localhost",
-			Name:     os.Getenv("DB_NAME"),
-			Pass:     os.Getenv("DB_PASSWORD"),
-			Port:     port,
-		},
+		connParams:     connParams,
 	}
 	return &driver, nil
 }
