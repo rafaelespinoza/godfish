@@ -72,7 +72,7 @@ func MakeFilename(version string, direction Direction, name string) (Filename, e
 	return Filename(head + dir + tail), nil
 }
 
-func ParseMutation(filename Filename) (mut Mutation, err error) {
+func ParseMigration(filename Filename) (mig Migration, err error) {
 	var ts time.Time
 	var dir Direction
 	base := filepath.Base(string(filename))
@@ -91,97 +91,102 @@ func ParseMutation(filename Filename) (mut Mutation, err error) {
 		return
 	}
 
-	mut, err = NewModification(ts, dir, parts[2])
+	mig, err = NewMutation(ts, dir, parts[2])
 	return
 }
 
-// A Mutation is a database change with a direction name and timestamp.
-// Typically, a Mutation with a DirForward Direction is paired with another
+// A Migration is a database change with a direction name and timestamp.
+// Typically, a Migration with a DirForward Direction is paired with another
 // migration of DirReverse that has the same name.
-type Mutation interface {
+type Migration interface {
 	Direction() Direction
 	Name() string
 	Timestamp() time.Time
 }
 
-// Modification implements the Mutation interface.
-type Modification struct {
+// Mutation implements the Migration interface.
+type Mutation struct {
 	direction Direction
 	name      string
 	timestamp time.Time
 }
 
-var _ Mutation = (*Modification)(nil)
+var _ Migration = (*Mutation)(nil)
 
-// NewModification constructs a Modification and returns a pointer. Its internal
+// NewMutation constructs a Mutation and returns a pointer. Its internal
 // timestamp field is set to UTC.
-func NewModification(ts time.Time, dir Direction, name string) (*Modification, error) {
+func NewMutation(ts time.Time, dir Direction, name string) (*Mutation, error) {
 	if dir == DirUnknown {
 		return nil, fmt.Errorf("cannot have unknown direction")
 	}
-	return &Modification{
+	return &Mutation{
 		direction: dir,
 		name:      name,
 		timestamp: ts.UTC(),
 	}, nil
 }
 
-func (m *Modification) Direction() Direction { return m.direction }
-func (m *Modification) Name() string         { return m.name }
-func (m *Modification) Timestamp() time.Time { return m.timestamp }
+func (m *Mutation) Direction() Direction { return m.direction }
+func (m *Mutation) Name() string         { return m.name }
+func (m *Mutation) Timestamp() time.Time { return m.timestamp }
 
-// A Migration composes database changes in forward and reverse directions.
-// Setting Reversible to true will generate a migration file for each direction.
-// Otherwise, it only generates a file in the forward direction.
-type Migration struct {
-	Forward    Mutation
-	Reverse    Mutation
+// MigrationParams collects inputs needed to generate migration files. Setting
+// Reversible to true will generate a migration file for each direction.
+// Otherwise, it only generates a file in the forward direction. The Directory
+// field refers to the path to the directory with the migration files.
+type MigrationParams struct {
+	Forward    Migration
+	Reverse    Migration
 	Reversible bool
-	Dir        *os.File
+	Directory  *os.File
 }
 
-// NewMigration constructs a Migration value that's ready to use.
-func NewMigration(name string, reversible bool, dir *os.File) (*Migration, error) {
-	var out Migration
+// NewMigrationParams constructs a MigrationParams that's ready to use. Passing
+// in true for reversible means that a complementary SQL file will be made for
+// rolling back. The directory parameter specifies which directory to output the
+// files to.
+func NewMigrationParams(name string, reversible bool, directory *os.File) (*MigrationParams, error) {
+	var out MigrationParams
 	var err error
 	var info os.FileInfo
-	if dir == nil {
-		if dir, err = os.Open(DefaultMigrationFileDirectory); err != nil {
+	if directory == nil {
+		if directory, err = os.Open(DefaultMigrationFileDirectory); err != nil {
 			return nil, err
 		}
 	}
-	if info, err = dir.Stat(); err != nil {
+	if info, err = directory.Stat(); err != nil {
 		return nil, err
 	} else if !info.IsDir() {
 		return nil, fmt.Errorf("input dir %q should be a directory", info.Name())
 	}
-	out.Dir = dir
+	out.Directory = directory
 
 	out.Reversible = reversible
 	timestamp := time.Now()
-	var mod *Modification
-	if mod, err = NewModification(timestamp, DirForward, name); err != nil {
+	var mut *Mutation
+	if mut, err = NewMutation(timestamp, DirForward, name); err != nil {
 		return nil, err
 	}
-	out.Forward = mod
-	if mod, err = NewModification(timestamp, DirReverse, name); err != nil {
+	out.Forward = mut
+	if mut, err = NewMutation(timestamp, DirReverse, name); err != nil {
 		return nil, err
 	}
-	out.Reverse = mod
+	out.Reverse = mut
 	return &out, nil
 }
 
-// GenerateFiles creates the forward and reverse migration files if the
-// migration is reversible, otherwise is generates just one migration file in
-// the forward direction. It closes each file handle when it's done.
-func (m *Migration) GenerateFiles() (err error) {
+// GenerateFiles creates the migration files. If the migration is reversible it
+// generates files in forward and reverse directions; otherwise is generates
+// just one migration file in the forward direction. It closes each file handle
+// when it's done.
+func (m *MigrationParams) GenerateFiles() (err error) {
 	var forwardFile, reverseFile *os.File
 	defer func() {
 		forwardFile.Close()
 		reverseFile.Close()
 	}()
-	baseDir := m.Dir.Name()
-	if forwardFile, err = newMutationFile(m.Forward, baseDir); err != nil {
+	baseDir := m.Directory.Name()
+	if forwardFile, err = newMigrationFile(m.Forward, baseDir); err != nil {
 		return
 	}
 	log.Println("created forward file, ", forwardFile.Name())
@@ -189,24 +194,24 @@ func (m *Migration) GenerateFiles() (err error) {
 		log.Println("migration marked irreversible, did not create reverse file")
 		return
 	}
-	if reverseFile, err = newMutationFile(m.Reverse, baseDir); err != nil {
+	if reverseFile, err = newMigrationFile(m.Reverse, baseDir); err != nil {
 		return
 	}
 	log.Println("created reverse file, ", reverseFile.Name())
 	return
 }
 
-func newMutationFile(m Mutation, baseDir string) (*os.File, error) {
-	filename, err := MakeMutationFilename(m)
+func newMigrationFile(m Migration, baseDir string) (*os.File, error) {
+	filename, err := MakeMigrationFilename(m)
 	if err != nil {
 		return nil, err
 	}
 	return os.Create(baseDir + "/" + string(filename))
 }
 
-// MakeMutationFilename passes in a Mutation's fields to create a Filename. An
-// error could be returned if mut is found to be an unsuitable Filename.
-func MakeMutationFilename(m Mutation) (Filename, error) {
+// MakeMigrationFilename passes in a Migration's fields to create a Filename. An
+// error could be returned if m is found to be an unsuitable Filename.
+func MakeMigrationFilename(m Migration) (Filename, error) {
 	return MakeFilename(
 		m.Timestamp().Format(TimeFormat),
 		m.Direction(),
@@ -214,11 +219,11 @@ func MakeMutationFilename(m Mutation) (Filename, error) {
 	)
 }
 
-// PathToMutationFile is a convenience function for prepending a directory path
-// to the base filename of a mutation. An error could be returned if the
-// Mutation's fields are unsuitable for a Filename.
-func PathToMutationFile(dir string, mut Mutation) (string, error) {
-	filename, err := MakeMutationFilename(mut)
+// PathToMigrationFile is a convenience function for prepending a directory path
+// to the base filename of a migration. An error could be returned if the
+// Migration's fields are unsuitable for a Filename.
+func PathToMigrationFile(dir string, mig Migration) (string, error) {
+	filename, err := MakeMigrationFilename(mig)
 	if err != nil {
 		return "", err
 	}
@@ -230,9 +235,9 @@ var (
 	maxVersion = time.Date(9999, 12, 31, 23, 59, 59, 0, time.UTC).Format(TimeFormat)
 )
 
-// Migrate executes all migrations at path in the specified direction.
+// Migrate executes all migrations at directoryPath in the specified direction.
 func Migrate(driver Driver, direction Direction, directoryPath string) (err error) {
-	var mutations []Mutation
+	var migrations []Migration
 	var dbHandler *sql.DB
 	var finishAtVersion string
 	if direction == DirForward {
@@ -241,26 +246,26 @@ func Migrate(driver Driver, direction Direction, directoryPath string) (err erro
 		finishAtVersion = minVersion
 	}
 
-	if mutations, err = ListAllAvailableMutations(direction, directoryPath, finishAtVersion); err != nil {
+	if migrations, err = ListAllAvailableMigrations(direction, directoryPath, finishAtVersion); err != nil {
 		return
 	}
 
 	if dbHandler, err = Connect(driver.Name(), driver.DSNParams()); err != nil {
 		return
 	}
-	for _, mut := range mutations {
-		var pathToMigrationFile string
-		if pathToMigrationFile, err = PathToMutationFile(directoryPath, mut); err != nil {
+	for _, mig := range migrations {
+		var pathToFile string
+		if pathToFile, err = PathToMigrationFile(directoryPath, mig); err != nil {
 			return
 		}
-		if err = runMutation(dbHandler, driver, pathToMigrationFile, mut); err != nil {
+		if err = runMigration(dbHandler, driver, pathToFile, mig); err != nil {
 			return
 		}
 	}
 	return
 }
 
-func MigrateOne(driver Driver, direction Direction, directoryPath, version string) (err error) {
+func ApplyMigration(driver Driver, direction Direction, directoryPath, version string) (err error) {
 	if direction == DirUnknown {
 		err = fmt.Errorf("unknown Direction %q", direction)
 		return
@@ -268,9 +273,9 @@ func MigrateOne(driver Driver, direction Direction, directoryPath, version strin
 
 	var baseGlob Filename
 	var filenames []string
-	var mut Mutation
+	var mig Migration
 	var dbHandler *sql.DB
-	var pathToMigrationFile string
+	var pathToFile string
 
 	if baseGlob, err = MakeFilename(version, direction, "*"); err != nil {
 		return
@@ -284,26 +289,26 @@ func MigrateOne(driver Driver, direction Direction, directoryPath, version strin
 		err = fmt.Errorf("need 1 matching filename; got %v", filenames)
 		return
 	}
-	if mut, err = ParseMutation(Filename(filenames[0])); err != nil {
+	if mig, err = ParseMigration(Filename(filenames[0])); err != nil {
 		return
 	}
 	if dbHandler, err = Connect(driver.Name(), driver.DSNParams()); err != nil {
 		return
 	}
-	if pathToMigrationFile, err = PathToMutationFile(directoryPath, mut); err != nil {
+	if pathToFile, err = PathToMigrationFile(directoryPath, mig); err != nil {
 		return
 	}
-	err = runMutation(dbHandler, driver, pathToMigrationFile, mut)
+	err = runMigration(dbHandler, driver, pathToFile, mig)
 	return
 }
 
-// runMutation executes a migration against the database. The input,
-// pathToMigrationFile should be relative to the current working directory.
-func runMutation(conn *sql.DB, driver Driver, pathToMigrationFile string, mut Mutation) (err error) {
+// runMigration executes a migration against the database. The input, pathToFile
+// should be relative to the current working directory.
+func runMigration(conn *sql.DB, driver Driver, pathToFile string, mig Migration) (err error) {
 	var file *os.File
 	var info os.FileInfo
 	defer file.Close()
-	if file, err = os.Open(pathToMigrationFile); err != nil {
+	if file, err = os.Open(pathToFile); err != nil {
 		return
 	}
 	if info, err = file.Stat(); err != nil {
@@ -321,8 +326,8 @@ func runMutation(conn *sql.DB, driver Driver, pathToMigrationFile string, mut Mu
 	}
 	err = driver.UpdateSchemaMigrations(
 		conn,
-		mut.Direction(),
-		mut.Timestamp().Format(TimeFormat),
+		mig.Direction(),
+		mig.Timestamp().Format(TimeFormat),
 	)
 	return
 }
@@ -332,18 +337,23 @@ func Connect(driverName string, dsnParams DSNParams) (db *sql.DB, err error) {
 	return
 }
 
-// DSNParams describes a type which generates a data source name (in other
-// words, a connection URL) for connecting to a database. The output will be
-// passed to the standard library's sql.Open method to connect to a database.
+// DSNParams describes a type which generates a data source name for connecting
+// to a database. The output will be passed to the standard library's sql.Open
+// method to connect to a database.
 type DSNParams interface {
 	String() string
 }
 
+// A Driver describes what a database driver (anything at
+// https://github.com/golang/go/wiki/SQLDrivers) should be able to do.
 type Driver interface {
+	// Name should return the name of driver: ie: postgres, mysql, etc
 	Name() string
 	DSNParams() DSNParams
 	CreateSchemaMigrationsTable(conn *sql.DB) error
 	DumpSchema() error
+	// AppliedVersions returns a list of migration versions that have been
+	// executed against your database.
 	AppliedVersions(conn *sql.DB) (*sql.Rows, error)
 	UpdateSchemaMigrations(conn *sql.DB, dir Direction, version string) error
 }
@@ -381,7 +391,7 @@ func DumpSchema(driver Driver) error {
 
 // Info displays the outputs of various helper functions.
 func Info(driver Driver, direction Direction, path string) (err error) {
-	var muts []Mutation
+	var migs []Migration
 	var appliedVersions, availableVersions, versionsToApply []string
 	var finishAtVersion string
 	if direction == DirForward {
@@ -390,12 +400,12 @@ func Info(driver Driver, direction Direction, path string) (err error) {
 		finishAtVersion = minVersion
 	}
 
-	if muts, err = ListAllAvailableMutations(direction, path, finishAtVersion); err != nil {
+	if migs, err = ListAllAvailableMigrations(direction, path, finishAtVersion); err != nil {
 		return
 	}
-	fmt.Println("-- all available mutations")
-	for _, mut := range muts {
-		fmt.Printf("%#v\n", mut)
+	fmt.Println("-- all available migrations")
+	for _, mig := range migs {
+		fmt.Printf("%#v\n", mig)
 	}
 	if appliedVersions, err = ListAppliedVersions(driver); err != nil {
 		return
@@ -404,7 +414,7 @@ func Info(driver Driver, direction Direction, path string) (err error) {
 	for _, version := range appliedVersions {
 		fmt.Println(version)
 	}
-	availableVersions = listAvailableVersions(muts)
+	availableVersions = listAvailableVersions(migs)
 	fmt.Println("-- available versions")
 	for _, version := range availableVersions {
 		fmt.Println(version)
@@ -423,9 +433,9 @@ func Info(driver Driver, direction Direction, path string) (err error) {
 	return
 }
 
-// ListAllAvailableMutations returns a list of Mutation values at path in a
+// ListAllAvailableMigrations returns a list of Migration values at path in a
 // specified direction.
-func ListAllAvailableMutations(direction Direction, path, finishAtVersion string) (out []Mutation, err error) {
+func ListAllAvailableMigrations(direction Direction, path, finishAtVersion string) (out []Migration, err error) {
 	if direction == DirUnknown {
 		err = fmt.Errorf("unknown Direction %q", direction)
 		return
@@ -445,21 +455,21 @@ func ListAllAvailableMutations(direction Direction, path, finishAtVersion string
 		return
 	}
 	for _, filename := range filenames {
-		var mut Mutation
-		if mut, err = ParseMutation(Filename(filename)); err != nil {
+		var mig Migration
+		if mig, err = ParseMigration(Filename(filename)); err != nil {
 			return
 		}
-		dir := mut.Direction()
+		dir := mig.Direction()
 		if dir != direction {
 			continue
 		}
-		timestamp := mut.Timestamp()
+		timestamp := mig.Timestamp()
 		if dir == DirForward && timestamp.After(finish) {
 			continue
 		} else if dir == DirReverse && timestamp.Before(finish) {
 			continue
 		}
-		out = append(out, mut)
+		out = append(out, mig)
 	}
 	return
 }
@@ -484,12 +494,12 @@ func ListAppliedVersions(driver Driver) (out []string, err error) {
 	return
 }
 
-// listAvailableVersions extracts the versions from mutation files and formats
+// listAvailableVersions extracts the versions from migration files and formats
 // them to TimeFormat.
-func listAvailableVersions(mutations []Mutation) []string {
-	out := make([]string, len(mutations))
-	for i, mut := range mutations {
-		out[i] = mut.Timestamp().Format(TimeFormat)
+func listAvailableVersions(migrations []Migration) []string {
+	out := make([]string, len(migrations))
+	for i, mig := range migrations {
+		out[i] = mig.Timestamp().Format(TimeFormat)
 	}
 	return out
 }

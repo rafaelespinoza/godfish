@@ -28,6 +28,7 @@ func (p PGParams) String() string {
 	)
 }
 
+// Postgres implements the Driver interface for postgres databases.
 type Postgres struct {
 	MigrationsConf MigrationsConf
 	connParams     PGParams
@@ -35,7 +36,7 @@ type Postgres struct {
 
 var _ Driver = (*Postgres)(nil)
 
-func NewPostgres(connParams PGParams) (Driver, error) {
+func NewPostgres(connParams PGParams) (*Postgres, error) {
 	if connParams.Port == "" {
 		connParams.Port = "5432"
 	}
