@@ -225,12 +225,23 @@ func PathToMutationFile(dir string, mut Mutation) (string, error) {
 	return dir + "/" + string(filename), nil
 }
 
+var (
+	minVersion = time.Date(0, 0, 0, 0, 0, 0, 0, time.UTC).Format(TimeFormat)
+	maxVersion = time.Date(9999, 12, 31, 23, 59, 59, 0, time.UTC).Format(TimeFormat)
+)
+
 // Migrate executes all migrations at path in the specified direction.
 func Migrate(driver Driver, direction Direction, directoryPath string) (err error) {
 	var mutations []Mutation
 	var dbHandler *sql.DB
+	var finishAtVersion string
+	if direction == DirForward {
+		finishAtVersion = maxVersion
+	} else {
+		finishAtVersion = minVersion
+	}
 
-	if mutations, err = ListAllAvailableMutations(direction, directoryPath); err != nil {
+	if mutations, err = ListAllAvailableMutations(direction, directoryPath, finishAtVersion); err != nil {
 		return
 	}
 
@@ -367,7 +378,14 @@ func DumpSchema(driver Driver) error {
 func Info(driver Driver, direction Direction, path string) (err error) {
 	var muts []Mutation
 	var appliedVersions, availableVersions, versionsToApply []string
-	if muts, err = ListAllAvailableMutations(direction, path); err != nil {
+	var finishAtVersion string
+	if direction == DirForward {
+		finishAtVersion = maxVersion
+	} else {
+		finishAtVersion = minVersion
+	}
+
+	if muts, err = ListAllAvailableMutations(direction, path, finishAtVersion); err != nil {
 		return
 	}
 	fmt.Println("-- all available mutations")
@@ -402,13 +420,14 @@ func Info(driver Driver, direction Direction, path string) (err error) {
 
 // ListAllAvailableMutations returns a list of Mutation values at path in a
 // specified direction.
-func ListAllAvailableMutations(direction Direction, path string) (out []Mutation, err error) {
+func ListAllAvailableMutations(direction Direction, path, finishAtVersion string) (out []Mutation, err error) {
 	if direction == DirUnknown {
 		err = fmt.Errorf("unknown Direction %q", direction)
 		return
 	}
 	var fileDir *os.File
 	var filenames []string
+	var finish time.Time
 	if fileDir, err = os.Open(path); err != nil {
 		return
 	}
@@ -417,12 +436,22 @@ func ListAllAvailableMutations(direction Direction, path string) (out []Mutation
 		return
 	}
 	sort.Strings(filenames)
+	if finish, err = time.Parse(finishAtVersion, TimeFormat); err != nil {
+		return
+	}
 	for _, filename := range filenames {
 		var mut Mutation
 		if mut, err = ParseMutation(Filename(filename)); err != nil {
 			return
 		}
-		if mut.Direction() != direction {
+		dir := mut.Direction()
+		if dir != direction {
+			continue
+		}
+		timestamp := mut.Timestamp()
+		if dir == DirForward && timestamp.After(finish) {
+			continue
+		} else if dir == DirReverse && timestamp.Before(finish) {
 			continue
 		}
 		out = append(out, mut)
