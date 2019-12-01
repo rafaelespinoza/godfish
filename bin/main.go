@@ -69,7 +69,7 @@ Usage: generate-migration -name <name> [-reversible]
 			if err != nil {
 				return err
 			}
-			migration, err := godfish.NewMigration(a.Name, a.Reversible, dir)
+			migration, err := godfish.NewMigrationParams(a.Name, a.Reversible, dir)
 			if err != nil {
 				return err
 			}
@@ -85,14 +85,11 @@ Usage: info -direction [forward|reverse] -driver <driverName>
 			return
 		},
 		mapper: func(a Args) error {
-			direction := godfish.DirForward
-			if strings.HasPrefix(a.Direction, "rev") || strings.HasPrefix(a.Direction, "back") {
-				direction = godfish.DirReverse
-			}
 			driver, err := newDriver(a.Driver)
 			if err != nil {
 				return err
 			}
+			direction := whichDirection(a)
 			return godfish.Info(driver, direction, pathToDBMigrations)
 		},
 	},
@@ -128,10 +125,7 @@ Usage: run-all -direction [forward|reverse] -driver <driverName>
 			if err != nil {
 				return err
 			}
-			direction := godfish.DirForward
-			if strings.HasPrefix(a.Direction, "rev") || strings.HasPrefix(a.Direction, "back") {
-				direction = godfish.DirReverse
-			}
+			direction := whichDirection(a)
 			return godfish.Migrate(driver, direction, pathToDBMigrations)
 		},
 	},
@@ -153,11 +147,8 @@ Usage: run-one -direction [forward|reverse] -driver <driverName> -version <times
 			if err != nil {
 				return err
 			}
-			direction := godfish.DirForward
-			if strings.HasPrefix(a.Direction, "rev") || strings.HasPrefix(a.Direction, "back") {
-				direction = godfish.DirReverse
-			}
-			return godfish.MigrateOne(
+			direction := whichDirection(a)
+			return godfish.ApplyMigration(
 				driver,
 				direction,
 				pathToDBMigrations,
@@ -248,6 +239,15 @@ func newDriver(driverName string) (driver godfish.Driver, err error) {
 		})
 	default:
 		err = fmt.Errorf("unsupported db driver %q", driverName)
+	}
+	return
+}
+
+func whichDirection(a Args) (direction godfish.Direction) {
+	direction = godfish.DirForward
+	d := strings.ToLower(a.Direction)
+	if strings.HasPrefix(d, "rev") || strings.HasPrefix(d, "back") {
+		direction = godfish.DirReverse
 	}
 	return
 }
