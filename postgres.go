@@ -53,8 +53,7 @@ func (d *Postgres) CreateSchemaMigrationsTable(conn *sql.DB) (err error) {
 	_, err = conn.Query(
 		`CREATE TABLE IF NOT EXISTS schema_migrations (
 			migration_id VARCHAR(128) PRIMARY KEY NOT NULL
-		)`,
-	)
+		)`)
 	return
 }
 
@@ -82,19 +81,19 @@ func (d *Postgres) AppliedVersions(conn *sql.DB) (rows *sql.Rows, err error) {
 	return
 }
 
-func (d *Postgres) ApplyMigration(conn *sql.DB, version string, dir Direction) (err error) {
-	if _, err = conn.Exec(""); err != nil { // TODO: put in contents of migration
-		return
-	}
-
+func (d *Postgres) UpdateSchemaMigrations(conn *sql.DB, dir Direction, version string) (err error) {
 	if dir == DirForward {
-		_, err = conn.Exec(
-			`INSERT INTO "schema_migrations" ("migration_id") VALUES '$1'`,
+		_, err = conn.Exec(`
+			INSERT INTO schema_migrations (migration_id)
+			VALUES ($1)
+			RETURNING migration_id`,
 			version,
 		)
 	} else {
-		_, err = conn.Exec(
-			`DELETE FROM "schema_migrations" WHERE "migration_id" = '$1'`,
+		_, err = conn.Exec(`
+			DELETE FROM schema_migrations
+			WHERE migration_id = $1
+			RETURNING migration_id`,
 			version,
 		)
 	}

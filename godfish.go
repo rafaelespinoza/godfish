@@ -253,7 +253,7 @@ func Migrate(driver Driver, direction Direction, directoryPath string) (err erro
 		if pathToMigrationFile, err = PathToMutationFile(directoryPath, mut); err != nil {
 			return
 		}
-		if err = runMutation(dbHandler, pathToMigrationFile); err != nil {
+		if err = runMutation(dbHandler, driver, pathToMigrationFile, mut); err != nil {
 			return
 		}
 	}
@@ -293,17 +293,15 @@ func MigrateOne(driver Driver, direction Direction, directoryPath, version strin
 	if pathToMigrationFile, err = PathToMutationFile(directoryPath, mut); err != nil {
 		return
 	}
-
-	return runMutation(dbHandler, pathToMigrationFile)
+	err = runMutation(dbHandler, driver, pathToMigrationFile, mut)
+	return
 }
 
-// runMutation executes a migration against the database. It takes in a database
-// connection handler and a path to the migration file. The pathToMigrationFile
-// should be relative to your current working directory.
-func runMutation(db *sql.DB, pathToMigrationFile string) (err error) {
+// runMutation executes a migration against the database. The input,
+// pathToMigrationFile should be relative to the current working directory.
+func runMutation(conn *sql.DB, driver Driver, pathToMigrationFile string, mut Mutation) (err error) {
 	var file *os.File
 	var info os.FileInfo
-	var rows *sql.Rows
 	defer file.Close()
 	if file, err = os.Open(pathToMigrationFile); err != nil {
 		return
@@ -315,11 +313,18 @@ func runMutation(db *sql.DB, pathToMigrationFile string) (err error) {
 	if _, err = file.Read(data); err != nil {
 		return
 	}
-	if rows, err = db.Query(string(data)); err != nil {
+	if _, err = conn.Query(string(data)); err != nil {
 		return
 	}
-	log.Printf("%v\n", rows)
-	return nil
+	if err = driver.CreateSchemaMigrationsTable(conn); err != nil {
+		return
+	}
+	err = driver.UpdateSchemaMigrations(
+		conn,
+		mut.Direction(),
+		mut.Timestamp().Format(TimeFormat),
+	)
+	return
 }
 
 func Connect(driverName string, dsnParams DSNParams) (db *sql.DB, err error) {
@@ -340,7 +345,7 @@ type Driver interface {
 	CreateSchemaMigrationsTable(conn *sql.DB) error
 	DumpSchema() error
 	AppliedVersions(conn *sql.DB) (*sql.Rows, error)
-	ApplyMigration(conn *sql.DB, version string, dir Direction) error
+	UpdateSchemaMigrations(conn *sql.DB, dir Direction, version string) error
 }
 
 func NewDriver(driverName string, dsnParams DSNParams) (driver Driver, err error) {
