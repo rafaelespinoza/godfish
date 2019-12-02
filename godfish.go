@@ -104,6 +104,16 @@ type Migration interface {
 	Timestamp() time.Time
 }
 
+// Basename generates a migration file's basename. The output format is:
+// "2006010215040506.${direction}.${name}.sql".
+func Basename(mig Migration) (string, error) {
+	out, err := makeMigrationFilename(mig)
+	if err != nil {
+		return "", err
+	}
+	return string(out), nil
+}
+
 // mutation implements the Migration interface.
 type mutation struct {
 	direction Direction
