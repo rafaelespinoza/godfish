@@ -231,7 +231,7 @@ func pathToMigrationFile(dir string, mig Migration) (string, error) {
 }
 
 var (
-	minVersion = time.Date(0, 0, 0, 0, 0, 0, 0, time.UTC).Format(TimeFormat)
+	minVersion = time.Date(0, 1, 1, 0, 0, 0, 0, time.UTC).Format(TimeFormat)
 	maxVersion = time.Date(9999, 12, 31, 23, 59, 59, 0, time.UTC).Format(TimeFormat)
 )
 
@@ -451,7 +451,7 @@ func listAllAvailableMigrations(direction Direction, path, finishAtVersion strin
 		return
 	}
 	sort.Strings(filenames)
-	if finish, err = time.Parse(finishAtVersion, TimeFormat); err != nil {
+	if finish, err = time.Parse(TimeFormat, finishAtVersion); err != nil {
 		return
 	}
 	for _, fn := range filenames {

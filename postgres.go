@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"database/sql"
 	"fmt"
-	"log"
 	"os/exec"
 )
 
@@ -59,11 +58,9 @@ func (d *postgres) CreateSchemaMigrationsTable(conn *sql.DB) (err error) {
 }
 
 func (d *postgres) DumpSchema() (err error) {
-	log.Println("dumping schema")
 	var out bytes.Buffer
 	cmd := exec.Command(
 		"pg_dump",
-		d.connParams.String(),
 		"--schema-only", "--no-acl", "--no-owner", "--no-password",
 		d.connParams.Name,
 	)
@@ -71,7 +68,7 @@ func (d *postgres) DumpSchema() (err error) {
 	if err = cmd.Run(); err != nil {
 		return
 	}
-	log.Println(out.String())
+	fmt.Println(out.String())
 	return
 }
 
