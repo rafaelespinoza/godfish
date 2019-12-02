@@ -7,7 +7,8 @@ import (
 	"os/exec"
 )
 
-// PostgresParams defines keys, values needed to connect to a postgres database.
+// PostgresParams implements the DSNParams interface and defines keys, values
+// needed to connect to a postgres database.
 type PostgresParams struct {
 	Encoding string // Encoding is the client encoding for the connection.
 	Host     string // Host is the name of the host to connect to.

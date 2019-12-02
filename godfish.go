@@ -275,6 +275,8 @@ func Migrate(driver Driver, direction Direction, directoryPath string) (err erro
 	return
 }
 
+// ApplyMigration runs a migration at directoryPath with the specified version
+// and direction.
 func ApplyMigration(driver Driver, direction Direction, directoryPath, version string) (err error) {
 	if direction == DirUnknown {
 		err = fmt.Errorf("unknown Direction %q", direction)
@@ -357,17 +359,20 @@ type DSNParams interface {
 // A Driver describes what a database driver (anything at
 // https://github.com/golang/go/wiki/SQLDrivers) should be able to do.
 type Driver interface {
-	// Name should return the name of driver: ie: postgres, mysql, etc
+	// Name should return the name of the driver: ie: postgres, mysql, etc
 	Name() string
 	DSNParams() DSNParams
 	CreateSchemaMigrationsTable(conn *sql.DB) error
 	DumpSchema() error
 	// AppliedVersions returns a list of migration versions that have been
-	// executed against your database.
+	// executed against the database.
 	AppliedVersions(conn *sql.DB) (*sql.Rows, error)
 	UpdateSchemaMigrations(conn *sql.DB, dir Direction, version string) error
 }
 
+// NewDriver initializes a Driver implementation by name and connection
+// parameters. An unrecognized name returns an error. The dsnParams should also
+// provide whatever is needed by the Driver.
 func NewDriver(driverName string, dsnParams DSNParams) (driver Driver, err error) {
 	switch driverName {
 	case "postgres":
@@ -383,10 +388,15 @@ func NewDriver(driverName string, dsnParams DSNParams) (driver Driver, err error
 	return
 }
 
+// MigrationsConf is intended to lend customizations such as specifying the path
+// to the migration files.
 type MigrationsConf struct {
 	PathToFiles string
 }
 
+// CreateSchemaMigrationsTable creates a table to track status of migrations on
+// the database. Running any migration will create the table, so you don't
+// usually need to call this function.
 func CreateSchemaMigrationsTable(driver Driver) error {
 	conn, err := connect(driver.Name(), driver.DSNParams())
 	if err != nil {
@@ -395,6 +405,7 @@ func CreateSchemaMigrationsTable(driver Driver) error {
 	return driver.CreateSchemaMigrationsTable(conn)
 }
 
+// DumpSchema describes the database structure and outputs to standard out.
 func DumpSchema(driver Driver) error {
 	return driver.DumpSchema()
 }
