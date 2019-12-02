@@ -230,7 +230,7 @@ func main() {
 func newDriver(driverName string) (driver godfish.Driver, err error) {
 	switch driverName {
 	case "postgres":
-		driver, err = godfish.NewDriver(driverName, godfish.PGParams{
+		driver, err = godfish.NewDriver(driverName, godfish.PostgresParams{
 			Encoding: "UTF8",
 			Host:     "localhost",
 			Name:     os.Getenv("DB_NAME"),
