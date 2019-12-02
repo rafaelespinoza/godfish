@@ -46,13 +46,13 @@ const (
 // DDL files are stored.
 const DefaultMigrationFileDirectory = "../migrations" // TODO: change or remove
 
-// Filename is just a string with a specific format to migration files. One part
+// filename is just a string with a specific format to migration files. One part
 // has a generated timestamp, one part has a direction, another has a name.
-type Filename string
+type filename string
 
-// MakeFilename creates a filename based on the independent parts. Format:
+// makeFilename creates a filename based on the independent parts. Format:
 // "2006010215040506.${direction}.${name}.sql"
-func MakeFilename(version string, direction Direction, name string) (Filename, error) {
+func makeFilename(version string, direction Direction, name string) (filename, error) {
 	if len(version) != len(TimeFormat) {
 		return "", fmt.Errorf("version must have length %d", len(TimeFormat))
 	} else if match, err := regexp.MatchString(`\d{14}`, version); err != nil {
@@ -69,13 +69,13 @@ func MakeFilename(version string, direction Direction, name string) (Filename, e
 	head := version + filenameDelimeter
 	tail := filenameDelimeter + name + ".sql"
 	dir := strings.ToLower(direction.String())
-	return Filename(head + dir + tail), nil
+	return filename(head + dir + tail), nil
 }
 
-func ParseMigration(filename Filename) (mig Migration, err error) {
+func parseMigration(name filename) (mig Migration, err error) {
 	var ts time.Time
 	var dir Direction
-	base := filepath.Base(string(filename))
+	base := filepath.Base(string(name))
 	parts := strings.Split(base, filenameDelimeter)
 
 	ts, err = time.Parse(TimeFormat, parts[0])
@@ -91,7 +91,7 @@ func ParseMigration(filename Filename) (mig Migration, err error) {
 		return
 	}
 
-	mig, err = NewMutation(ts, dir, parts[2])
+	mig, err = newMutation(ts, dir, parts[2])
 	return
 }
 
@@ -104,31 +104,31 @@ type Migration interface {
 	Timestamp() time.Time
 }
 
-// Mutation implements the Migration interface.
-type Mutation struct {
+// mutation implements the Migration interface.
+type mutation struct {
 	direction Direction
 	name      string
 	timestamp time.Time
 }
 
-var _ Migration = (*Mutation)(nil)
+var _ Migration = (*mutation)(nil)
 
-// NewMutation constructs a Mutation and returns a pointer. Its internal
+// newMutation constructs a mutation and returns a pointer. Its internal
 // timestamp field is set to UTC.
-func NewMutation(ts time.Time, dir Direction, name string) (*Mutation, error) {
+func newMutation(ts time.Time, dir Direction, name string) (*mutation, error) {
 	if dir == DirUnknown {
 		return nil, fmt.Errorf("cannot have unknown direction")
 	}
-	return &Mutation{
+	return &mutation{
 		direction: dir,
 		name:      name,
 		timestamp: ts.UTC(),
 	}, nil
 }
 
-func (m *Mutation) Direction() Direction { return m.direction }
-func (m *Mutation) Name() string         { return m.name }
-func (m *Mutation) Timestamp() time.Time { return m.timestamp }
+func (m *mutation) Direction() Direction { return m.direction }
+func (m *mutation) Name() string         { return m.name }
+func (m *mutation) Timestamp() time.Time { return m.timestamp }
 
 // MigrationParams collects inputs needed to generate migration files. Setting
 // Reversible to true will generate a migration file for each direction.
@@ -163,12 +163,12 @@ func NewMigrationParams(name string, reversible bool, directory *os.File) (*Migr
 
 	out.Reversible = reversible
 	timestamp := time.Now()
-	var mut *Mutation
-	if mut, err = NewMutation(timestamp, DirForward, name); err != nil {
+	var mut *mutation
+	if mut, err = newMutation(timestamp, DirForward, name); err != nil {
 		return nil, err
 	}
 	out.Forward = mut
-	if mut, err = NewMutation(timestamp, DirReverse, name); err != nil {
+	if mut, err = newMutation(timestamp, DirReverse, name); err != nil {
 		return nil, err
 	}
 	out.Reverse = mut
@@ -202,28 +202,28 @@ func (m *MigrationParams) GenerateFiles() (err error) {
 }
 
 func newMigrationFile(m Migration, baseDir string) (*os.File, error) {
-	filename, err := MakeMigrationFilename(m)
+	filename, err := makeMigrationFilename(m)
 	if err != nil {
 		return nil, err
 	}
 	return os.Create(baseDir + "/" + string(filename))
 }
 
-// MakeMigrationFilename passes in a Migration's fields to create a Filename. An
-// error could be returned if m is found to be an unsuitable Filename.
-func MakeMigrationFilename(m Migration) (Filename, error) {
-	return MakeFilename(
+// makeMigrationFilename passes in a Migration's fields to create a filename. An
+// error could be returned if m is found to be an unsuitable filename.
+func makeMigrationFilename(m Migration) (filename, error) {
+	return makeFilename(
 		m.Timestamp().Format(TimeFormat),
 		m.Direction(),
 		m.Name(),
 	)
 }
 
-// PathToMigrationFile is a convenience function for prepending a directory path
+// pathToMigrationFile is a convenience function for prepending a directory path
 // to the base filename of a migration. An error could be returned if the
-// Migration's fields are unsuitable for a Filename.
-func PathToMigrationFile(dir string, mig Migration) (string, error) {
-	filename, err := MakeMigrationFilename(mig)
+// Migration's fields are unsuitable for a filename.
+func pathToMigrationFile(dir string, mig Migration) (string, error) {
+	filename, err := makeMigrationFilename(mig)
 	if err != nil {
 		return "", err
 	}
@@ -246,16 +246,16 @@ func Migrate(driver Driver, direction Direction, directoryPath string) (err erro
 		finishAtVersion = minVersion
 	}
 
-	if migrations, err = ListAllAvailableMigrations(direction, directoryPath, finishAtVersion); err != nil {
+	if migrations, err = listAllAvailableMigrations(direction, directoryPath, finishAtVersion); err != nil {
 		return
 	}
 
-	if dbHandler, err = Connect(driver.Name(), driver.DSNParams()); err != nil {
+	if dbHandler, err = connect(driver.Name(), driver.DSNParams()); err != nil {
 		return
 	}
 	for _, mig := range migrations {
 		var pathToFile string
-		if pathToFile, err = PathToMigrationFile(directoryPath, mig); err != nil {
+		if pathToFile, err = pathToMigrationFile(directoryPath, mig); err != nil {
 			return
 		}
 		if err = runMigration(dbHandler, driver, pathToFile, mig); err != nil {
@@ -271,13 +271,13 @@ func ApplyMigration(driver Driver, direction Direction, directoryPath, version s
 		return
 	}
 
-	var baseGlob Filename
+	var baseGlob filename
 	var filenames []string
 	var mig Migration
 	var dbHandler *sql.DB
 	var pathToFile string
 
-	if baseGlob, err = MakeFilename(version, direction, "*"); err != nil {
+	if baseGlob, err = makeFilename(version, direction, "*"); err != nil {
 		return
 	}
 	if filenames, err = filepath.Glob(directoryPath + "/" + string(baseGlob)); err != nil {
@@ -289,13 +289,13 @@ func ApplyMigration(driver Driver, direction Direction, directoryPath, version s
 		err = fmt.Errorf("need 1 matching filename; got %v", filenames)
 		return
 	}
-	if mig, err = ParseMigration(Filename(filenames[0])); err != nil {
+	if mig, err = parseMigration(filename(filenames[0])); err != nil {
 		return
 	}
-	if dbHandler, err = Connect(driver.Name(), driver.DSNParams()); err != nil {
+	if dbHandler, err = connect(driver.Name(), driver.DSNParams()); err != nil {
 		return
 	}
-	if pathToFile, err = PathToMigrationFile(directoryPath, mig); err != nil {
+	if pathToFile, err = pathToMigrationFile(directoryPath, mig); err != nil {
 		return
 	}
 	err = runMigration(dbHandler, driver, pathToFile, mig)
@@ -332,7 +332,7 @@ func runMigration(conn *sql.DB, driver Driver, pathToFile string, mig Migration)
 	return
 }
 
-func Connect(driverName string, dsnParams DSNParams) (db *sql.DB, err error) {
+func connect(driverName string, dsnParams DSNParams) (db *sql.DB, err error) {
 	db, err = sql.Open(driverName, dsnParams.String())
 	return
 }
@@ -361,11 +361,11 @@ type Driver interface {
 func NewDriver(driverName string, dsnParams DSNParams) (driver Driver, err error) {
 	switch driverName {
 	case "postgres":
-		params, ok := dsnParams.(PGParams)
+		params, ok := dsnParams.(PostgresParams)
 		if !ok {
-			err = fmt.Errorf("dsnParams should be a PGParams, got %T", params)
+			err = fmt.Errorf("dsnParams should be a PostgresParams, got %T", params)
 		} else {
-			driver, err = NewPostgres(params)
+			driver, err = newPostgres(params)
 		}
 	default:
 		err = fmt.Errorf("unknown driver %q", driverName)
@@ -378,7 +378,7 @@ type MigrationsConf struct {
 }
 
 func CreateSchemaMigrationsTable(driver Driver) error {
-	conn, err := Connect(driver.Name(), driver.DSNParams())
+	conn, err := connect(driver.Name(), driver.DSNParams())
 	if err != nil {
 		return err
 	}
@@ -400,14 +400,14 @@ func Info(driver Driver, direction Direction, path string) (err error) {
 		finishAtVersion = minVersion
 	}
 
-	if migs, err = ListAllAvailableMigrations(direction, path, finishAtVersion); err != nil {
+	if migs, err = listAllAvailableMigrations(direction, path, finishAtVersion); err != nil {
 		return
 	}
 	fmt.Println("-- all available migrations")
 	for _, mig := range migs {
 		fmt.Printf("%#v\n", mig)
 	}
-	if appliedVersions, err = ListAppliedVersions(driver); err != nil {
+	if appliedVersions, err = listAppliedVersions(driver); err != nil {
 		return
 	}
 	fmt.Println("-- applied versions")
@@ -419,7 +419,7 @@ func Info(driver Driver, direction Direction, path string) (err error) {
 	for _, version := range availableVersions {
 		fmt.Println(version)
 	}
-	if versionsToApply, err = ListVersionsToApply(
+	if versionsToApply, err = listVersionsToApply(
 		direction,
 		appliedVersions,
 		availableVersions,
@@ -433,9 +433,9 @@ func Info(driver Driver, direction Direction, path string) (err error) {
 	return
 }
 
-// ListAllAvailableMigrations returns a list of Migration values at path in a
+// listAllAvailableMigrations returns a list of Migration values at path in a
 // specified direction.
-func ListAllAvailableMigrations(direction Direction, path, finishAtVersion string) (out []Migration, err error) {
+func listAllAvailableMigrations(direction Direction, path, finishAtVersion string) (out []Migration, err error) {
 	if direction == DirUnknown {
 		err = fmt.Errorf("unknown Direction %q", direction)
 		return
@@ -454,9 +454,9 @@ func ListAllAvailableMigrations(direction Direction, path, finishAtVersion strin
 	if finish, err = time.Parse(finishAtVersion, TimeFormat); err != nil {
 		return
 	}
-	for _, filename := range filenames {
+	for _, fn := range filenames {
 		var mig Migration
-		if mig, err = ParseMigration(Filename(filename)); err != nil {
+		if mig, err = parseMigration(filename(fn)); err != nil {
 			return
 		}
 		dir := mig.Direction()
@@ -474,10 +474,10 @@ func ListAllAvailableMigrations(direction Direction, path, finishAtVersion strin
 	return
 }
 
-func ListAppliedVersions(driver Driver) (out []string, err error) {
+func listAppliedVersions(driver Driver) (out []string, err error) {
 	var conn *sql.DB
 	var rows *sql.Rows
-	if conn, err = Connect(driver.Name(), driver.DSNParams()); err != nil {
+	if conn, err = connect(driver.Name(), driver.DSNParams()); err != nil {
 		return
 	}
 	if rows, err = driver.AppliedVersions(conn); err != nil {
@@ -504,7 +504,7 @@ func listAvailableVersions(migrations []Migration) []string {
 	return out
 }
 
-func ListVersionsToApply(direction Direction, applied, available []string) (out []string, err error) {
+func listVersionsToApply(direction Direction, applied, available []string) (out []string, err error) {
 	if direction == DirUnknown {
 		err = fmt.Errorf("unknown Direction %q", direction)
 		return

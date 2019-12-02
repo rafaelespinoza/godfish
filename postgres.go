@@ -8,8 +8,8 @@ import (
 	"os/exec"
 )
 
-// PGParams defines keys, values needed to connect to a postgres database.
-type PGParams struct {
+// PostgresParams defines keys, values needed to connect to a postgres database.
+type PostgresParams struct {
 	Encoding string // Encoding is the client encoding for the connection.
 	Host     string // Host is the name of the host to connect to.
 	Name     string // Name is the database name.
@@ -18,39 +18,39 @@ type PGParams struct {
 	User     string // User is the name of the user to connect as.
 }
 
-var _ DSNParams = (*PGParams)(nil)
+var _ DSNParams = (*PostgresParams)(nil)
 
 // String generates a data source name (or connection URL) based on the fields.
-func (p PGParams) String() string {
+func (p PostgresParams) String() string {
 	return fmt.Sprintf(
 		"postgresql://%s:%s/%s?client_encoding=%s&sslmode=require",
 		p.Host, p.Port, p.Name, p.Encoding,
 	)
 }
 
-// Postgres implements the Driver interface for postgres databases.
-type Postgres struct {
+// postgres implements the Driver interface for postgres databases.
+type postgres struct {
 	MigrationsConf MigrationsConf
-	connParams     PGParams
+	connParams     PostgresParams
 }
 
-var _ Driver = (*Postgres)(nil)
+var _ Driver = (*postgres)(nil)
 
-func NewPostgres(connParams PGParams) (*Postgres, error) {
+func newPostgres(connParams PostgresParams) (*postgres, error) {
 	if connParams.Port == "" {
 		connParams.Port = "5432"
 	}
-	driver := Postgres{
+	driver := postgres{
 		MigrationsConf: MigrationsConf{"db/migrations"},
 		connParams:     connParams,
 	}
 	return &driver, nil
 }
 
-func (d *Postgres) Name() string         { return "postgres" }
-func (d *Postgres) DSNParams() DSNParams { return d.connParams }
+func (d *postgres) Name() string         { return "postgres" }
+func (d *postgres) DSNParams() DSNParams { return d.connParams }
 
-func (d *Postgres) CreateSchemaMigrationsTable(conn *sql.DB) (err error) {
+func (d *postgres) CreateSchemaMigrationsTable(conn *sql.DB) (err error) {
 	_, err = conn.Query(
 		`CREATE TABLE IF NOT EXISTS schema_migrations (
 			migration_id VARCHAR(128) PRIMARY KEY NOT NULL
@@ -58,7 +58,7 @@ func (d *Postgres) CreateSchemaMigrationsTable(conn *sql.DB) (err error) {
 	return
 }
 
-func (d *Postgres) DumpSchema() (err error) {
+func (d *postgres) DumpSchema() (err error) {
 	log.Println("dumping schema")
 	var out bytes.Buffer
 	cmd := exec.Command(
@@ -75,14 +75,14 @@ func (d *Postgres) DumpSchema() (err error) {
 	return
 }
 
-func (d *Postgres) AppliedVersions(conn *sql.DB) (rows *sql.Rows, err error) {
+func (d *postgres) AppliedVersions(conn *sql.DB) (rows *sql.Rows, err error) {
 	rows, err = conn.Query(
 		`SELECT migration_id FROM schema_migrations ORDER BY migration_id ASC`,
 	)
 	return
 }
 
-func (d *Postgres) UpdateSchemaMigrations(conn *sql.DB, dir Direction, version string) (err error) {
+func (d *postgres) UpdateSchemaMigrations(conn *sql.DB, dir Direction, version string) (err error) {
 	if dir == DirForward {
 		_, err = conn.Exec(`
 			INSERT INTO schema_migrations (migration_id)
