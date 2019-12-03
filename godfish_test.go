@@ -12,21 +12,31 @@ import (
 )
 
 const (
-	baseTestOutputDir = "/tmp/godfish"
 	testDBName        = "godfish_test"
+	baseTestOutputDir = "/tmp/godfish_test"
 )
 
-// TODO: for each driver you want to test, check if a database exists. if it
-// doesn't, then create one.
-// if err = createTestDB(driver); err != nil {
-// 	t.Errorf(
-// 		"could not create test database for %q; %v",
-// 		driver.Name(), err,
-// 	)
-// 	return
-// }
+var DriversToTest = []struct {
+	name      string
+	dsnParams godfish.DSNParams
+}{
+	{
+		name: "postgres",
+		dsnParams: godfish.PostgresParams{
+			Encoding: "UTF8",
+			Host:     "localhost",
+			Name:     testDBName,
+			Pass:     os.Getenv("DB_PASSWORD"),
+			Port:     "5432",
+		},
+	},
+}
+
 func TestMain(m *testing.M) {
 	os.MkdirAll(baseTestOutputDir, 0755)
+	for _, driver := range DriversToTest {
+		os.Mkdir(baseTestOutputDir+"/"+driver.name, 0755)
+	}
 	m.Run()
 	os.RemoveAll(baseTestOutputDir)
 }
@@ -104,29 +114,9 @@ func TestMigrationParams(t *testing.T) {
 }
 
 func TestDriver(t *testing.T) {
-	tests := []struct {
-		driverName string
-		dsnParams  godfish.DSNParams
-	}{
-		{
-			driverName: "postgres",
-			dsnParams: godfish.PostgresParams{
-				Encoding: "UTF8",
-				Host:     "localhost",
-				Name:     testDBName,
-				Pass:     os.Getenv("DB_PASSWORD"),
-				Port:     "5432",
-			},
-		},
-	}
-
-	testDir, err := os.Open(baseTestOutputDir)
-	if err != nil {
-		t.Error(err)
-		return
-	}
-	for i, test := range tests {
-		driver, err := godfish.NewDriver(test.driverName, test.dsnParams)
+	for i, test := range DriversToTest {
+		pathToTestDir := baseTestOutputDir + "/" + test.name
+		driver, err := godfish.NewDriver(test.name, test.dsnParams)
 		if err != nil {
 			t.Error(err)
 			return
@@ -134,12 +124,12 @@ func TestDriver(t *testing.T) {
 		defer func() {
 			if err := truncateSchemaMigrations(driver); err != nil {
 				t.Errorf(
-					"could not truncate schema_migrations table for %q; %v",
-					driver.Name(), err,
+					"test [%d]; could not truncate schema_migrations table for %q; %v",
+					i, driver.Name(), err,
 				)
 			}
 		}()
-		migrations, err := makeTestMigrations(driver.Name(), testDir)
+		migrations, err := makeTestMigrations(driver.Name(), pathToTestDir)
 		if err != nil {
 			panic(err)
 		}
@@ -156,7 +146,7 @@ func TestDriver(t *testing.T) {
 			err = godfish.ApplyMigration(
 				driver,
 				mig.Direction(),
-				baseTestOutputDir,
+				pathToTestDir,
 				mig.Timestamp().Format(godfish.TimeFormat),
 			)
 			if err != nil {
@@ -169,7 +159,7 @@ func TestDriver(t *testing.T) {
 		}
 
 		// test Migrate in forward direction
-		if err = godfish.Migrate(driver, godfish.DirForward, baseTestOutputDir); err != nil {
+		if err = godfish.Migrate(driver, godfish.DirForward, pathToTestDir); err != nil {
 			t.Errorf(
 				"test [%d]; driver %q; could not Migrate in %s Direction",
 				i, driver.Name(), godfish.DirForward,
@@ -181,7 +171,7 @@ func TestDriver(t *testing.T) {
 			"-- %s test [%d] calling Info %s %s\n",
 			t.Name(), i, driver.Name(), godfish.DirForward,
 		)
-		if err = godfish.Info(driver, godfish.DirForward, baseTestOutputDir); err != nil {
+		if err = godfish.Info(driver, godfish.DirForward, pathToTestDir); err != nil {
 			t.Errorf(
 				"test [%d]; could not output info in %s Direction; %v",
 				i, godfish.DirForward, err,
@@ -194,7 +184,7 @@ func TestDriver(t *testing.T) {
 			"-- %s test [%d] calling Info %s %s\n",
 			t.Name(), i, driver.Name(), godfish.DirReverse,
 		)
-		if err = godfish.Info(driver, godfish.DirReverse, baseTestOutputDir); err != nil {
+		if err = godfish.Info(driver, godfish.DirReverse, pathToTestDir); err != nil {
 			t.Errorf(
 				"test [%d]; could not output info in %s Direction; %v",
 				i, godfish.DirReverse, err,
@@ -209,7 +199,7 @@ func TestDriver(t *testing.T) {
 		}
 
 		// test Migrate in reverse direction
-		if err = godfish.Migrate(driver, godfish.DirReverse, baseTestOutputDir); err != nil {
+		if err = godfish.Migrate(driver, godfish.DirReverse, pathToTestDir); err != nil {
 			t.Errorf(
 				"test [%d]; driver %q; could not Migrate in %s Direction",
 				i, driver.Name(), godfish.DirReverse,
@@ -218,10 +208,36 @@ func TestDriver(t *testing.T) {
 	}
 }
 
+// testMigration is a godfish.Migration implementation that's used to override
+// the timestamp field, so that the generated filename is "unique".
+type testMigration struct {
+	direction godfish.Direction
+	name      string
+	timestamp time.Time
+}
+
+var _ godfish.Migration = (*testMigration)(nil)
+
+func newTestMigration(mig godfish.Migration, offset time.Duration) godfish.Migration {
+	return &testMigration{
+		direction: mig.Direction(),
+		name:      mig.Name(),
+		timestamp: mig.Timestamp().Add(offset),
+	}
+}
+
+func (m *testMigration) Direction() godfish.Direction { return m.direction }
+func (m *testMigration) Name() string                 { return m.name }
+func (m *testMigration) Timestamp() time.Time         { return m.timestamp }
+
 // makeTestMigrations generates some stub migrations in both directions,
 // generates the files and populates each with some dummy content. The
 // migrations in the forward direction come before the reverse direction.
-func makeTestMigrations(driverName string, testDir *os.File) ([]godfish.Migration, error) {
+func makeTestMigrations(driverName, pathToTestDir string) ([]godfish.Migration, error) {
+	testDir, err := os.Open(pathToTestDir)
+	if err != nil {
+		return nil, err
+	}
 	type stubbedMigrationContent struct{ forward, reverse string }
 	stubs := []stubbedMigrationContent{
 		{
@@ -236,9 +252,6 @@ func makeTestMigrations(driverName string, testDir *os.File) ([]godfish.Migratio
 	head := make([]godfish.Migration, 0)
 	tail := make([]godfish.Migration, 0)
 	for i, stub := range stubs {
-		// need "unique" timestamps for migrations. TODO: think of workaround
-		time.Sleep(1 * time.Second)
-
 		var filename string
 		var file *os.File
 		var err error
@@ -256,6 +269,10 @@ func makeTestMigrations(driverName string, testDir *os.File) ([]godfish.Migratio
 		); err != nil {
 			return nil, err
 		}
+		// need "unique" timestamps for migrations.
+		timestampOffset := time.Duration(i+1) * time.Second
+		params.Forward = newTestMigration(params.Forward, timestampOffset)
+		params.Reverse = newTestMigration(params.Reverse, timestampOffset)
 		if err = params.GenerateFiles(); err != nil {
 			return nil, err
 		}
@@ -264,7 +281,7 @@ func makeTestMigrations(driverName string, testDir *os.File) ([]godfish.Migratio
 			if filename, err = godfish.Basename(mig); err != nil {
 				return nil, err
 			}
-			if file, err = os.Open(baseTestOutputDir + "/" + filename); err != nil {
+			if file, err = os.Open(pathToTestDir + "/" + filename); err != nil {
 				return nil, err
 			}
 			// this only works if the slice we're iterating through has
@@ -298,67 +315,6 @@ func truncateSchemaMigrations(driver godfish.Driver) (err error) {
 		if val, ok := err.(*exec.ExitError); ok {
 			fmt.Println(string(val.Stderr))
 			err = val
-		}
-	default:
-		err = fmt.Errorf("unknown Driver %q", driver.Name())
-	}
-	return
-}
-
-func createTestDB(driver godfish.Driver) (err error) {
-	switch driver.Name() {
-	case "postgres":
-		dsnParams := driver.DSNParams()
-		var params godfish.PostgresParams
-		if dsn, ok := dsnParams.(godfish.PostgresParams); !ok {
-			err = fmt.Errorf("expected dsnParams to be a PostgresParams, got %T", dsn)
-			return
-		} else {
-			params = dsn
-		}
-		cmd := exec.Command(
-			"createdb",
-			"-e",
-			"--encoding", params.Encoding,
-			"--host", params.Host,
-			"--port", params.Port,
-			"--username", params.User,
-			"--no-password",
-			params.Name,
-		)
-		_, err = cmd.Output()
-		if val, ok := err.(*exec.ExitError); ok {
-			err = fmt.Errorf("%v. %v", val.String(), string(val.Stderr))
-		}
-	default:
-		err = fmt.Errorf("unknown Driver %q", driver.Name())
-	}
-	return
-}
-
-func dropTestDB(driver godfish.Driver) (err error) {
-	switch driver.Name() {
-	case "postgres":
-		dsnParams := driver.DSNParams()
-		var params godfish.PostgresParams
-		if dsn, ok := dsnParams.(godfish.PostgresParams); !ok {
-			err = fmt.Errorf("expected dsnParams to be a PostgresParams, got %T", dsn)
-			return
-		} else {
-			params = dsn
-		}
-		cmd := exec.Command(
-			"dropdb",
-			"-e", "--if-exists",
-			"--host", params.Host,
-			"--port", params.Port,
-			"--username", params.User,
-			"--no-password",
-			params.Name,
-		)
-		_, err = cmd.Output()
-		if val, ok := err.(*exec.ExitError); ok {
-			err = fmt.Errorf("%v. %v", val.String(), string(val.Stderr))
 		}
 	default:
 		err = fmt.Errorf("unknown Driver %q", driver.Name())
