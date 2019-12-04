@@ -5,6 +5,10 @@ import (
 	"database/sql"
 	"fmt"
 	"os/exec"
+
+	// this is a database driver, imported for side effects only so we can
+	// connect using the sql package.
+	_ "github.com/lib/pq"
 )
 
 // PostgresParams implements the DSNParams interface and defines keys, values
@@ -50,6 +54,11 @@ func newPostgres(connParams PostgresParams) (*postgres, error) {
 func (d *postgres) Name() string         { return "postgres" }
 func (d *postgres) DSNParams() DSNParams { return d.connParams }
 
+func (d *postgres) Execute(conn *sql.DB, query string, args ...interface{}) (err error) {
+	_, err = conn.Query(query)
+	return
+}
+
 func (d *postgres) CreateSchemaMigrationsTable(conn *sql.DB) (err error) {
 	_, err = conn.Query(
 		`CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -73,10 +82,11 @@ func (d *postgres) DumpSchema() (err error) {
 	return
 }
 
-func (d *postgres) AppliedVersions(conn *sql.DB) (rows *sql.Rows, err error) {
-	rows, err = conn.Query(
+func (d *postgres) AppliedVersions(conn *sql.DB) (out AppliedVersions, err error) {
+	rows, err := conn.Query(
 		`SELECT migration_id FROM schema_migrations ORDER BY migration_id ASC`,
 	)
+	out = AppliedVersions(rows)
 	return
 }
 

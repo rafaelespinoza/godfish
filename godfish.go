@@ -10,10 +10,6 @@ import (
 	"sort"
 	"strings"
 	"time"
-
-	// this is a database driver, imported for side effects only, so we can
-	// connect using the sql package.
-	_ "github.com/lib/pq"
 )
 
 // Direction describes which way the change goes.
@@ -246,17 +242,16 @@ var (
 )
 
 // Migrate executes all migrations at directoryPath in the specified direction.
-func Migrate(driver Driver, direction Direction, directoryPath string) (err error) {
+func Migrate(driver Driver, directoryPath string, direction Direction, finishAtVersion string) (err error) {
 	var migrations []Migration
 	var dbHandler *sql.DB
-	var finishAtVersion string
-	if direction == DirForward {
+	if finishAtVersion == "" && direction == DirForward {
 		finishAtVersion = maxVersion
-	} else {
+	} else if finishAtVersion == "" && direction == DirReverse {
 		finishAtVersion = minVersion
 	}
 
-	if migrations, err = listAllAvailableMigrations(direction, directoryPath, finishAtVersion); err != nil {
+	if migrations, err = listMigrationsToApply(driver, directoryPath, direction, finishAtVersion, false); err != nil {
 		return
 	}
 
@@ -277,40 +272,63 @@ func Migrate(driver Driver, direction Direction, directoryPath string) (err erro
 
 // ApplyMigration runs a migration at directoryPath with the specified version
 // and direction.
-func ApplyMigration(driver Driver, direction Direction, directoryPath, version string) (err error) {
+func ApplyMigration(driver Driver, directoryPath string, direction Direction, version string) (err error) {
 	if direction == DirUnknown {
 		err = fmt.Errorf("unknown Direction %q", direction)
 		return
 	}
+	if version == "" {
+		// attempt to find the next version to apply in the direction
+		limit := maxVersion
+		if direction == DirReverse {
+			limit = minVersion
+		}
+		if toApply, ierr := listMigrationsToApply(driver, directoryPath, direction, limit, false); ierr != nil {
+			err = fmt.Errorf("specified no version; error attempting to find one; %v", ierr)
+			return
+		} else if len(toApply) < 1 {
+			err = fmt.Errorf("specified no version, did not find one to apply")
+			return
+		} else {
+			version = toApply[0].Timestamp().Format(TimeFormat)
+		}
+	}
 
-	var baseGlob filename
-	var filenames []string
 	var mig Migration
 	var dbHandler *sql.DB
 	var pathToFile string
 
-	if baseGlob, err = makeFilename(version, direction, "*"); err != nil {
+	if pathToFile, err = figureOutBasename(directoryPath, direction, version); err != nil {
 		return
 	}
-	if filenames, err = filepath.Glob(directoryPath + "/" + string(baseGlob)); err != nil {
-		return
-	} else if len(filenames) == 0 {
-		err = fmt.Errorf("could not find matching files")
-		return
-	} else if len(filenames) > 1 {
-		err = fmt.Errorf("need 1 matching filename; got %v", filenames)
-		return
-	}
-	if mig, err = parseMigration(filename(filenames[0])); err != nil {
+	fn := filename(directoryPath + "/" + pathToFile)
+	if mig, err = parseMigration(fn); err != nil {
 		return
 	}
 	if dbHandler, err = connect(driver.Name(), driver.DSNParams()); err != nil {
 		return
 	}
-	if pathToFile, err = pathToMigrationFile(directoryPath, mig); err != nil {
+	err = runMigration(dbHandler, driver, pathToFile, mig)
+	return
+}
+
+func figureOutBasename(directoryPath string, direction Direction, version string) (f string, e error) {
+	var baseGlob filename
+	var filenames []string
+	if baseGlob, e = makeFilename(version, direction, "*"); e != nil {
 		return
 	}
-	err = runMigration(dbHandler, driver, pathToFile, mig)
+	glob := directoryPath + "/" + string(baseGlob)
+	if filenames, e = filepath.Glob(glob); e != nil {
+		return
+	} else if len(filenames) == 0 {
+		e = fmt.Errorf("could not find matching files")
+		return
+	} else if len(filenames) > 1 {
+		e = fmt.Errorf("need 1 matching filename; got %v", filenames)
+		return
+	}
+	f = filenames[0]
 	return
 }
 
@@ -330,7 +348,7 @@ func runMigration(conn *sql.DB, driver Driver, pathToFile string, mig Migration)
 	if _, err = file.Read(data); err != nil {
 		return
 	}
-	if _, err = conn.Query(string(data)); err != nil {
+	if err = driver.Execute(conn, string(data)); err != nil {
 		return
 	}
 	if err = driver.CreateSchemaMigrationsTable(conn); err != nil {
@@ -364,9 +382,13 @@ type Driver interface {
 	DSNParams() DSNParams
 	CreateSchemaMigrationsTable(conn *sql.DB) error
 	DumpSchema() error
+	// Execute runs the schema change and commits it to the database. The query
+	// parameter is a SQL string and may contain placeholders for the values in
+	// args. Input should be passed to conn so it could be sanitized, escaped.
+	Execute(conn *sql.DB, query string, args ...interface{}) error
 	// AppliedVersions returns a list of migration versions that have been
 	// executed against the database.
-	AppliedVersions(conn *sql.DB) (*sql.Rows, error)
+	AppliedVersions(conn *sql.DB) (AppliedVersions, error)
 	UpdateSchemaMigrations(conn *sql.DB, dir Direction, version string) error
 }
 
@@ -394,6 +416,19 @@ type MigrationsConf struct {
 	PathToFiles string
 }
 
+// AppliedVersions represents an iterative list of migrations that have been run
+// against the database and have been recorded in the schema migrations table.
+// It's enough to convert a sql.Rows struct when implementing the Driver
+// interface since a sql.Rows already satisfies this interface. See the existing
+// Driver implementations in this package for examples.
+type AppliedVersions interface {
+	Close() error
+	Next() bool
+	Scan(dest ...interface{}) error
+}
+
+var _ AppliedVersions = (*sql.Rows)(nil)
+
 // CreateSchemaMigrationsTable creates a table to track status of migrations on
 // the database. Running any migration will create the table, so you don't
 // usually need to call this function.
@@ -411,69 +446,102 @@ func DumpSchema(driver Driver) error {
 }
 
 // Info displays the outputs of various helper functions.
-func Info(driver Driver, direction Direction, path string) (err error) {
-	var migs []Migration
-	var appliedVersions, availableVersions, versionsToApply []string
-	var finishAtVersion string
-	if direction == DirForward {
-		finishAtVersion = maxVersion
-	} else {
-		finishAtVersion = minVersion
-	}
-
-	if migs, err = listAllAvailableMigrations(direction, path, finishAtVersion); err != nil {
-		return
-	}
-	fmt.Println("-- all available migrations")
-	for _, mig := range migs {
-		fmt.Printf("%#v\n", mig)
-	}
-	if appliedVersions, err = listAppliedVersions(driver); err != nil {
-		return
-	}
-	fmt.Println("-- applied versions")
-	for _, version := range appliedVersions {
-		fmt.Println(version)
-	}
-	availableVersions = listAvailableVersions(migs)
-	fmt.Println("-- available versions")
-	for _, version := range availableVersions {
-		fmt.Println(version)
-	}
-	if versionsToApply, err = listVersionsToApply(
+func Info(driver Driver, directoryPath string, direction Direction, finishAtVersion string) (err error) {
+	_, err = listMigrationsToApply(
+		driver,
+		directoryPath,
 		direction,
-		appliedVersions,
-		availableVersions,
+		finishAtVersion,
+		true,
+	)
+	return
+}
+
+func listMigrationsToApply(driver Driver, directoryPath string, direction Direction, finishAtVersion string, verbose bool) (out []Migration, err error) {
+	var available, applied, toApply []Migration
+	var finish time.Time
+	if available, err = listAvailableMigrations(directoryPath, direction); err != nil {
+		return
+	}
+	if verbose {
+		fmt.Println("-- All available migrations")
+		printMigrations(available)
+		fmt.Println()
+	}
+	if err = scanAppliedVersions(driver, func(rows AppliedVersions) (e error) {
+		var version, basename string
+		var mig Migration
+		if e = rows.Scan(&version); e != nil {
+			return
+		}
+		if basename, e = figureOutBasename(directoryPath, direction, version); e != nil {
+			return
+		}
+		if mig, e = parseMigration(filename(basename)); e != nil {
+			return
+		}
+		applied = append(applied, mig)
+		return
+	}); err != nil {
+		return
+	}
+	if verbose {
+		fmt.Println("-- Applied migrations")
+		printMigrations(applied)
+		fmt.Println()
+	}
+	if toApply, err = selectMigrationsToApply(
+		direction,
+		applied,
+		available,
 	); err != nil {
 		return
 	}
-	fmt.Println("-- versions to apply")
-	for _, version := range versionsToApply {
-		fmt.Println(version)
+	if finishAtVersion == "" && direction == DirForward {
+		finishAtVersion = maxVersion
+	} else if finishAtVersion == "" && direction == DirReverse {
+		finishAtVersion = minVersion
+	}
+	if finish, err = time.Parse(TimeFormat, finishAtVersion); err != nil {
+		return
+	}
+	for _, mig := range toApply {
+		timestamp := mig.Timestamp()
+		if direction == DirForward && timestamp.After(finish) {
+			break
+		}
+		if direction == DirReverse && timestamp.Before(finish) {
+			break
+		}
+		out = append(out, mig)
+	}
+	if verbose {
+		fmt.Println("-- Migrations to apply")
+		printMigrations(out)
 	}
 	return
 }
 
-// listAllAvailableMigrations returns a list of Migration values at path in a
-// specified direction.
-func listAllAvailableMigrations(direction Direction, path, finishAtVersion string) (out []Migration, err error) {
+// listAvailableMigrations returns a list of Migration values at directoryPath in
+// a specified direction.
+func listAvailableMigrations(directoryPath string, direction Direction) (out []Migration, err error) {
 	if direction == DirUnknown {
 		err = fmt.Errorf("unknown Direction %q", direction)
 		return
 	}
 	var fileDir *os.File
 	var filenames []string
-	var finish time.Time
-	if fileDir, err = os.Open(path); err != nil {
+	if fileDir, err = os.Open(directoryPath); err != nil {
 		return
 	}
 	defer fileDir.Close()
 	if filenames, err = fileDir.Readdirnames(0); err != nil {
 		return
 	}
-	sort.Strings(filenames)
-	if finish, err = time.Parse(TimeFormat, finishAtVersion); err != nil {
-		return
+	if direction == DirForward {
+		sort.Strings(filenames)
+	} else {
+		sort.Sort(sort.Reverse(sort.StringSlice(filenames)))
 	}
 	for _, fn := range filenames {
 		var mig Migration
@@ -484,20 +552,14 @@ func listAllAvailableMigrations(direction Direction, path, finishAtVersion strin
 		if dir != direction {
 			continue
 		}
-		timestamp := mig.Timestamp()
-		if dir == DirForward && timestamp.After(finish) {
-			continue
-		} else if dir == DirReverse && timestamp.Before(finish) {
-			continue
-		}
 		out = append(out, mig)
 	}
 	return
 }
 
-func listAppliedVersions(driver Driver) (out []string, err error) {
+func scanAppliedVersions(driver Driver, scan func(AppliedVersions) error) (err error) {
 	var conn *sql.DB
-	var rows *sql.Rows
+	var rows AppliedVersions
 	if conn, err = connect(driver.Name(), driver.DSNParams()); err != nil {
 		return
 	}
@@ -506,66 +568,73 @@ func listAppliedVersions(driver Driver) (out []string, err error) {
 	}
 	defer rows.Close()
 	for rows.Next() {
-		var version string
-		if err = rows.Scan(&version); err != nil {
+		if err = scan(rows); err != nil {
 			return
 		}
-		out = append(out, version)
 	}
 	return
 }
 
-// listAvailableVersions extracts the versions from migration files and formats
-// them to TimeFormat.
-func listAvailableVersions(migrations []Migration) []string {
-	out := make([]string, len(migrations))
-	for i, mig := range migrations {
-		out[i] = mig.Timestamp().Format(TimeFormat)
-	}
-	return out
-}
-
-func listVersionsToApply(direction Direction, applied, available []string) (out []string, err error) {
+func selectMigrationsToApply(direction Direction, applied, available []Migration) (out []Migration, err error) {
 	if direction == DirUnknown {
 		err = fmt.Errorf("unknown Direction %q", direction)
 		return
 	}
 
-	// Collect versions in 3 "sets". Using empty struct as value because its
-	// storage size is 0 bytes.
-	allVersions := make(map[string]struct{})
-	uniqueToApplied := make(map[string]struct{})
-	for _, version := range applied {
-		uniqueToApplied[version] = struct{}{}
-		allVersions[version] = struct{}{}
+	allVersions := make(map[int64]Migration)
+	uniqueToApplied := make(map[int64]Migration)
+	for _, mig := range applied {
+		version := mig.Timestamp().Unix()
+		uniqueToApplied[version] = mig
+		allVersions[version] = mig
 	}
-	uniqueToAvailable := make(map[string]struct{})
-	for _, version := range available {
+	uniqueToAvailable := make(map[int64]Migration)
+	for _, mig := range available {
+		version := mig.Timestamp().Unix()
 		if _, ok := uniqueToApplied[version]; ok {
 			delete(uniqueToApplied, version)
 		} else {
-			uniqueToAvailable[version] = struct{}{}
-			allVersions[version] = struct{}{}
+			uniqueToAvailable[version] = mig
+			allVersions[version] = mig
 		}
 	}
 
 	if direction == DirForward {
-		for v := range allVersions {
-			_, isApplied := uniqueToApplied[v]
-			_, isAvailable := uniqueToAvailable[v]
+		for version, mig := range allVersions {
+			_, isApplied := uniqueToApplied[version]
+			_, isAvailable := uniqueToAvailable[version]
 			if !isApplied && isAvailable {
-				out = append(out, v)
+				out = append(out, mig)
 			}
 		}
 	} else {
-		for v := range allVersions {
-			_, appliedOK := uniqueToApplied[v]
-			_, availableOK := uniqueToAvailable[v]
+		for version, mig := range allVersions {
+			_, appliedOK := uniqueToApplied[version]
+			_, availableOK := uniqueToAvailable[version]
 			if !appliedOK && !availableOK {
-				out = append(out, v)
+				out = append(out, mig)
 			}
 		}
 	}
-	sort.Strings(out)
+	if direction == DirForward {
+		sort.Slice(out, func(i, j int) bool {
+			return out[i].Timestamp().Before(out[j].Timestamp())
+		})
+	} else {
+		sort.Slice(out, func(i, j int) bool {
+			return out[j].Timestamp().Before(out[i].Timestamp())
+		})
+	}
 	return
+}
+
+func printMigrations(migrations []Migration) {
+	fmt.Printf("\t%-20s | %-10s | %-s\n", "version", "direction", "name")
+	fmt.Printf("\t%-20s | %-10s | %-s\n", "-------", "---------", "----")
+	for _, mig := range migrations {
+		fmt.Printf(
+			"\t%-20s | %-10s | %-s\n",
+			mig.Timestamp().Format(TimeFormat), mig.Direction(), mig.Name(),
+		)
+	}
 }
