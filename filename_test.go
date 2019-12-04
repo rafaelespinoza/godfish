@@ -36,12 +36,12 @@ func TestFilename(t *testing.T) {
 	}
 }
 
-func mustMakeMigration(direction Direction) Migration {
-	ts, err := time.Parse("20060102150405", "20191118121314")
+func mustMakeMigration(version string, direction Direction, name string) Migration {
+	ts, err := time.Parse(TimeFormat, version)
 	if err != nil {
 		panic(err)
 	}
-	mut, err := newMutation(ts, direction, "test")
+	mut, err := newMutation(ts, direction, name)
 	if err != nil {
 		panic(err)
 	}
@@ -55,11 +55,11 @@ func TestParseMigration(t *testing.T) {
 	}{
 		{
 			filename: filename("20191118121314.forward.test.sql"),
-			expected: mustMakeMigration(DirForward),
+			expected: mustMakeMigration("20191118121314", DirForward, "test"),
 		},
 		{
 			filename: filename("20191118121314.reverse.test.sql"),
-			expected: mustMakeMigration(DirReverse),
+			expected: mustMakeMigration("20191118121314", DirReverse, "test"),
 		},
 	}
 
