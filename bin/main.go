@@ -33,35 +33,18 @@ type command struct {
 
 // commands registers any operation by name to a command.
 var commands = map[string]command{
-	"dump-schema": command{
-		description: "generate a sql file describing the db schema",
+	"create-migration": {
+		description: "generate migration files",
 		help: func() (out string) {
 			out = fmt.Sprintf(`
-Usage: dump-schema -driver <driverName>
-	`)
-			return
-		},
-		mapper: func(a Args) error {
-			driver, err := newDriver(a.Driver)
-			if err != nil {
-				return err
-			}
-			godfish.DumpSchema(driver)
-			return nil
-		},
-	},
-	"generate-migration": command{
-		description: "create migration files",
-		help: func() (out string) {
-			out = fmt.Sprintf(`
-Usage: generate-migration -name <name> [-reversible]
+Usage: %s create-migration -name <name> [-reversible]
 
-	Creates migration files at %s: one meant for the "forward" direction,
+	Generate migration files at %s: one meant for the "forward" direction,
 	another meant for "reverse". Optionally create a migration in the forward
 	direction only by passing the flag "-reversible=false". The "name" flag has
 	no effects other than on the generated filename. The output filename
-	automatically has a "version", which is a timestamp in the form: %s.`,
-				pathToDBMigrations, godfish.TimeFormat)
+	automatically has a "version". Timestamp format: %s.`,
+				bin, pathToDBMigrations, godfish.TimeFormat)
 			return
 		},
 		mapper: func(a Args) error {
@@ -76,12 +59,29 @@ Usage: generate-migration -name <name> [-reversible]
 			return migration.GenerateFiles()
 		},
 	},
-	"info": command{
+	"dump-schema": {
+		description: "generate a sql file describing the db schema",
+		help: func() (out string) {
+			out = fmt.Sprintf(`
+Usage: %s dump-schema -driver <driverName>
+	`, bin)
+			return
+		},
+		mapper: func(a Args) error {
+			driver, err := newDriver(a.Driver)
+			if err != nil {
+				return err
+			}
+			godfish.DumpSchema(driver)
+			return nil
+		},
+	},
+	"info": {
 		description: "output current state of migrations",
 		help: func() (out string) {
 			out = fmt.Sprintf(`
-Usage: info -direction [forward|reverse] -driver <driverName>
-			`)
+Usage: %s info -direction [forward|reverse] -driver <driverName>
+			`, bin)
 			return
 		},
 		mapper: func(a Args) error {
@@ -90,16 +90,16 @@ Usage: info -direction [forward|reverse] -driver <driverName>
 				return err
 			}
 			direction := whichDirection(a)
-			return godfish.Info(driver, direction, pathToDBMigrations)
+			return godfish.Info(driver, pathToDBMigrations, direction, a.Version)
 		},
 	},
-	"init": command{
-		description: "creates schema migrations table",
+	"init": {
+		description: "create schema migrations table",
 		help: func() (out string) {
 			out = fmt.Sprintf(`
-Usage: init -driver <driverName>
+Usage: %s init -driver <driverName>
 
-Creates the db table to track migrations, unless it already exists.`)
+Creates the db table to track migrations, unless it already exists.`, bin)
 			return
 		},
 		mapper: func(a Args) error {
@@ -110,36 +110,17 @@ Creates the db table to track migrations, unless it already exists.`)
 			return godfish.CreateSchemaMigrationsTable(driver)
 		},
 	},
-	"run-all": command{
-		description: "execute all migration files",
-		help: func() (out string) {
-			out = `
-Usage: run-all -direction [forward|reverse] -driver <driverName>
-
-	Execute all migration files in either forward or reverse directions.
-	Specify the direction using the "direction" flag.`
-			return
-		},
-		mapper: func(a Args) error {
-			driver, err := newDriver(a.Driver)
-			if err != nil {
-				return err
-			}
-			direction := whichDirection(a)
-			return godfish.Migrate(driver, direction, pathToDBMigrations)
-		},
-	},
-	"run-one": command{
-		description: "execute one migration",
+	"migrate": {
+		description: "execute migration(s) in the forward direction",
 		help: func() (out string) {
 			out = fmt.Sprintf(`
-Usage: run-one -direction [forward|reverse] -driver <driverName> -version <timestamp>
+Usage: %s migrate -driver <driverName> [-version <timestamp>]
 
-	Execute just one migration file. Specify the migration direction with the
-	"direction" flag, which is "forward" by default. The "version" flag is used
-	to specify which migration to run. It should be a timestamp in the form:
-	%s.`,
-				godfish.TimeFormat)
+	Execute migration(s) in the forward direction. If the "version" is left
+	unspecified, then all available migrations are executed. Otherwise,
+	available migrations are executed up to and including the specified version.
+	Specify a version in the form: %s.`,
+				bin, godfish.TimeFormat)
 			return
 		},
 		mapper: func(a Args) error {
@@ -147,13 +128,89 @@ Usage: run-one -direction [forward|reverse] -driver <driverName> -version <times
 			if err != nil {
 				return err
 			}
-			direction := whichDirection(a)
+			if a.Version == "" {
+				err = godfish.Migrate(
+					driver,
+					pathToDBMigrations,
+					godfish.DirForward,
+					a.Version,
+				)
+			} else {
+				err = godfish.ApplyMigration(
+					driver,
+					pathToDBMigrations,
+					godfish.DirForward,
+					a.Version,
+				)
+			}
+			return err
+		},
+	},
+	"remigrate": {
+		description: "rollback and then re-apply the last migration",
+		help: func() (out string) {
+			out = fmt.Sprintf(`
+Usage: %s remigrate -driver <driverName>
+
+	Execute the last migration in reverse (rollback) and then execute the same
+	one forward. This could be useful for development.`, bin)
+			return
+		},
+		mapper: func(a Args) error {
+			driver, err := newDriver(a.Driver)
+			if err != nil {
+				return err
+			}
+			if err = godfish.ApplyMigration(
+				driver,
+				pathToDBMigrations,
+				godfish.DirReverse,
+				"",
+			); err != nil {
+				return err
+			}
 			return godfish.ApplyMigration(
 				driver,
-				direction,
 				pathToDBMigrations,
-				args.Version,
+				godfish.DirForward,
+				"",
 			)
+		},
+	},
+	"rollback": {
+		description: "execute migration(s) in the reverse direction",
+		help: func() (out string) {
+			out = fmt.Sprintf(`
+Usage: %s rollback -driver <driverName> [-version <timestamp>]
+
+	Execute migration(s) in the reverse direction. If the "version" is left
+	unspecified, then only the first available migration is executed. Otherwise,
+	available migrations are executed down to and including the specified
+	version. Specify a version in the form: %s.`,
+				bin, godfish.TimeFormat)
+			return
+		},
+		mapper: func(a Args) error {
+			driver, err := newDriver(a.Driver)
+			if err != nil {
+				return err
+			}
+			if a.Version == "" {
+				err = godfish.ApplyMigration(
+					driver,
+					pathToDBMigrations,
+					godfish.DirReverse,
+					a.Version,
+				)
+			} else {
+				err = godfish.Migrate(
+					driver,
+					pathToDBMigrations,
+					godfish.DirReverse,
+					a.Version,
+				)
+			}
+			return err
 		},
 	},
 }
@@ -163,7 +220,10 @@ Usage: run-one -direction [forward|reverse] -driver <driverName> -version <times
 // command from the project root as well.
 const pathToDBMigrations = "db/migrations"
 
-var args Args
+var (
+	args Args
+	bin  = os.Args[0]
+)
 
 func init() {
 	flag.Usage = func() {
@@ -187,12 +247,12 @@ Commands:
 	}
 
 	flag.StringVar(&args.Cmd, "cmd", "", "name of command to execute")
-	flag.StringVar(&args.Name, "name", "", "generate a migration with a name, ie: foo")
+	flag.StringVar(&args.Name, "name", "", "create a migration with a name, ie: foo")
 	flag.StringVar(
 		&args.Version,
 		"version",
 		"",
-		fmt.Sprintf("timestamp of migration to run, format: %s", godfish.TimeFormat),
+		fmt.Sprintf("timestamp of migration, format: %s", godfish.TimeFormat),
 	)
 	flag.StringVar(
 		&args.Direction,
@@ -201,7 +261,7 @@ Commands:
 		"direction of migration to run. [forward | reverse]",
 	)
 	flag.StringVar(&args.Driver, "driver", "", "name of database driver, ie: postgres, mysql")
-	flag.BoolVar(&args.Reversible, "reversible", true, "generate a reversible migration?")
+	flag.BoolVar(&args.Reversible, "reversible", true, "create a reversible migration?")
 	flag.BoolVar(&args.Help, "h", false, "show help menu")
 	flag.BoolVar(&args.Help, "help", false, "show help menu")
 	flag.Parse()
@@ -211,9 +271,8 @@ func main() {
 	var err error
 	if cmd, ok := commands[args.Cmd]; !ok {
 		flag.Usage()
-		err = fmt.Errorf("unknown command %q\n", args.Cmd)
+		err = fmt.Errorf("unknown command %q", args.Cmd)
 	} else if args.Help {
-		flag.Usage()
 		fmt.Fprint(
 			flag.CommandLine.Output(),
 			cmd.help(),
@@ -223,7 +282,8 @@ func main() {
 		err = cmd.mapper(args)
 	}
 	if err != nil {
-		panic(err)
+		fmt.Println(err)
+		os.Exit(1)
 	}
 }
 
