@@ -244,26 +244,27 @@ var (
 // Migrate executes all migrations at directoryPath in the specified direction.
 func Migrate(driver Driver, directoryPath string, direction Direction, finishAtVersion string) (err error) {
 	var migrations []Migration
-	var dbHandler *sql.DB
+	defer driver.Close()
+
 	if finishAtVersion == "" && direction == DirForward {
 		finishAtVersion = maxVersion
 	} else if finishAtVersion == "" && direction == DirReverse {
 		finishAtVersion = minVersion
 	}
 
+	if _, err = driver.Connect(); err != nil {
+		return
+	}
 	if migrations, err = listMigrationsToApply(driver, directoryPath, direction, finishAtVersion, false); err != nil {
 		return
 	}
 
-	if dbHandler, err = connect(driver.Name(), driver.DSNParams()); err != nil {
-		return
-	}
 	for _, mig := range migrations {
 		var pathToFile string
 		if pathToFile, err = pathToMigrationFile(directoryPath, mig); err != nil {
 			return
 		}
-		if err = runMigration(dbHandler, driver, pathToFile, mig); err != nil {
+		if err = runMigration(driver, pathToFile, mig); err != nil {
 			return
 		}
 	}
@@ -273,8 +274,15 @@ func Migrate(driver Driver, directoryPath string, direction Direction, finishAtV
 // ApplyMigration runs a migration at directoryPath with the specified version
 // and direction.
 func ApplyMigration(driver Driver, directoryPath string, direction Direction, version string) (err error) {
+	var mig Migration
+	var pathToFile string
+	defer driver.Close()
+
 	if direction == DirUnknown {
 		err = fmt.Errorf("unknown Direction %q", direction)
+		return
+	}
+	if _, err = driver.Connect(); err != nil {
 		return
 	}
 	if version == "" {
@@ -294,10 +302,6 @@ func ApplyMigration(driver Driver, directoryPath string, direction Direction, ve
 		}
 	}
 
-	var mig Migration
-	var dbHandler *sql.DB
-	var pathToFile string
-
 	if pathToFile, err = figureOutBasename(directoryPath, direction, version); err != nil {
 		return
 	}
@@ -305,10 +309,7 @@ func ApplyMigration(driver Driver, directoryPath string, direction Direction, ve
 	if mig, err = parseMigration(fn); err != nil {
 		return
 	}
-	if dbHandler, err = connect(driver.Name(), driver.DSNParams()); err != nil {
-		return
-	}
-	err = runMigration(dbHandler, driver, pathToFile, mig)
+	err = runMigration(driver, pathToFile, mig)
 	return
 }
 
@@ -334,7 +335,7 @@ func figureOutBasename(directoryPath string, direction Direction, version string
 
 // runMigration executes a migration against the database. The input, pathToFile
 // should be relative to the current working directory.
-func runMigration(conn *sql.DB, driver Driver, pathToFile string, mig Migration) (err error) {
+func runMigration(driver Driver, pathToFile string, mig Migration) (err error) {
 	var file *os.File
 	var info os.FileInfo
 	defer file.Close()
@@ -348,14 +349,13 @@ func runMigration(conn *sql.DB, driver Driver, pathToFile string, mig Migration)
 	if _, err = file.Read(data); err != nil {
 		return
 	}
-	if err = driver.Execute(conn, string(data)); err != nil {
+	if err = driver.Execute(string(data)); err != nil {
 		return
 	}
-	if err = driver.CreateSchemaMigrationsTable(conn); err != nil {
+	if err = driver.CreateSchemaMigrationsTable(); err != nil {
 		return
 	}
 	err = driver.UpdateSchemaMigrations(
-		conn,
 		mig.Direction(),
 		mig.Timestamp().Format(TimeFormat),
 	)
@@ -379,17 +379,26 @@ type DSNParams interface {
 type Driver interface {
 	// Name should return the name of the driver: ie: postgres, mysql, etc
 	Name() string
+	// Connect should open a connection (a *sql.DB) to the database and save an
+	// internal reference to that connection for later use. This library might
+	// call this method multiple times, so use the internal reference if it's
+	// present instead of reconnecting to the database.
+	Connect() (*sql.DB, error)
+	// Close should check if there's an internal reference to a database
+	// connection (a *sql.DB) and if it's present, close it. Then reset the
+	// internal reference to that connection to nil.
+	Close() error
 	DSNParams() DSNParams
-	CreateSchemaMigrationsTable(conn *sql.DB) error
+	CreateSchemaMigrationsTable() error
 	DumpSchema() error
 	// Execute runs the schema change and commits it to the database. The query
 	// parameter is a SQL string and may contain placeholders for the values in
 	// args. Input should be passed to conn so it could be sanitized, escaped.
-	Execute(conn *sql.DB, query string, args ...interface{}) error
+	Execute(query string, args ...interface{}) error
 	// AppliedVersions returns a list of migration versions that have been
 	// executed against the database.
-	AppliedVersions(conn *sql.DB) (AppliedVersions, error)
-	UpdateSchemaMigrations(conn *sql.DB, dir Direction, version string) error
+	AppliedVersions() (AppliedVersions, error)
+	UpdateSchemaMigrations(dir Direction, version string) error
 }
 
 // NewDriver initializes a Driver implementation by name and connection
@@ -432,21 +441,29 @@ var _ AppliedVersions = (*sql.Rows)(nil)
 // CreateSchemaMigrationsTable creates a table to track status of migrations on
 // the database. Running any migration will create the table, so you don't
 // usually need to call this function.
-func CreateSchemaMigrationsTable(driver Driver) error {
-	conn, err := connect(driver.Name(), driver.DSNParams())
-	if err != nil {
+func CreateSchemaMigrationsTable(driver Driver) (err error) {
+	if _, err = driver.Connect(); err != nil {
 		return err
 	}
-	return driver.CreateSchemaMigrationsTable(conn)
+	defer driver.Close()
+	return driver.CreateSchemaMigrationsTable()
 }
 
 // DumpSchema describes the database structure and outputs to standard out.
-func DumpSchema(driver Driver) error {
+func DumpSchema(driver Driver) (err error) {
+	if _, err = driver.Connect(); err != nil {
+		return err
+	}
+	defer driver.Close()
 	return driver.DumpSchema()
 }
 
 // Info displays the outputs of various helper functions.
 func Info(driver Driver, directoryPath string, direction Direction, finishAtVersion string) (err error) {
+	if _, err = driver.Connect(); err != nil {
+		return err
+	}
+	defer driver.Close()
 	_, err = listMigrationsToApply(
 		driver,
 		directoryPath,
@@ -558,12 +575,8 @@ func listAvailableMigrations(directoryPath string, direction Direction) (out []M
 }
 
 func scanAppliedVersions(driver Driver, scan func(AppliedVersions) error) (err error) {
-	var conn *sql.DB
 	var rows AppliedVersions
-	if conn, err = connect(driver.Name(), driver.DSNParams()); err != nil {
-		return
-	}
-	if rows, err = driver.AppliedVersions(conn); err != nil {
+	if rows, err = driver.AppliedVersions(); err != nil {
 		return
 	}
 	defer rows.Close()

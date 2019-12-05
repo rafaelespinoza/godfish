@@ -35,6 +35,7 @@ func (p PostgresParams) String() string {
 // postgres implements the Driver interface for postgres databases.
 type postgres struct {
 	MigrationsConf MigrationsConf
+	connection     *sql.DB
 	connParams     PostgresParams
 }
 
@@ -53,14 +54,35 @@ func newPostgres(connParams PostgresParams) (*postgres, error) {
 
 func (d *postgres) Name() string         { return "postgres" }
 func (d *postgres) DSNParams() DSNParams { return d.connParams }
-
-func (d *postgres) Execute(conn *sql.DB, query string, args ...interface{}) (err error) {
-	_, err = conn.Query(query)
+func (d *postgres) Connect() (conn *sql.DB, err error) {
+	if d.connection != nil {
+		conn = d.connection
+		return
+	}
+	if conn, err = connect(d.Name(), d.DSNParams()); err != nil {
+		return
+	}
+	d.connection = conn
 	return
 }
 
-func (d *postgres) CreateSchemaMigrationsTable(conn *sql.DB) (err error) {
-	_, err = conn.Query(
+func (d *postgres) Close() (err error) {
+	conn := d.connection
+	if conn == nil {
+		return
+	}
+	d.connection = nil
+	err = conn.Close()
+	return
+}
+
+func (d *postgres) Execute(query string, args ...interface{}) (err error) {
+	_, err = d.connection.Query(query)
+	return
+}
+
+func (d *postgres) CreateSchemaMigrationsTable() (err error) {
+	_, err = d.connection.Query(
 		`CREATE TABLE IF NOT EXISTS schema_migrations (
 			migration_id VARCHAR(128) PRIMARY KEY NOT NULL
 		)`)
@@ -82,15 +104,16 @@ func (d *postgres) DumpSchema() (err error) {
 	return
 }
 
-func (d *postgres) AppliedVersions(conn *sql.DB) (out AppliedVersions, err error) {
-	rows, err := conn.Query(
+func (d *postgres) AppliedVersions() (out AppliedVersions, err error) {
+	rows, err := d.connection.Query(
 		`SELECT migration_id FROM schema_migrations ORDER BY migration_id ASC`,
 	)
 	out = AppliedVersions(rows)
 	return
 }
 
-func (d *postgres) UpdateSchemaMigrations(conn *sql.DB, dir Direction, version string) (err error) {
+func (d *postgres) UpdateSchemaMigrations(dir Direction, version string) (err error) {
+	conn := d.connection
 	if dir == DirForward {
 		_, err = conn.Exec(`
 			INSERT INTO schema_migrations (migration_id)
