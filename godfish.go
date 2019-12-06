@@ -38,10 +38,6 @@ const (
 	TimeFormat = "20060102150405"
 )
 
-// DefaultMigrationFileDirectory is the location relative to this file where
-// DDL files are stored.
-const DefaultMigrationFileDirectory = "../migrations" // TODO: change or remove
-
 // filename is just a string with a specific format to migration files. One part
 // has a generated timestamp, one part has a direction, another has a name.
 type filename string
@@ -155,11 +151,6 @@ func NewMigrationParams(name string, reversible bool, directory *os.File) (*Migr
 	var out MigrationParams
 	var err error
 	var info os.FileInfo
-	if directory == nil {
-		if directory, err = os.Open(DefaultMigrationFileDirectory); err != nil {
-			return nil, err
-		}
-	}
 	if info, err = directory.Stat(); err != nil {
 		return nil, err
 	} else if !info.IsDir() {
