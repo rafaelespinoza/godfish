@@ -370,6 +370,7 @@ type DSNParams interface {
 type Driver interface {
 	// Name should return the name of the driver: ie: postgres, mysql, etc
 	Name() string
+
 	// Connect should open a connection (a *sql.DB) to the database and save an
 	// internal reference to that connection for later use. This library might
 	// call this method multiple times, so use the internal reference if it's
@@ -379,16 +380,25 @@ type Driver interface {
 	// connection (a *sql.DB) and if it's present, close it. Then reset the
 	// internal reference to that connection to nil.
 	Close() error
+	// DSNParams returns data source name info, ie: how do I connect?
 	DSNParams() DSNParams
+
+	// AppliedVersions queries the schema migrations table for migration
+	// versions that have been executed against the database.
+	AppliedVersions() (AppliedVersions, error)
+	// CreateSchemaMigrationsTable should create a table to record migration
+	// versions once they've been applied. The version should be a timestamp as
+	// a string, formatted as the TimeFormat variable in this package.
 	CreateSchemaMigrationsTable() error
+	// DumpSchema should output the database structure to stdout.
 	DumpSchema() error
 	// Execute runs the schema change and commits it to the database. The query
 	// parameter is a SQL string and may contain placeholders for the values in
 	// args. Input should be passed to conn so it could be sanitized, escaped.
 	Execute(query string, args ...interface{}) error
-	// AppliedVersions returns a list of migration versions that have been
-	// executed against the database.
-	AppliedVersions() (AppliedVersions, error)
+	// UpdateSchemaMigrations records a timestamped version of a migration that
+	// has been successfully applied by adding a new row to the schema
+	// migrations table.
 	UpdateSchemaMigrations(dir Direction, version string) error
 }
 
@@ -418,8 +428,8 @@ type MigrationsConf struct {
 
 // AppliedVersions represents an iterative list of migrations that have been run
 // against the database and have been recorded in the schema migrations table.
-// It's enough to convert a sql.Rows struct when implementing the Driver
-// interface since a sql.Rows already satisfies this interface. See the existing
+// It's enough to convert a *sql.Rows struct when implementing the Driver
+// interface since a *sql.Rows already satisfies this interface. See existing
 // Driver implementations in this package for examples.
 type AppliedVersions interface {
 	Close() error
