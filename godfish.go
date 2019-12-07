@@ -2,6 +2,7 @@ package godfish
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -262,6 +263,11 @@ func Migrate(driver Driver, directoryPath string, direction Direction, finishAtV
 	return
 }
 
+var (
+	ErrNoVersionFound = errors.New("no version found")
+	ErrNoFilesFound   = errors.New("no files found")
+)
+
 // ApplyMigration runs a migration at directoryPath with the specified version
 // and direction.
 func ApplyMigration(driver Driver, directoryPath string, direction Direction, version string) (err error) {
@@ -286,7 +292,7 @@ func ApplyMigration(driver Driver, directoryPath string, direction Direction, ve
 			err = fmt.Errorf("specified no version; error attempting to find one; %v", ierr)
 			return
 		} else if len(toApply) < 1 {
-			err = fmt.Errorf("specified no version, did not find one to apply")
+			err = ErrNoVersionFound
 			return
 		} else {
 			version = toApply[0].Timestamp().Format(TimeFormat)
@@ -314,7 +320,7 @@ func figureOutBasename(directoryPath string, direction Direction, version string
 	if filenames, e = filepath.Glob(glob); e != nil {
 		return
 	} else if len(filenames) == 0 {
-		e = fmt.Errorf("could not find matching files")
+		e = ErrNoFilesFound
 		return
 	} else if len(filenames) > 1 {
 		e = fmt.Errorf("need 1 matching filename; got %v", filenames)
@@ -550,6 +556,9 @@ func listAvailableMigrations(directoryPath string, direction Direction) (out []M
 	var fileDir *os.File
 	var filenames []string
 	if fileDir, err = os.Open(directoryPath); err != nil {
+		if _, ok := err.(*os.PathError); ok {
+			err = fmt.Errorf("path to migration files %q not found", directoryPath)
+		}
 		return
 	}
 	defer fileDir.Close()
