@@ -7,7 +7,7 @@ import (
 	"sort"
 	"strings"
 
-	"bitbucket.org/rafaelespinoza/godfish"
+	"bitbucket.org/rafaelespinoza/godfish/godfish"
 )
 
 // Args describes the CLI inputs.

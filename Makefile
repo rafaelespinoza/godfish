@@ -19,7 +19,10 @@ SETUPS=$(addsuffix -setup, $(DRIVERS_TO_TEST))
 TEARDOWNS=$(addsuffix -teardown, $(DRIVERS_TO_TEST))
 
 test: clean db
-	go test $(ARGS) .
+	go test ./godfish $(ARGS)
+
+install:
+	go install -i .
 
 db: $(SETUPS)
 clean: $(TEARDOWNS)

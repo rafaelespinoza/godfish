@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"bitbucket.org/rafaelespinoza/godfish"
+	"bitbucket.org/rafaelespinoza/godfish/godfish"
 )
 
 const (
