@@ -34,20 +34,21 @@ func (p PostgresParams) String() string {
 
 // postgres implements the Driver interface for postgres databases.
 type postgres struct {
-	MigrationsConf MigrationsConf
-	connection     *sql.DB
-	connParams     PostgresParams
+	connection *sql.DB
+	connParams PostgresParams
 }
 
 var _ Driver = (*postgres)(nil)
 
 func newPostgres(connParams PostgresParams) (*postgres, error) {
+	if connParams.Host == "" {
+		connParams.Host = "localhost"
+	}
 	if connParams.Port == "" {
 		connParams.Port = "5432"
 	}
 	driver := postgres{
-		MigrationsConf: MigrationsConf{"db/migrations"},
-		connParams:     connParams,
+		connParams: connParams,
 	}
 	return &driver, nil
 }

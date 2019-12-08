@@ -2,8 +2,10 @@ package godfish
 
 import (
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
@@ -429,7 +431,8 @@ func NewDriver(driverName string, dsnParams DSNParams) (driver Driver, err error
 // MigrationsConf is intended to lend customizations such as specifying the path
 // to the migration files.
 type MigrationsConf struct {
-	PathToFiles string
+	DriverName  string `json:"driver_name"`
+	PathToFiles string `json:"path_to_files"`
 }
 
 // AppliedVersions represents an iterative list of migrations that have been run
@@ -479,6 +482,28 @@ func Info(driver Driver, directoryPath string, direction Direction, finishAtVers
 		true,
 	)
 	return
+}
+
+// Init creates a configuration file at pathToFile unless it already exists.
+func Init(pathToFile string) (err error) {
+	_, err = os.Stat(pathToFile)
+	if err == nil {
+		fmt.Printf("config file %q already present\n", pathToFile)
+		return nil
+	}
+	if !os.IsNotExist(err) {
+		return err
+	}
+
+	var data []byte
+	if data, err = json.MarshalIndent(MigrationsConf{}, "", "\t"); err != nil {
+		return err
+	}
+	return ioutil.WriteFile(
+		pathToFile,
+		append(data, byte('\n')),
+		os.FileMode(0644),
+	)
 }
 
 func listMigrationsToApply(driver Driver, directoryPath string, direction Direction, finishAtVersion string, verbose bool) (out []Migration, err error) {

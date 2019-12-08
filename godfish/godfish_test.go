@@ -1,7 +1,9 @@
 package godfish_test
 
 import (
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -536,4 +538,60 @@ func truncateSchemaMigrations(driver godfish.Driver) (err error) {
 		err = fmt.Errorf("unknown Driver %q", driver.Name())
 	}
 	return
+}
+
+func TestInit(t *testing.T) {
+	var err error
+	const pathToFile = baseTestOutputDir + "/config.json"
+	// setup: file should not exist at first
+	if _, err = os.Stat(pathToFile); !os.IsNotExist(err) {
+		t.Fatalf("setup error; file at %q should not exist", pathToFile)
+		return
+	}
+
+	// test 1: file created with this shape
+	if err = godfish.Init(pathToFile); err != nil {
+		t.Fatalf("something else is wrong with setup; %v", err)
+		return
+	}
+	var conf godfish.MigrationsConf
+	if data, err := ioutil.ReadFile(pathToFile); err != nil {
+		t.Fatal(err)
+	} else if err = json.Unmarshal(data, &conf); err != nil {
+		t.Fatal(err)
+	}
+	conf.DriverName = "foo"
+	conf.PathToFiles = baseTestOutputDir + "/bar"
+
+	// test2: write data and make sure it's not overwritten after calling Init
+	if data, err := json.MarshalIndent(conf, "", "\t"); err != nil {
+		t.Fatal(err)
+	} else {
+		ioutil.WriteFile(
+			pathToFile,
+			append(data, byte('\n')),
+			os.FileMode(0644),
+		)
+	}
+	if err := godfish.Init(pathToFile); err != nil {
+		t.Fatal(err)
+	}
+	var conf2 godfish.MigrationsConf
+	if data, err := ioutil.ReadFile(pathToFile); err != nil {
+		t.Fatal(err)
+	} else if err = json.Unmarshal(data, &conf2); err != nil {
+		t.Fatal(err)
+	}
+	if conf2.DriverName != "foo" {
+		t.Errorf(
+			"expected conf.DriverName to be %q, got %q",
+			"foo", conf2.DriverName,
+		)
+	}
+	if conf2.PathToFiles != baseTestOutputDir+"/bar" {
+		t.Errorf(
+			"expected conf.PathToFiles to be %q, got %q",
+			"foo", conf2.PathToFiles,
+		)
+	}
 }
