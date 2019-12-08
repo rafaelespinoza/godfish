@@ -177,21 +177,13 @@ Usage: %s migrate [-version timestamp]
 			if err != nil {
 				return err
 			}
-			if a.Version == "" {
-				err = godfish.Migrate(
-					driver,
-					a.Files,
-					godfish.DirForward,
-					a.Version,
-				)
-			} else {
-				err = godfish.ApplyMigration(
-					driver,
-					a.Files,
-					godfish.DirForward,
-					a.Version,
-				)
-			}
+
+			err = godfish.Migrate(
+				driver,
+				a.Files,
+				godfish.DirForward,
+				a.Version,
+			)
 			return err
 		},
 	},
