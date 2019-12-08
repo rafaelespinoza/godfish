@@ -97,7 +97,7 @@ func TestMigrationParams(t *testing.T) {
 	}
 	expectedDirections := []string{"reverse", "forward"}
 	for i, name := range filesAfter {
-		patt := fmt.Sprintf("[0-9]*.%s.foo.sql", expectedDirections[i])
+		patt := fmt.Sprintf("%s-[0-9]*-foo.sql", expectedDirections[i])
 		if match, err := filepath.Match(patt, name); err != nil {
 			t.Error(err)
 			return

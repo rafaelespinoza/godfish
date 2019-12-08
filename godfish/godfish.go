@@ -32,7 +32,7 @@ func (d Direction) String() string {
 }
 
 const (
-	filenameDelimeter = "."
+	filenameDelimeter = "-"
 	// TimeFormat provides a consistent timestamp layout for migration
 	// filenames. Formatting time in go works a little differently than in other
 	// languages. Read more at: https://golang.org/pkg/time/#pkg-constants.
@@ -44,7 +44,7 @@ const (
 type filename string
 
 // makeFilename creates a filename based on the independent parts. Format:
-// "2006010215040506.${direction}.${name}.sql"
+// "${direction}-2006010215040506-${name}.sql"
 func makeFilename(version string, direction Direction, name string) (filename, error) {
 	if len(version) != len(TimeFormat) {
 		return "", fmt.Errorf("version must have length %d", len(TimeFormat))
@@ -59,10 +59,9 @@ func makeFilename(version string, direction Direction, name string) (filename, e
 	if strings.Contains(name, filenameDelimeter) {
 		return "", fmt.Errorf("name %q cannot contain %q", name, filenameDelimeter)
 	}
-	head := version + filenameDelimeter
-	tail := filenameDelimeter + name + ".sql"
-	dir := strings.ToLower(direction.String())
-	return filename(head + dir + tail), nil
+	dir := strings.ToLower(direction.String()) + filenameDelimeter
+	ver := version + filenameDelimeter
+	return filename(dir + ver + name + ".sql"), nil
 }
 
 func parseMigration(name filename) (mig Migration, err error) {
@@ -71,20 +70,21 @@ func parseMigration(name filename) (mig Migration, err error) {
 	base := filepath.Base(string(name))
 	parts := strings.Split(base, filenameDelimeter)
 
-	ts, err = time.Parse(TimeFormat, parts[0])
-	if err != nil {
-		return
-	}
-	if strings.ToLower(parts[1]) == "forward" {
+	if strings.ToLower(parts[0]) == "forward" {
 		dir = DirForward
-	} else if strings.ToLower(parts[1]) == "reverse" {
+	} else if strings.ToLower(parts[0]) == "reverse" {
 		dir = DirReverse
 	} else {
 		err = fmt.Errorf("unknown Direction %q", parts[1])
 		return
 	}
 
-	mig, err = newMutation(ts, dir, parts[2])
+	ts, err = time.Parse(TimeFormat, parts[1])
+	if err != nil {
+		return
+	}
+
+	mig, err = newMutation(ts, dir, strings.TrimSuffix(parts[2], ".sql"))
 	return
 }
 
@@ -98,7 +98,7 @@ type Migration interface {
 }
 
 // Basename generates a migration file's basename. The output format is:
-// "2006010215040506.${direction}.${name}.sql".
+// "${direction}-2006010215040506-${name}.sql".
 func Basename(mig Migration) (string, error) {
 	out, err := makeMigrationFilename(mig)
 	if err != nil {
@@ -652,12 +652,12 @@ func selectMigrationsToApply(direction Direction, applied, available []Migration
 }
 
 func printMigrations(migrations []Migration) {
-	fmt.Printf("\t%-20s | %-10s | %-s\n", "version", "direction", "name")
-	fmt.Printf("\t%-20s | %-10s | %-s\n", "-------", "---------", "----")
+	fmt.Printf("\t%-10s | %-20s | %-s\n", "direction", "version", "name")
+	fmt.Printf("\t%-10s | %-20s | %-s\n", "---------", "-------", "----")
 	for _, mig := range migrations {
 		fmt.Printf(
-			"\t%-20s | %-10s | %-s\n",
-			mig.Timestamp().Format(TimeFormat), mig.Direction(), mig.Name(),
+			"\t%-10s | %-20s | %-s\n",
+			mig.Direction(), mig.Timestamp().Format(TimeFormat), mig.Name(),
 		)
 	}
 }

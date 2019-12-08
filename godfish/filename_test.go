@@ -23,8 +23,8 @@ func TestFilename(t *testing.T) {
 		mustMakeFilename(version, DirReverse, name),
 	}
 	expected := []filename{
-		filename("20191118121314.forward.test.sql"),
-		filename("20191118121314.reverse.test.sql"),
+		filename("forward-20191118121314-test.sql"),
+		filename("reverse-20191118121314-test.sql"),
 	}
 	for i, name := range actual {
 		if name != expected[i] {
@@ -54,11 +54,11 @@ func TestParseMigration(t *testing.T) {
 		expected Migration
 	}{
 		{
-			filename: filename("20191118121314.forward.test.sql"),
+			filename: filename("forward-20191118121314-test.sql"),
 			expected: mustMakeMigration("20191118121314", DirForward, "test"),
 		},
 		{
-			filename: filename("20191118121314.reverse.test.sql"),
+			filename: filename("reverse-20191118121314-test.sql"),
 			expected: mustMakeMigration("20191118121314", DirReverse, "test"),
 		},
 	}
