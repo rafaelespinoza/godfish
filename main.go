@@ -14,210 +14,21 @@ import (
 
 // Args describes the CLI inputs and other configuration variables.
 type Args struct {
-	Cmd        string
 	Conf       string
+	Debug      bool
 	Direction  string
 	Driver     string
 	Files      string
-	Help       bool
 	Name       string
 	Reversible bool
 	Version    string
 }
 
-// argsToCommand is a wrapper function that selects and maps command line inputs
-// needed by the associated command.
-type argsToCommand func(Args) error
-
-type command struct {
-	description string // summarize in < 1 line.
-	help        func() string
-	mapper      argsToCommand
-}
-
-// commands registers any operation by name to a command.
-var commands = map[string]command{
-	"create-migration": {
-		description: "generate migration files",
-		help: func() (out string) {
-			out = fmt.Sprintf(`
-Usage: %s -cmd create-migration -name <name> [-reversible]
-
-	Generate migration files: one meant for the "forward" direction,
-	another meant for "reverse". Optionally create a migration in the forward
-	direction only by passing the flag "-reversible=false". The "name" flag has
-	no effects other than on the generated filename. The output filename
-	automatically has a "version". Timestamp format: %s.`,
-				bin, godfish.TimeFormat)
-			return
-		},
-		mapper: func(a Args) error {
-			dir, err := os.Open(a.Files)
-			if err != nil {
-				return err
-			}
-			migration, err := godfish.NewMigrationParams(a.Name, a.Reversible, dir)
-			if err != nil {
-				return err
-			}
-			return migration.GenerateFiles()
-		},
-	},
-	"dump-schema": {
-		description: "generate a sql file describing the db schema",
-		help: func() (out string) {
-			out = fmt.Sprintf(`
-Usage: %s -cmd dump-schema [-driver driverName]
-	`, bin)
-			return
-		},
-		mapper: func(a Args) error {
-			driver, err := newDriver(a.Driver)
-			if err != nil {
-				return err
-			}
-			godfish.DumpSchema(driver)
-			return nil
-		},
-	},
-	"info": {
-		description: "output current state of migrations",
-		help: func() (out string) {
-			out = fmt.Sprintf(`
-Usage: %s -cmd info -direction [forward|reverse] [-driver driverName]
-			`, bin)
-			return
-		},
-		mapper: func(a Args) error {
-			driver, err := newDriver(a.Driver)
-			if err != nil {
-				return err
-			}
-			direction := whichDirection(a)
-			return godfish.Info(driver, a.Files, direction, a.Version)
-		},
-	},
-	"init": {
-		description: "create godfish configuration file",
-		help: func() (out string) {
-			out = fmt.Sprintf(`
-Usage: %s -cmd init [-conf <pathToFile>]
-
-Creates a configuration file, unless it already exists.`, bin)
-			return
-		},
-		mapper: func(a Args) error {
-			return godfish.Init(a.Conf)
-		},
-	},
-	"migrate": {
-		description: "execute migration(s) in the forward direction",
-		help: func() (out string) {
-			out = fmt.Sprintf(`
-Usage: %s -cmd migrate [-driver driverName] [-version <timestamp>]
-
-	Execute migration(s) in the forward direction. If the "version" is left
-	unspecified, then all available migrations are executed. Otherwise,
-	available migrations are executed up to and including the specified version.
-	Specify a version in the form: %s.`,
-				bin, godfish.TimeFormat)
-			return
-		},
-		mapper: func(a Args) error {
-			driver, err := newDriver(a.Driver)
-			if err != nil {
-				return err
-			}
-			if a.Version == "" {
-				err = godfish.Migrate(
-					driver,
-					a.Files,
-					godfish.DirForward,
-					a.Version,
-				)
-			} else {
-				err = godfish.ApplyMigration(
-					driver,
-					a.Files,
-					godfish.DirForward,
-					a.Version,
-				)
-			}
-			return err
-		},
-	},
-	"remigrate": {
-		description: "rollback and then re-apply the last migration",
-		help: func() (out string) {
-			out = fmt.Sprintf(`
-Usage: %s -cmd remigrate [-driver driverName]
-
-	Execute the last migration in reverse (rollback) and then execute the same
-	one forward. This could be useful for development.`, bin)
-			return
-		},
-		mapper: func(a Args) error {
-			driver, err := newDriver(a.Driver)
-			if err != nil {
-				return err
-			}
-			if err = godfish.ApplyMigration(
-				driver,
-				a.Files,
-				godfish.DirReverse,
-				"",
-			); err != nil {
-				return err
-			}
-			return godfish.ApplyMigration(
-				driver,
-				a.Files,
-				godfish.DirForward,
-				"",
-			)
-		},
-	},
-	"rollback": {
-		description: "execute migration(s) in the reverse direction",
-		help: func() (out string) {
-			out = fmt.Sprintf(`
-Usage: %s -cmd rollback [-driver driverName] [-version <timestamp>]
-
-	Execute migration(s) in the reverse direction. If the "version" is left
-	unspecified, then only the first available migration is executed. Otherwise,
-	available migrations are executed down to and including the specified
-	version. Specify a version in the form: %s.`,
-				bin, godfish.TimeFormat)
-			return
-		},
-		mapper: func(a Args) error {
-			driver, err := newDriver(a.Driver)
-			if err != nil {
-				return err
-			}
-			if a.Version == "" {
-				err = godfish.ApplyMigration(
-					driver,
-					a.Files,
-					godfish.DirReverse,
-					a.Version,
-				)
-			} else {
-				err = godfish.Migrate(
-					driver,
-					a.Files,
-					godfish.DirReverse,
-					a.Version,
-				)
-			}
-			return err
-		},
-	},
-}
-
 var (
+	// args is the shared set of named values.
 	args Args
-	bin  = os.Args[0]
+	// bin is the name of the binary.
+	bin = os.Args[0]
 )
 
 func init() {
@@ -231,95 +42,92 @@ func init() {
 		}
 		sort.Strings(cmds)
 		fmt.Fprintf(
-			flag.CommandLine.Output(), `Usage: %s -cmd command [arguments]
+			flag.CommandLine.Output(), `Usage: %s command [arguments]
 
 Commands:
 
 %v`, os.Args[0], strings.Join(cmds, "\n"),
 		)
-		fmt.Printf("\n\nFlags:\n\n")
-		flag.PrintDefaults()
+		printFlagDefaults(flag.CommandLine)
 	}
 
-	flag.StringVar(&args.Cmd, "cmd", "", "name of command to execute")
 	flag.StringVar(&args.Conf, "conf", ".godfish.json", "path to godfish config file")
-	flag.StringVar(&args.Driver, "driver", "", "name of database driver, ie: postgres, mysql")
-	flag.StringVar(&args.Files, "files", "db/migrations", "directory path for migration files")
-	flag.StringVar(&args.Name, "name", "", "create a migration with a name, ie: foo")
+	flag.BoolVar(&args.Debug, "debug", false, "output extra debugging info")
 	flag.StringVar(
-		&args.Version,
-		"version",
+		&args.Driver,
+		"driver",
 		"",
-		fmt.Sprintf("timestamp of migration, format: %s", godfish.TimeFormat),
+		"name of driver, can also set with config file",
 	)
 	flag.StringVar(
-		&args.Direction,
-		"direction",
-		"forward",
-		"direction of migration to run. [forward | reverse]",
+		&args.Files,
+		"files",
+		"",
+		"path to migration files, can also set with config file",
 	)
-	flag.BoolVar(&args.Reversible, "reversible", true, "create a reversible migration?")
-	flag.BoolVar(&args.Help, "h", false, "show help menu")
-	flag.BoolVar(&args.Help, "help", false, "show help menu")
+}
 
-	flag.Parse()
+// initCommand selects the sub command to run. If the command name is not found,
+// then it outputs help. If the command is found, then merge config file with
+// CLI args and set up the command.
+func initCommand(positionalArgs []string, a *Args) (cmd *command, err error) {
+	if len(positionalArgs) == 0 || positionalArgs[0] == "help" {
+		err = flag.ErrHelp
+		return
+	} else if c, ok := commands[positionalArgs[0]]; !ok {
+		err = fmt.Errorf("unknown command %q", positionalArgs[0])
+		return
+	} else {
+		cmd = c
+	}
+
+	// Read configuration file, if present. Negotiate with Args.
 	var conf godfish.MigrationsConf
-	if file, err := ioutil.ReadFile(args.Conf); err != nil {
-		// carry on
-	} else if err = json.Unmarshal(file, &conf); err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+	if data, ierr := ioutil.ReadFile(a.Conf); ierr != nil {
+		// probably no config file present, rely on Args instead.
+	} else if ierr = json.Unmarshal(data, &conf); ierr != nil {
+		err = ierr
+		return
 	}
-	if args.Driver == "" && conf.DriverName != "" {
-		args.Driver = conf.DriverName
+	if a.Driver == "" && conf.DriverName != "" {
+		a.Driver = conf.DriverName
 	}
-	if args.Files == "" && conf.PathToFiles != "" {
-		args.Files = conf.PathToFiles
+	if a.Files == "" && conf.PathToFiles != "" {
+		a.Files = conf.PathToFiles
 	}
+
+	if a.Debug {
+		fmt.Printf("configuration file at %q, %#v\n", a.Conf, conf)
+	}
+	flags := cmd.setup(a)
+	if err = flags.Parse(positionalArgs[1:]); err != nil {
+		return
+	}
+	if a.Debug {
+		fmt.Printf("flag.Args(): %#v\n", flag.Args())
+		fmt.Printf("Args: %#v\n", a)
+	}
+	return
 }
 
 func main() {
+	flag.Parse()
+
+	var cmd *command
 	var err error
 
-	if cmd, ok := commands[args.Cmd]; !ok {
+	if cmd, err = initCommand(flag.Args(), &args); cmd == nil {
+		// either asked for help or asked for unknown command
 		flag.Usage()
-		err = fmt.Errorf("unknown command %q", args.Cmd)
-	} else if args.Help {
-		fmt.Fprint(
-			flag.CommandLine.Output(),
-			cmd.help(),
-		)
-		fmt.Println()
-	} else {
-		err = cmd.mapper(args)
-	}
-	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	} else if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
-}
 
-func newDriver(driverName string) (driver godfish.Driver, err error) {
-	switch driverName {
-	case "postgres":
-		driver, err = godfish.NewDriver(driverName, godfish.PostgresParams{
-			Encoding: "UTF8",
-			Host:     os.Getenv("DB_HOST"),
-			Name:     os.Getenv("DB_NAME"),
-			Pass:     os.Getenv("DB_PASSWORD"),
-			Port:     os.Getenv("DB_PORT"),
-		})
-	default:
-		err = fmt.Errorf("unsupported db driver %q", driverName)
+	if err = cmd.run(args); err != nil {
+		fmt.Println(err)
+		os.Exit(1)
 	}
-	return
-}
-
-func whichDirection(a Args) (direction godfish.Direction) {
-	direction = godfish.DirForward
-	d := strings.ToLower(a.Direction)
-	if strings.HasPrefix(d, "rev") || strings.HasPrefix(d, "back") {
-		direction = godfish.DirReverse
-	}
-	return
 }
