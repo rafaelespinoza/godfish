@@ -266,8 +266,9 @@ func Migrate(driver Driver, directoryPath string, direction Direction, finishAtV
 }
 
 var (
-	ErrNoVersionFound = errors.New("no version found")
-	ErrNoFilesFound   = errors.New("no files found")
+	ErrNoVersionFound               = errors.New("no version found")
+	ErrNoFilesFound                 = errors.New("no files found")
+	ErrSchemaMigrationsDoesNotExist = errors.New("table \"schema_migrations\" does not exist")
 )
 
 // ApplyMigration runs a migration at directoryPath with the specified version
@@ -531,7 +532,13 @@ func listMigrationsToApply(driver Driver, directoryPath string, direction Direct
 		}
 		applied = append(applied, mig)
 		return
-	}); err != nil {
+	}); err == ErrSchemaMigrationsDoesNotExist {
+		// The next invocation of CreateSchemaMigrationsTable should fix this.
+		// We can continue with zero value for now.
+		if verbose {
+			fmt.Printf("no migrations applied yet; %v\n", err)
+		}
+	} else if err != nil {
 		return
 	}
 	if verbose {

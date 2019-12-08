@@ -6,9 +6,7 @@ import (
 	"fmt"
 	"os/exec"
 
-	// this is a database driver, imported for side effects only so we can
-	// connect using the sql package.
-	_ "github.com/lib/pq"
+	"github.com/lib/pq"
 )
 
 // PostgresParams implements the DSNParams interface and defines keys, values
@@ -109,6 +107,11 @@ func (d *postgres) AppliedVersions() (out AppliedVersions, err error) {
 	rows, err := d.connection.Query(
 		`SELECT migration_id FROM schema_migrations ORDER BY migration_id ASC`,
 	)
+	if ierr, ok := err.(*pq.Error); ok {
+		if ierr.Message == "relation \"schema_migrations\" does not exist" {
+			err = ErrSchemaMigrationsDoesNotExist
+		}
+	}
 	out = AppliedVersions(rows)
 	return
 }
