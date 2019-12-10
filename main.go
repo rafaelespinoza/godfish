@@ -70,7 +70,7 @@ Commands:
 // initCommand selects the sub command to run. If the command name is not found,
 // then it outputs help. If the command is found, then merge config file with
 // CLI args and set up the command.
-func initCommand(positionalArgs []string, a *Args) (cmd *command, err error) {
+func initCommand(positionalArgs []string, a *Args) (subcmd *command, err error) {
 	if len(positionalArgs) == 0 || positionalArgs[0] == "help" {
 		err = flag.ErrHelp
 		return
@@ -78,7 +78,7 @@ func initCommand(positionalArgs []string, a *Args) (cmd *command, err error) {
 		err = fmt.Errorf("unknown command %q", positionalArgs[0])
 		return
 	} else {
-		cmd = c
+		subcmd = c
 	}
 
 	// Read configuration file, if present. Negotiate with Args.
@@ -97,15 +97,16 @@ func initCommand(positionalArgs []string, a *Args) (cmd *command, err error) {
 	}
 
 	if a.Debug {
-		fmt.Printf("configuration file at %q, %#v\n", a.Conf, conf)
+		fmt.Printf("positional arguments: %#v\n", flag.Args())
+		fmt.Printf("config file at %q: %#v\n", a.Conf, conf)
+		fmt.Printf("Args prior subcmd flag parse: %#v\n", a)
 	}
-	flags := cmd.setup(a)
-	if err = flags.Parse(positionalArgs[1:]); err != nil {
+	subflags := subcmd.setup(a)
+	if err = subflags.Parse(positionalArgs[1:]); err != nil {
 		return
 	}
 	if a.Debug {
-		fmt.Printf("flag.Args(): %#v\n", flag.Args())
-		fmt.Printf("Args: %#v\n", a)
+		fmt.Printf("Args after subcmd flag parse: %#v\n", a)
 	}
 	return
 }

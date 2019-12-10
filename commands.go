@@ -39,8 +39,7 @@ var commands = map[string]*command{
 				"create a reversible migration?",
 			)
 			flags.Usage = func() {
-				fmt.Printf(`
-Usage: %s create-migration -name name [-reversible]
+				fmt.Printf(`Usage: %s create-migration -name name [-reversible]
 
 	Generate migration files: one meant for the "forward" direction,
 	another meant for "reverse". Optionally create a migration in the forward
@@ -70,11 +69,10 @@ Usage: %s create-migration -name name [-reversible]
 		setup: func(a *Args) *flag.FlagSet {
 			flags := flag.NewFlagSet("dump-schema", flag.ExitOnError)
 			flags.Usage = func() {
-				fmt.Printf(`
-Usage: %s dump-schema
+				fmt.Printf(`Usage: %s dump-schema
 
-	Print a database structure file to standard output.
-	`, bin)
+	Print a database structure file to standard output.`,
+					bin)
 				printFlagDefaults(flags)
 			}
 			return flags
@@ -105,11 +103,9 @@ Usage: %s dump-schema
 				fmt.Sprintf("timestamp of migration, format: %s", godfish.TimeFormat),
 			)
 			flags.Usage = func() { // TODO: mention version
-				fmt.Printf(`
-Usage: %s info -direction [forward|reverse] [-version version]
+				fmt.Printf(`Usage: %s info -direction [forward|reverse] [-version version]
 
-	Output info on helper functions.
-			`, bin)
+	Output info on helper functions.`, bin)
 				printFlagDefaults(flags)
 			}
 			return flags
@@ -134,8 +130,7 @@ Usage: %s info -direction [forward|reverse] [-version version]
 				"path to godfish config file",
 			)
 			flags.Usage = func() {
-				fmt.Printf(`
-Usage: %s init [-conf pathToFile]
+				fmt.Printf(`Usage: %s init [-conf pathToFile]
 
 	Creates a configuration file, unless it already exists.`, bin)
 				printFlagDefaults(flags)
@@ -158,8 +153,7 @@ Usage: %s init [-conf pathToFile]
 				fmt.Sprintf("timestamp of migration, format: %s", godfish.TimeFormat),
 			)
 			flags.Usage = func() {
-				fmt.Printf(`
-Usage: %s migrate [-version timestamp]
+				fmt.Printf(`Usage: %s migrate [-version timestamp]
 
 	Execute migration(s) in the forward direction. If the "version" is left
 	unspecified, then all available migrations are executed. Otherwise,
@@ -193,8 +187,7 @@ Usage: %s migrate [-version timestamp]
 			flags := flag.NewFlagSet("remigrate", flag.ExitOnError)
 			// TODO: files flag?
 			flags.Usage = func() { // TODO: mention files flag?
-				fmt.Printf(`
-Usage: %s remigrate
+				fmt.Printf(`Usage: %s remigrate
 
 	Execute the last migration in reverse (rollback) and then execute the same
 	one forward. This could be useful for development.`, bin)
@@ -236,8 +229,7 @@ Usage: %s remigrate
 				fmt.Sprintf("timestamp of migration, format: %s", godfish.TimeFormat),
 			)
 			flags.Usage = func() {
-				fmt.Printf(`
-Usage: %s rollback -version timestamp
+				fmt.Printf(`Usage: %s rollback -version timestamp
 
 	Execute migration(s) in the reverse direction. If the "version" is left
 	unspecified, then only the first available migration is executed. Otherwise,
@@ -275,14 +267,24 @@ Usage: %s rollback -version timestamp
 }
 
 func newDriver(driverName string) (driver godfish.Driver, err error) {
+	// try to keep the environment variable keys the same for all drivers.
+	var (
+		dbHost     = os.Getenv("DB_HOST")
+		dbName     = os.Getenv("DB_NAME")
+		dbPassword = os.Getenv("DB_PASSWORD")
+		dbPort     = os.Getenv("DB_PORT")
+		dbUser     = os.Getenv("DB_USER")
+	)
+
 	switch driverName {
 	case "postgres":
 		driver, err = godfish.NewDriver(driverName, godfish.PostgresParams{
 			Encoding: "UTF8",
-			Host:     os.Getenv("DB_HOST"),
-			Name:     os.Getenv("DB_NAME"),
-			Pass:     os.Getenv("DB_PASSWORD"),
-			Port:     os.Getenv("DB_PORT"),
+			Host:     dbHost,
+			Name:     dbName,
+			Pass:     dbPassword,
+			Port:     dbPort,
+			User:     dbUser,
 		})
 	default:
 		err = fmt.Errorf("unsupported db driver %q", driverName)
