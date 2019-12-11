@@ -44,10 +44,16 @@ func TestMigrationParams(t *testing.T) {
 	var testDir *os.File
 	var mig *godfish.MigrationParams
 	var err error
-	if testDir, err = os.Open(baseTestOutputDir); err != nil {
+	pathToTestDir := baseTestOutputDir + "/" + t.Name()
+	if err := os.MkdirAll(pathToTestDir, 0755); err != nil {
+		t.Fatalf("error creating test directory %s", pathToTestDir)
+		return
+	}
+	if testDir, err = os.Open(pathToTestDir); err != nil {
 		t.Error(err)
 		return
 	}
+	defer os.RemoveAll(pathToTestDir)
 	if mig, err = godfish.NewMigrationParams("foo", true, testDir); err != nil {
 		t.Error(err)
 		return
