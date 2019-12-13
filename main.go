@@ -41,14 +41,47 @@ func init() {
 			)
 		}
 		sort.Strings(cmds)
-		fmt.Fprintf(
-			flag.CommandLine.Output(), `Usage: %s command [arguments]
+		fmt.Fprintf(flag.CommandLine.Output(), `Usage:
 
+	%s [flags] command [sub-flags]
+
+Description:
+
+	godfish is a database migration manager. It tracks the status of migrations
+	by recording a timestamp in a table called "schema_migrations" in the
+	"migration_id" column. Those timestamps correspond to SQL migration files
+	that you write and store somewhere on the filesystem. You need to configure
+	the path to the SQL migration files as well as the name of the driver to use
+	(ie: postgres, mysql, potato, potato).
+
+	Configuration options are set with flags or with a configuration file. Options
+	specified via flags will take precedence over the config file.
+
+	Specify database connection params with environment variables:
+		DB_HOST=
+		DB_NAME=
+		DB_PASSWORD=
+		DB_PORT=
+		DB_USER=
+
+	The following flags should go before the command.`,
+			bin)
+		printFlagDefaults(flag.CommandLine)
+		fmt.Fprintf(
+			flag.CommandLine.Output(), `
 Commands:
 
-%v`, os.Args[0], strings.Join(cmds, "\n"),
-		)
-		printFlagDefaults(flag.CommandLine)
+	These will have their own set of flags. Put them after the command.
+
+	%v
+
+Examples:
+
+	%s -h
+	%s [command] -h
+`,
+			strings.Join(cmds, "\n\t"), bin, bin)
+
 	}
 
 	flag.StringVar(&args.Conf, "conf", ".godfish.json", "path to godfish config file")

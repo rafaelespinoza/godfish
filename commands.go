@@ -103,7 +103,7 @@ var commands = map[string]*command{
 				fmt.Sprintf("timestamp of migration, format: %s", godfish.TimeFormat),
 			)
 			flags.Usage = func() { // TODO: mention version
-				fmt.Printf(`Usage: %s info -direction [forward|reverse] [-version version]
+				fmt.Printf(`Usage: %s info [-direction forward|reverse] [-version version]
 
 	Output info on helper functions.`, bin)
 				printFlagDefaults(flags)
@@ -229,7 +229,7 @@ var commands = map[string]*command{
 				fmt.Sprintf("timestamp of migration, format: %s", godfish.TimeFormat),
 			)
 			flags.Usage = func() {
-				fmt.Printf(`Usage: %s rollback -version timestamp
+				fmt.Printf(`Usage: %s rollback [-version timestamp]
 
 	Execute migration(s) in the reverse direction. If the "version" is left
 	unspecified, then only the first available migration is executed. Otherwise,
