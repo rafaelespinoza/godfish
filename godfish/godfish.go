@@ -1,3 +1,8 @@
+// Package godfish is a database migration library built to support a CLI tool,
+// also called godfish. This documentation is available for development. To get
+// the CLI and/or get help with it:
+// 		go get -u bitbucket.org/rafaelespinoza/godfish
+// 		godfish -h
 package godfish
 
 import (
