@@ -278,14 +278,23 @@ func newDriver(driverName string) (driver godfish.Driver, err error) {
 
 	switch driverName {
 	case "postgres":
-		driver, err = godfish.NewDriver(driverName, godfish.PostgresParams{
+		driver, err = godfish.NewDriver(godfish.PostgresParams{
 			Encoding: "UTF8",
 			Host:     dbHost,
 			Name:     dbName,
 			Pass:     dbPassword,
 			Port:     dbPort,
 			User:     dbUser,
-		})
+		}, nil)
+	case "mysql":
+		driver, err = godfish.NewDriver(godfish.MySQLParams{
+			Encoding: "UTF8",
+			Host:     dbHost,
+			Name:     dbName,
+			Pass:     dbPassword,
+			Port:     dbPort,
+			User:     dbUser,
+		}, nil)
 	default:
 		err = fmt.Errorf("unsupported db driver %q", driverName)
 	}

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"testing"
 	"time"
@@ -30,6 +29,17 @@ var DriversToTest = []struct {
 			Name:     testDBName,
 			Pass:     os.Getenv("DB_PASSWORD"),
 			Port:     "5432",
+		},
+	},
+	{
+		name: "mysql",
+		dsnParams: godfish.MySQLParams{
+			Encoding: "UTF8",
+			Host:     "localhost",
+			Name:     testDBName,
+			Pass:     os.Getenv("DB_PASSWORD"),
+			Port:     "3306",
+			User:     "godfish",
 		},
 	},
 }
@@ -502,14 +512,19 @@ func makeTestDriverStubs(pathToTestDir string, contents []contentStub, versions 
 			if filename, err = godfish.Basename(mig); err != nil {
 				return nil, err
 			}
-			if file, err = os.Open(pathToTestDir + "/" + filename); err != nil {
+			if file, err = os.OpenFile(
+				pathToTestDir+"/"+filename,
+				os.O_RDWR|os.O_CREATE,
+				0755,
+			); err != nil {
 				return nil, err
 			}
 			// this only works if the slice we're iterating through has
 			// migrations where each Direction is in the order:
 			// [forward, reverse]
 			if j == 0 {
-				if file.WriteString(content.forward); err != nil {
+				if _, e := file.WriteString(content.forward); e != nil {
+					err = e
 					return nil, err
 				}
 				out[i] = testDriverStub{
@@ -529,20 +544,11 @@ func makeTestDriverStubs(pathToTestDir string, contents []contentStub, versions 
 }
 
 func truncateSchemaMigrations(driver godfish.Driver) (err error) {
-	switch driver.Name() {
-	case "postgres":
-		cmd := exec.Command(
-			"psql",
-			testDBName, "-e", "-c", "TRUNCATE TABLE schema_migrations CASCADE",
-		)
-		_, err = cmd.Output()
-		if val, ok := err.(*exec.ExitError); ok {
-			fmt.Println(string(val.Stderr))
-			err = val
-		}
-	default:
-		err = fmt.Errorf("unknown Driver %q", driver.Name())
+	if _, err = driver.Connect(); err != nil {
+		return
 	}
+	defer driver.Close()
+	err = driver.Execute(`TRUNCATE TABLE schema_migrations`)
 	return
 }
 
