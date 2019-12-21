@@ -376,6 +376,7 @@ func connect(driverName string, dsnParams DSNParams) (db *sql.DB, err error) {
 // to a database. The output will be passed to the standard library's sql.Open
 // method to connect to a database.
 type DSNParams interface {
+	NewDriver(*MigrationsConf) (Driver, error)
 	String() string
 }
 
@@ -419,19 +420,8 @@ type Driver interface {
 // NewDriver initializes a Driver implementation by name and connection
 // parameters. An unrecognized name returns an error. The dsnParams should also
 // provide whatever is needed by the Driver.
-func NewDriver(driverName string, dsnParams DSNParams) (driver Driver, err error) {
-	switch driverName {
-	case "postgres":
-		params, ok := dsnParams.(PostgresParams)
-		if !ok {
-			err = fmt.Errorf("dsnParams should be a PostgresParams, got %T", params)
-		} else {
-			driver, err = newPostgres(params)
-		}
-	default:
-		err = fmt.Errorf("unknown driver %q", driverName)
-	}
-	return
+func NewDriver(dsnParams DSNParams, migConf *MigrationsConf) (driver Driver, err error) {
+	return dsnParams.NewDriver(migConf)
 }
 
 // MigrationsConf is intended to lend customizations such as specifying the path

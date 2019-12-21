@@ -128,7 +128,7 @@ func TestDriver(t *testing.T) {
 			)
 			return
 		}
-		driver, err := godfish.NewDriver(test.name, test.dsnParams)
+		driver, err := godfish.NewDriver(test.dsnParams, nil)
 		if err != nil {
 			t.Error(err)
 			return

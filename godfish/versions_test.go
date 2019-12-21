@@ -62,6 +62,9 @@ func (d *StubDB) AppliedVersions() (AppliedVersions, error) {
 
 type StubDSN struct{}
 
+func (d StubDSN) NewDriver(migConf *MigrationsConf) (Driver, error) {
+	return &StubDB{dsn: d}, nil
+}
 func (d StubDSN) String() string { return "this://is.a/test" }
 
 var _ DSNParams = (*StubDSN)(nil)

@@ -22,6 +22,10 @@ type PostgresParams struct {
 
 var _ DSNParams = (*PostgresParams)(nil)
 
+func (p PostgresParams) NewDriver(migConf *MigrationsConf) (Driver, error) {
+	return newPostgres(p)
+}
+
 // String generates a data source name (or connection URL) based on the fields.
 func (p PostgresParams) String() string {
 	return fmt.Sprintf(
