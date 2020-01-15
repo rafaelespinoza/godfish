@@ -1,16 +1,17 @@
-package godfish
+package mysql
 
 import (
 	"database/sql"
 	"fmt"
 	"os/exec"
 
-	"github.com/go-sql-driver/mysql"
+	"bitbucket.org/rafaelespinoza/godfish/godfish"
+	my "github.com/go-sql-driver/mysql"
 )
 
-// MySQLParams implements the DSNParams interface and defines keys, values
+// Params implements the godfish.DSNParams interface and defines keys, values
 // needed to connect to a mysql database.
-type MySQLParams struct {
+type Params struct {
 	Encoding string // Encoding is the client encoding for the connection.
 	Host     string // Host is the name of the host to connect to.
 	Name     string // Name is the database name.
@@ -19,56 +20,54 @@ type MySQLParams struct {
 	User     string // User is the name of the user to connect as.
 }
 
-var _ DSNParams = (*MySQLParams)(nil)
+var _ godfish.DSNParams = (*Params)(nil)
 
-func (p MySQLParams) NewDriver(migConf *MigrationsConf) (Driver, error) {
+// NewDriver creates a new mysql driver.
+func (p Params) NewDriver(migConf *godfish.MigrationsConf) (godfish.Driver, error) {
 	return newMySQL(p)
 }
 
 // String generates a data source name (or connection URL) based on the fields.
-func (p MySQLParams) String() string {
+func (p Params) String() string {
 	return fmt.Sprintf(
 		"%s:%s@tcp(%s:%s)/%s",
 		p.User, p.Pass, p.Host, p.Port, p.Name,
 	)
 }
 
-// my implements the Driver interface for mysql databases.
-type my struct {
+// driver implements the godfish.Driver interface for mysql databases.
+type driver struct {
 	connection *sql.DB
-	connParams MySQLParams
+	connParams Params
 }
 
-var _ Driver = (*my)(nil)
+var _ godfish.Driver = (*driver)(nil)
 
-func newMySQL(connParams MySQLParams) (*my, error) {
+func newMySQL(connParams Params) (*driver, error) {
 	if connParams.Host == "" {
 		connParams.Host = "localhost"
 	}
 	if connParams.Port == "" {
 		connParams.Port = "3306"
 	}
-	driver := my{
-		connParams: connParams,
-	}
-	return &driver, nil
+	return &driver{connParams: connParams}, nil
 }
 
-func (d *my) Name() string         { return "mysql" }
-func (d *my) DSNParams() DSNParams { return d.connParams }
-func (d *my) Connect() (conn *sql.DB, err error) {
+func (d *driver) Name() string                 { return "mysql" }
+func (d *driver) DSNParams() godfish.DSNParams { return d.connParams }
+func (d *driver) Connect() (conn *sql.DB, err error) {
 	if d.connection != nil {
 		conn = d.connection
 		return
 	}
-	if conn, err = connect(d.Name(), d.DSNParams()); err != nil {
+	if conn, err = sql.Open(d.Name(), d.DSNParams().String()); err != nil {
 		return
 	}
 	d.connection = conn
 	return
 }
 
-func (d *my) Close() (err error) {
+func (d *driver) Close() (err error) {
 	conn := d.connection
 	if conn == nil {
 		return
@@ -78,12 +77,12 @@ func (d *my) Close() (err error) {
 	return
 }
 
-func (d *my) Execute(query string, args ...interface{}) (err error) {
+func (d *driver) Execute(query string, args ...interface{}) (err error) {
 	_, err = d.connection.Query(query)
 	return
 }
 
-func (d *my) CreateSchemaMigrationsTable() (err error) {
+func (d *driver) CreateSchemaMigrationsTable() (err error) {
 	_, err = d.connection.Query(
 		`CREATE TABLE IF NOT EXISTS schema_migrations (
 			migration_id VARCHAR(128) PRIMARY KEY NOT NULL
@@ -91,7 +90,7 @@ func (d *my) CreateSchemaMigrationsTable() (err error) {
 	return
 }
 
-func (d *my) DumpSchema() (err error) {
+func (d *driver) DumpSchema() (err error) {
 	params := d.connParams
 	cmd := exec.Command(
 		"mysqldump",
@@ -112,23 +111,23 @@ func (d *my) DumpSchema() (err error) {
 	return
 }
 
-func (d *my) AppliedVersions() (out AppliedVersions, err error) {
+func (d *driver) AppliedVersions() (out godfish.AppliedVersions, err error) {
 	rows, err := d.connection.Query(
 		`SELECT migration_id FROM schema_migrations ORDER BY migration_id ASC`,
 	)
-	if ierr, ok := err.(*mysql.MySQLError); ok {
+	if ierr, ok := err.(*my.MySQLError); ok {
 		// https://dev.mysql.com/doc/refman/8.0/en/server-error-reference.html#error_er_no_such_table
 		if ierr.Number == 1146 {
-			err = ErrSchemaMigrationsDoesNotExist
+			err = godfish.ErrSchemaMigrationsDoesNotExist
 		}
 	}
-	out = AppliedVersions(rows)
+	out = godfish.AppliedVersions(rows)
 	return
 }
 
-func (d *my) UpdateSchemaMigrations(dir Direction, version string) (err error) {
+func (d *driver) UpdateSchemaMigrations(dir godfish.Direction, version string) (err error) {
 	conn := d.connection
-	if dir == DirForward {
+	if dir == godfish.DirForward {
 		_, err = conn.Exec(`
 			INSERT INTO schema_migrations (migration_id)
 			VALUES (?)`,

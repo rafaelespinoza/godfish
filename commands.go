@@ -7,6 +7,8 @@ import (
 	"strings"
 
 	"bitbucket.org/rafaelespinoza/godfish/godfish"
+	"bitbucket.org/rafaelespinoza/godfish/mysql"
+	"bitbucket.org/rafaelespinoza/godfish/postgres"
 )
 
 type command struct {
@@ -278,7 +280,7 @@ func newDriver(driverName string) (driver godfish.Driver, err error) {
 
 	switch driverName {
 	case "postgres":
-		driver, err = godfish.NewDriver(godfish.PostgresParams{
+		driver, err = godfish.NewDriver(postgres.Params{
 			Encoding: "UTF8",
 			Host:     dbHost,
 			Name:     dbName,
@@ -287,7 +289,7 @@ func newDriver(driverName string) (driver godfish.Driver, err error) {
 			User:     dbUser,
 		}, nil)
 	case "mysql":
-		driver, err = godfish.NewDriver(godfish.MySQLParams{
+		driver, err = godfish.NewDriver(mysql.Params{
 			Encoding: "UTF8",
 			Host:     dbHost,
 			Name:     dbName,

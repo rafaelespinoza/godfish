@@ -1,4 +1,4 @@
-package godfish
+package postgres
 
 import (
 	"bytes"
@@ -6,12 +6,13 @@ import (
 	"fmt"
 	"os/exec"
 
+	"bitbucket.org/rafaelespinoza/godfish/godfish"
 	"github.com/lib/pq"
 )
 
-// PostgresParams implements the DSNParams interface and defines keys, values
+// Params implements the godfish.DSNParams interface and defines keys, values
 // needed to connect to a postgres database.
-type PostgresParams struct {
+type Params struct {
 	Encoding string // Encoding is the client encoding for the connection.
 	Host     string // Host is the name of the host to connect to.
 	Name     string // Name is the database name.
@@ -20,56 +21,54 @@ type PostgresParams struct {
 	User     string // User is the name of the user to connect as.
 }
 
-var _ DSNParams = (*PostgresParams)(nil)
+var _ godfish.DSNParams = (*Params)(nil)
 
-func (p PostgresParams) NewDriver(migConf *MigrationsConf) (Driver, error) {
+// NewDriver creates a new postgres driver.
+func (p Params) NewDriver(migConf *godfish.MigrationsConf) (godfish.Driver, error) {
 	return newPostgres(p)
 }
 
 // String generates a data source name (or connection URL) based on the fields.
-func (p PostgresParams) String() string {
+func (p Params) String() string {
 	return fmt.Sprintf(
 		"postgresql://%s:%s/%s?client_encoding=%s&sslmode=require",
 		p.Host, p.Port, p.Name, p.Encoding,
 	)
 }
 
-// postgres implements the Driver interface for postgres databases.
-type postgres struct {
+// driver implements the Driver interface for postgres databases.
+type driver struct {
 	connection *sql.DB
-	connParams PostgresParams
+	connParams Params
 }
 
-var _ Driver = (*postgres)(nil)
+var _ godfish.Driver = (*driver)(nil)
 
-func newPostgres(connParams PostgresParams) (*postgres, error) {
+func newPostgres(connParams Params) (*driver, error) {
 	if connParams.Host == "" {
 		connParams.Host = "localhost"
 	}
 	if connParams.Port == "" {
 		connParams.Port = "5432"
 	}
-	driver := postgres{
-		connParams: connParams,
-	}
-	return &driver, nil
+	return &driver{connParams: connParams}, nil
 }
 
-func (d *postgres) Name() string         { return "postgres" }
-func (d *postgres) DSNParams() DSNParams { return d.connParams }
-func (d *postgres) Connect() (conn *sql.DB, err error) {
+func (d *driver) Name() string                 { return "postgres" }
+func (d *driver) DSNParams() godfish.DSNParams { return d.connParams }
+func (d *driver) Connect() (conn *sql.DB, err error) {
 	if d.connection != nil {
 		conn = d.connection
 		return
 	}
-	if conn, err = connect(d.Name(), d.DSNParams()); err != nil {
+	if conn, err = sql.Open(d.Name(), d.DSNParams().String()); err != nil {
 		return
 	}
 	d.connection = conn
 	return
 }
 
-func (d *postgres) Close() (err error) {
+func (d *driver) Close() (err error) {
 	conn := d.connection
 	if conn == nil {
 		return
@@ -79,12 +78,12 @@ func (d *postgres) Close() (err error) {
 	return
 }
 
-func (d *postgres) Execute(query string, args ...interface{}) (err error) {
+func (d *driver) Execute(query string, args ...interface{}) (err error) {
 	_, err = d.connection.Query(query)
 	return
 }
 
-func (d *postgres) CreateSchemaMigrationsTable() (err error) {
+func (d *driver) CreateSchemaMigrationsTable() (err error) {
 	_, err = d.connection.Query(
 		`CREATE TABLE IF NOT EXISTS schema_migrations (
 			migration_id VARCHAR(128) PRIMARY KEY NOT NULL
@@ -92,7 +91,7 @@ func (d *postgres) CreateSchemaMigrationsTable() (err error) {
 	return
 }
 
-func (d *postgres) DumpSchema() (err error) {
+func (d *driver) DumpSchema() (err error) {
 	var out bytes.Buffer
 	cmd := exec.Command(
 		"pg_dump",
@@ -107,22 +106,22 @@ func (d *postgres) DumpSchema() (err error) {
 	return
 }
 
-func (d *postgres) AppliedVersions() (out AppliedVersions, err error) {
+func (d *driver) AppliedVersions() (out godfish.AppliedVersions, err error) {
 	rows, err := d.connection.Query(
 		`SELECT migration_id FROM schema_migrations ORDER BY migration_id ASC`,
 	)
 	if ierr, ok := err.(*pq.Error); ok {
 		if ierr.Message == "relation \"schema_migrations\" does not exist" {
-			err = ErrSchemaMigrationsDoesNotExist
+			err = godfish.ErrSchemaMigrationsDoesNotExist
 		}
 	}
-	out = AppliedVersions(rows)
+	out = godfish.AppliedVersions(rows)
 	return
 }
 
-func (d *postgres) UpdateSchemaMigrations(dir Direction, version string) (err error) {
+func (d *driver) UpdateSchemaMigrations(dir godfish.Direction, version string) (err error) {
 	conn := d.connection
-	if dir == DirForward {
+	if dir == godfish.DirForward {
 		_, err = conn.Exec(`
 			INSERT INTO schema_migrations (migration_id)
 			VALUES ($1)

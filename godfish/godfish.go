@@ -39,11 +39,11 @@ func (d Direction) String() string {
 }
 
 const (
-	filenameDelimeter = "-"
 	// TimeFormat provides a consistent timestamp layout for migration
 	// filenames. Formatting time in go works a little differently than in other
 	// languages. Read more at: https://golang.org/pkg/time/#pkg-constants.
-	TimeFormat = "20060102150405"
+	TimeFormat        = "20060102150405"
+	filenameDelimeter = "-"
 )
 
 // filename is just a string with a specific format to migration files. One part
@@ -105,7 +105,7 @@ type Migration interface {
 }
 
 // Basename generates a migration file's basename. The output format is:
-// "${direction}-2006010215040506-${name}.sql".
+// "${direction}-${timestamp}-${name}.sql".
 func Basename(mig Migration) (string, error) {
 	out, err := makeMigrationFilename(mig)
 	if err != nil {
@@ -271,8 +271,12 @@ func Migrate(driver Driver, directoryPath string, direction Direction, finishAtV
 }
 
 var (
-	ErrNoVersionFound               = errors.New("no version found")
-	ErrNoFilesFound                 = errors.New("no files found")
+	// ErrNoFilesFound is returned when there are no migration files.
+	ErrNoFilesFound = errors.New("no files found")
+	// ErrNoVersionFound means no matching migration version is found.
+	ErrNoVersionFound = errors.New("no version found")
+	// ErrSchemaMigrationsDoesNotExist means there is no database table to
+	// record migration status.
 	ErrSchemaMigrationsDoesNotExist = errors.New("table \"schema_migrations\" does not exist")
 )
 
@@ -367,11 +371,6 @@ func runMigration(driver Driver, pathToFile string, mig Migration) (err error) {
 	return
 }
 
-func connect(driverName string, dsnParams DSNParams) (db *sql.DB, err error) {
-	db, err = sql.Open(driverName, dsnParams.String())
-	return
-}
-
 // DSNParams describes a type which generates a data source name for connecting
 // to a database. The output will be passed to the standard library's sql.Open
 // method to connect to a database.
@@ -418,8 +417,7 @@ type Driver interface {
 }
 
 // NewDriver initializes a Driver implementation by name and connection
-// parameters. An unrecognized name returns an error. The dsnParams should also
-// provide whatever is needed by the Driver.
+// parameters.
 func NewDriver(dsnParams DSNParams, migConf *MigrationsConf) (driver Driver, err error) {
 	return dsnParams.NewDriver(migConf)
 }
