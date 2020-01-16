@@ -1,32 +1,175 @@
-package main
+// Package commands contains all the CLI stuff.
+package commands
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"os"
+	"sort"
 	"strings"
 
-	"bitbucket.org/rafaelespinoza/godfish/godfish"
-	"bitbucket.org/rafaelespinoza/godfish/mysql"
-	"bitbucket.org/rafaelespinoza/godfish/postgres"
+	"bitbucket.org/rafaelespinoza/godfish"
 )
 
-type command struct {
-	// description should summarize the command in < 1 line.
+// arguments describes the CLI inputs and other configuration variables.
+type arguments struct {
+	Conf       string
+	Debug      bool
+	Direction  string
+	DSN        godfish.DSN
+	Files      string
+	Name       string
+	Reversible bool
+	Version    string
+}
+
+var (
+	// args is the shared set of named values.
+	args arguments
+	// bin is the name of the binary.
+	bin = os.Args[0]
+)
+
+// Run does all the CLI things.
+func Run(dsn godfish.DSN) (err error) {
+	flag.Parse()
+	args.DSN = dsn
+
+	var cmd *subcommand
+
+	if cmd, err = initSubcommand(flag.Args(), &args); cmd == nil {
+		// either asked for help or asked for unknown command
+		flag.Usage()
+	}
+	if err != nil {
+		return
+	}
+
+	err = cmd.run(args)
+	return
+}
+
+func init() {
+	flag.Usage = func() {
+		cmds := make([]string, 0)
+		for cmd := range subcommands {
+			cmds = append(
+				cmds,
+				fmt.Sprintf("%-20s\t%-40s", cmd, subcommands[cmd].description),
+			)
+		}
+		sort.Strings(cmds)
+		fmt.Fprintf(flag.CommandLine.Output(), `Usage:
+
+	%s [flags] command [sub-flags]
+
+Description:
+
+	godfish is a database migration manager. It tracks the status of migrations
+	by recording a timestamp in a table called "schema_migrations" in the
+	"migration_id" column. Those timestamps correspond to SQL migration files
+	that you write and store somewhere on the filesystem. You need to configure
+	the path to the SQL migration files as well as the name of the driver to use
+	(ie: postgres, mysql, potato, potato).
+
+	Configuration options are set with flags or with a configuration file. Options
+	specified via flags will take precedence over the config file.
+
+	Specify database connection params with environment variables:
+		DB_HOST=
+		DB_NAME=
+		DB_PASSWORD=
+		DB_PORT=
+		DB_USER=
+
+	The following flags should go before the command.`,
+			bin)
+		printFlagDefaults(flag.CommandLine)
+		fmt.Fprintf(
+			flag.CommandLine.Output(), `
+Commands:
+
+	These will have their own set of flags. Put them after the command.
+
+	%v
+
+Examples:
+
+	%s [command] -h
+`,
+			strings.Join(cmds, "\n\t"), bin)
+
+	}
+
+	flag.StringVar(&args.Conf, "conf", ".godfish.json", "path to godfish config file")
+	flag.BoolVar(&args.Debug, "debug", false, "output extra debugging info")
+	flag.StringVar(
+		&args.Files,
+		"files",
+		"",
+		"path to migration files, can also set with config file",
+	)
+}
+
+// initSubcommand selects the sub command to run. If the command name is not
+// found, then it outputs help. If the command is found, then merge config file
+// with CLI args and set up the Subcommand.
+func initSubcommand(positionalArgs []string, a *arguments) (subcmd *subcommand, err error) {
+	if len(positionalArgs) == 0 || positionalArgs[0] == "help" {
+		err = flag.ErrHelp
+		return
+	} else if c, ok := subcommands[positionalArgs[0]]; !ok {
+		err = fmt.Errorf("unknown command %q", positionalArgs[0])
+		return
+	} else {
+		subcmd = c
+	}
+
+	// Read configuration file, if present. Negotiate with Args.
+	var conf godfish.MigrationsConf
+	if data, ierr := ioutil.ReadFile(a.Conf); ierr != nil {
+		// probably no config file present, rely on Args instead.
+	} else if ierr = json.Unmarshal(data, &conf); ierr != nil {
+		err = ierr
+		return
+	}
+	if a.Files == "" && conf.PathToFiles != "" {
+		a.Files = conf.PathToFiles
+	}
+
+	if a.Debug {
+		fmt.Printf("positional arguments: %#v\n", flag.Args())
+		fmt.Printf("config file at %q: %#v\n", a.Conf, conf)
+		fmt.Printf("Args prior subcmd flag parse: %#v\n", a)
+	}
+	subflags := subcmd.setup(a)
+	if err = subflags.Parse(positionalArgs[1:]); err != nil {
+		return
+	}
+	if a.Debug {
+		fmt.Printf("Args after subcmd flag parse: %#v\n", a)
+	}
+	return
+}
+
+type subcommand struct {
+	// description should provide a short summary.
 	description string
 	// setup should prepare Args for interpretation by using the pointer to Args
 	// with the returned flag set.
-	setup func(a *Args) *flag.FlagSet
+	setup func(a *arguments) *flag.FlagSet
 	// run is a wrapper function that selects the necessary command line inputs,
 	// executes the command and returns any errors.
-	run func(a Args) error
+	run func(a arguments) error
 }
 
-// commands registers any operation by name to a command.
-var commands = map[string]*command{
-	"create-migration": &command{
+// subcommands registers any operation by name to a subcommand.
+var subcommands = map[string]*subcommand{
+	"create-migration": &subcommand{
 		description: "generate migration files",
-		setup: func(a *Args) *flag.FlagSet {
+		setup: func(a *arguments) *flag.FlagSet {
 			flags := flag.NewFlagSet("create-migration", flag.ExitOnError)
 			flags.StringVar(
 				&a.Name,
@@ -54,7 +197,7 @@ var commands = map[string]*command{
 			}
 			return flags
 		},
-		run: func(a Args) error {
+		run: func(a arguments) error {
 			dir, err := os.Open(a.Files)
 			if err != nil {
 				return err
@@ -66,9 +209,9 @@ var commands = map[string]*command{
 			return migration.GenerateFiles()
 		},
 	},
-	"dump-schema": &command{
+	"dump-schema": &subcommand{
 		description: "generate a sql file describing the db schema",
-		setup: func(a *Args) *flag.FlagSet {
+		setup: func(a *arguments) *flag.FlagSet {
 			flags := flag.NewFlagSet("dump-schema", flag.ExitOnError)
 			flags.Usage = func() {
 				fmt.Printf(`Usage: %s dump-schema
@@ -79,8 +222,8 @@ var commands = map[string]*command{
 			}
 			return flags
 		},
-		run: func(a Args) error {
-			driver, err := newDriver(a.Driver)
+		run: func(a arguments) error {
+			driver, err := bootDriver(a.DSN)
 			if err != nil {
 				return err
 			}
@@ -88,9 +231,9 @@ var commands = map[string]*command{
 			return nil
 		},
 	},
-	"info": &command{
+	"info": &subcommand{
 		description: "output current state of migrations",
-		setup: func(a *Args) *flag.FlagSet {
+		setup: func(a *arguments) *flag.FlagSet {
 			flags := flag.NewFlagSet("info", flag.ExitOnError)
 			flags.StringVar(
 				&a.Direction,
@@ -112,8 +255,8 @@ var commands = map[string]*command{
 			}
 			return flags
 		},
-		run: func(a Args) error {
-			driver, err := newDriver(a.Driver)
+		run: func(a arguments) error {
+			driver, err := bootDriver(a.DSN)
 			if err != nil {
 				return err
 			}
@@ -121,9 +264,9 @@ var commands = map[string]*command{
 			return godfish.Info(driver, a.Files, direction, a.Version)
 		},
 	},
-	"init": &command{
+	"init": &subcommand{
 		description: "create godfish configuration file",
-		setup: func(a *Args) *flag.FlagSet {
+		setup: func(a *arguments) *flag.FlagSet {
 			flags := flag.NewFlagSet("init", flag.ExitOnError)
 			flags.StringVar(
 				&a.Conf,
@@ -140,13 +283,13 @@ var commands = map[string]*command{
 
 			return flags
 		},
-		run: func(a Args) error {
+		run: func(a arguments) error {
 			return godfish.Init(a.Conf)
 		},
 	},
-	"migrate": &command{
+	"migrate": &subcommand{
 		description: "execute migration(s) in the forward direction",
-		setup: func(a *Args) *flag.FlagSet {
+		setup: func(a *arguments) *flag.FlagSet {
 			flags := flag.NewFlagSet("migrate", flag.ExitOnError)
 			flags.StringVar(
 				&a.Version,
@@ -168,8 +311,8 @@ var commands = map[string]*command{
 
 			return flags
 		},
-		run: func(a Args) error {
-			driver, err := newDriver(a.Driver)
+		run: func(a arguments) error {
+			driver, err := bootDriver(a.DSN)
 			if err != nil {
 				return err
 			}
@@ -183,9 +326,9 @@ var commands = map[string]*command{
 			return err
 		},
 	},
-	"remigrate": &command{
+	"remigrate": &subcommand{
 		description: "rollback and then re-apply the last migration",
-		setup: func(a *Args) *flag.FlagSet {
+		setup: func(a *arguments) *flag.FlagSet {
 			flags := flag.NewFlagSet("remigrate", flag.ExitOnError)
 			// TODO: files flag?
 			flags.Usage = func() { // TODO: mention files flag?
@@ -198,8 +341,8 @@ var commands = map[string]*command{
 
 			return flags
 		},
-		run: func(a Args) error {
-			driver, err := newDriver(a.Driver)
+		run: func(a arguments) error {
+			driver, err := bootDriver(a.DSN)
 			if err != nil {
 				return err
 			}
@@ -219,9 +362,9 @@ var commands = map[string]*command{
 			)
 		},
 	},
-	"rollback": &command{
+	"rollback": &subcommand{
 		description: "execute migration(s) in the reverse direction",
-		setup: func(a *Args) *flag.FlagSet {
+		setup: func(a *arguments) *flag.FlagSet {
 			flags := flag.NewFlagSet("rollback", flag.ExitOnError)
 			// TODO: files flag?
 			flags.StringVar(
@@ -243,8 +386,8 @@ var commands = map[string]*command{
 			}
 			return flags
 		},
-		run: func(a Args) error {
-			driver, err := newDriver(a.Driver)
+		run: func(a arguments) error {
+			driver, err := bootDriver(a.DSN)
 			if err != nil {
 				return err
 			}
@@ -268,42 +411,22 @@ var commands = map[string]*command{
 	},
 }
 
-func newDriver(driverName string) (driver godfish.Driver, err error) {
-	// try to keep the environment variable keys the same for all drivers.
-	var (
-		dbHost     = os.Getenv("DB_HOST")
-		dbName     = os.Getenv("DB_NAME")
-		dbPassword = os.Getenv("DB_PASSWORD")
-		dbPort     = os.Getenv("DB_PORT")
-		dbUser     = os.Getenv("DB_USER")
-	)
-
-	switch driverName {
-	case "postgres":
-		driver, err = godfish.NewDriver(postgres.Params{
-			Encoding: "UTF8",
-			Host:     dbHost,
-			Name:     dbName,
-			Pass:     dbPassword,
-			Port:     dbPort,
-			User:     dbUser,
-		}, nil)
-	case "mysql":
-		driver, err = godfish.NewDriver(mysql.Params{
-			Encoding: "UTF8",
-			Host:     dbHost,
-			Name:     dbName,
-			Pass:     dbPassword,
-			Port:     dbPort,
-			User:     dbUser,
-		}, nil)
-	default:
-		err = fmt.Errorf("unsupported db driver %q", driverName)
+func bootDriver(dsn godfish.DSN) (driver godfish.Driver, err error) {
+	connParams := godfish.ConnectionParams{
+		Host: os.Getenv("DB_HOST"),
+		Name: os.Getenv("DB_NAME"),
+		Pass: os.Getenv("DB_PASSWORD"),
+		Port: os.Getenv("DB_PORT"),
+		User: os.Getenv("DB_USER"),
 	}
+	if err = dsn.Boot(connParams); err != nil {
+		return
+	}
+	driver, err = dsn.NewDriver(nil)
 	return
 }
 
-func whichDirection(a Args) (direction godfish.Direction) {
+func whichDirection(a arguments) (direction godfish.Direction) {
 	direction = godfish.DirForward
 	d := strings.ToLower(a.Direction)
 	if strings.HasPrefix(d, "rev") || strings.HasPrefix(d, "back") {

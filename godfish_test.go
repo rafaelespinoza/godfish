@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"bitbucket.org/rafaelespinoza/godfish/godfish"
+	"bitbucket.org/rafaelespinoza/godfish"
 )
 
 const baseTestOutputDir = "/tmp/godfish_test"
@@ -103,13 +103,11 @@ func TestInit(t *testing.T) {
 	// setup: file should not exist at first
 	if _, err = os.Stat(pathToFile); !os.IsNotExist(err) {
 		t.Fatalf("setup error; file at %q should not exist", pathToFile)
-		return
 	}
 
 	// test 1: file created with this shape
 	if err = godfish.Init(pathToFile); err != nil {
 		t.Fatalf("something else is wrong with setup; %v", err)
-		return
 	}
 	var conf godfish.MigrationsConf
 	if data, err := ioutil.ReadFile(pathToFile); err != nil {
@@ -117,7 +115,6 @@ func TestInit(t *testing.T) {
 	} else if err = json.Unmarshal(data, &conf); err != nil {
 		t.Fatal(err)
 	}
-	conf.DriverName = "foo"
 	conf.PathToFiles = baseTestOutputDir + "/bar"
 
 	// test2: write data and make sure it's not overwritten after calling Init
@@ -138,12 +135,6 @@ func TestInit(t *testing.T) {
 		t.Fatal(err)
 	} else if err = json.Unmarshal(data, &conf2); err != nil {
 		t.Fatal(err)
-	}
-	if conf2.DriverName != "foo" {
-		t.Errorf(
-			"expected conf.DriverName to be %q, got %q",
-			"foo", conf2.DriverName,
-		)
 	}
 	if conf2.PathToFiles != baseTestOutputDir+"/bar" {
 		t.Errorf(

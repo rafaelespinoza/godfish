@@ -1,6 +1,6 @@
 # godfish
 
-[![GoDoc](https://godoc.org/bitbucket.org/rafaelespinoza/godfish/godfish?status.svg)](https://godoc.org/bitbucket.org/rafaelespinoza/godfish/godfish)
+[![GoDoc](https://godoc.org/bitbucket.org/rafaelespinoza/godfish?status.svg)](https://godoc.org/bitbucket.org/rafaelespinoza/godfish)
 
 `godfish` is a relational database migration manager. It's similar to the very
 good [`dogfish`](https://github.com/dwb/dogfish), but written in golang.
@@ -14,20 +14,25 @@ It's been tested w/ golang v1.12 on linux systems.
 - as little dependencies outside of the standard library as possible
 - not terrible error messages
 
+## build
 
-## installation
-
-```
-go install bitbucket.org/rafaelespinoza/godfish
-```
-
-or for development
+Make a CLI binary for the DB you want to use. This tool comes with a couple of
+driver implementations (mysql, postgres at the moment). Build one like so:
 
 ```
-go get bitbucket.org/rafaelespinoza/godfish
-cd "$GOPATH/bitbucket.org/rafaelespinoza/godfish"
-make install
+make mysql
+make postgres
 ```
+
+This outputs a binary, named `godfish`, which would only import from libraries
+of your targeted DBMS. From there you could move it to `$GOPATH/bin`, move it
+to your project or whatever else you need to do.
+
+One goal of this project is to minimize dependencies outside of the golang
+standard library *yet* also support many DBMSs. As far as I know, it's more
+common to have one DBMS in a project. The point is that you don't need to
+install `fooDB` for your `barDB` project.  But if you do need `fooDB` and
+`barDB` in the same project, build both and take care of the naming yourself.
 
 ## usage
 
@@ -87,6 +92,7 @@ reverse-20191205031405-update_more_stuff.sql
 
 These are welcome. To get you started, the code has some documentation, a godoc
 page, at least one implementation of each interface and tests. `gofmt` or gtfo.
+
 Comments line lengths should be limited to 80 characters wide. Try not to make
 source code lines too long. More lines is fine with the exception of
 declarations of exported identifiers; they should be on one line, otherwise the

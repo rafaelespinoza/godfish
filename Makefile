@@ -1,44 +1,48 @@
-TEST_DB_NAME=godfish_test
+BIN=godfish
 DB_USER=godfish
 DB_HOST=localhost
+TEST_DB_NAME=godfish_test
 
-# Register database drivers to test. For every item in this array, there should
+# Register database drivers to make. For every item in this array, there should
 # be three separate targets elsewhere in the Makefile. Here's an example using a
 # made-up DBMS:
 #
-#	foodb-setup:
+#	foodb-test-setup:
 #		command to create $(TEST_DB_NAME)
-#	foodb-teardown:
+#	foodb-test-teardown:
 #		command to drop $(TEST_DB_NAME)
-#	foodb: foodb-setup foodb-teardown
+#	foodb:
+#		go build ...
 #
-# One should have a target suffix "-teardown", another should have the target
-# suffix "-setup" and the last one is just named after the DBMS, but it targets
-# the other two.
-DRIVERS_TO_TEST=postgres mysql
+# One should have a target suffix "-test-teardown", another should have the
+# target suffix "-test-setup" and the last one is just named after the DBMS,
+# which builds the CLI binary.
+DRIVERS=postgres mysql
 
-SETUPS=$(addsuffix -setup, $(DRIVERS_TO_TEST))
-TEARDOWNS=$(addsuffix -teardown, $(DRIVERS_TO_TEST))
+SETUPS=$(addsuffix -test-setup, $(DRIVERS))
+TEARDOWNS=$(addsuffix -test-teardown, $(DRIVERS))
 
-test: clean db
-	go test ./godfish $(ARGS)
+test:
+	go test ./... $(ARGS)
+test-setups: $(SETUPS)
+test-teardowns: $(TEARDOWNS)
 
-install:
-	go install -i .
+.PHONY: $(DRIVERS) clean
+clean:
+	rm $(BIN)
 
-db: $(SETUPS)
-clean: $(TEARDOWNS)
-
-postgres: postgres-teardown postgres-setup
-postgres-teardown:
+postgres:
+	go build -o $(BIN) -i -v ./$@/godfish
+postgres-test-teardown:
 	dropdb --if-exists $(TEST_DB_NAME)
-postgres-setup:
+postgres-test-setup:
 	createdb -E utf8 $(TEST_DB_NAME)
 
-mysql: mysql-teardown mysql-setup
-mysql-teardown:
+mysql:
+	go build -o $(BIN) -i -v ./$@/godfish
+mysql-test-teardown:
 	mysql -u $(DB_USER) -h $(DB_HOST) \
 		-e "DROP DATABASE IF EXISTS ${TEST_DB_NAME}"
-mysql-setup:
+mysql-test-setup:
 	mysql -u $(DB_USER) -h $(DB_HOST) \
 		-e "CREATE DATABASE IF NOT EXISTS ${TEST_DB_NAME}"

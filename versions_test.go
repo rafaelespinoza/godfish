@@ -20,7 +20,7 @@ var _ Driver = (*StubDB)(nil)
 func (d *StubDB) Name() string              { return "stub" }
 func (d *StubDB) Connect() (*sql.DB, error) { return d.connection, d.err }
 func (d *StubDB) Close() error              { return d.err }
-func (d *StubDB) DSNParams() DSNParams      { return d.dsn }
+func (d *StubDB) DSN() DSN                  { return &d.dsn }
 func (d *StubDB) CreateSchemaMigrationsTable() error {
 	if d.appliedVersions == nil {
 		d.appliedVersions = makeStubAppliedVersions()
@@ -60,14 +60,18 @@ func (d *StubDB) AppliedVersions() (AppliedVersions, error) {
 	return d.appliedVersions, d.err
 }
 
-type StubDSN struct{}
+type StubDSN struct{ ConnectionParams }
 
+func (d StubDSN) Boot(params ConnectionParams) error {
+	d.ConnectionParams = params
+	return nil
+}
 func (d StubDSN) NewDriver(migConf *MigrationsConf) (Driver, error) {
 	return &StubDB{dsn: d}, nil
 }
 func (d StubDSN) String() string { return "this://is.a/test" }
 
-var _ DSNParams = (*StubDSN)(nil)
+var _ DSN = (*StubDSN)(nil)
 
 type StubAppliedVersions struct {
 	counter  int

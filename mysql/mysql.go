@@ -5,30 +5,31 @@ import (
 	"fmt"
 	"os/exec"
 
-	"bitbucket.org/rafaelespinoza/godfish/godfish"
+	"bitbucket.org/rafaelespinoza/godfish"
 	my "github.com/go-sql-driver/mysql"
 )
 
-// Params implements the godfish.DSNParams interface and defines keys, values
-// needed to connect to a mysql database.
-type Params struct {
-	Encoding string // Encoding is the client encoding for the connection.
-	Host     string // Host is the name of the host to connect to.
-	Name     string // Name is the database name.
-	Pass     string // Pass is the password to use for the connection.
-	Port     string // Port is the connection port.
-	User     string // User is the name of the user to connect as.
+// DSN implements the godfish.DSN interface and defines keys, values needed to
+// connect to a mysql database.
+type DSN struct {
+	godfish.ConnectionParams
 }
 
-var _ godfish.DSNParams = (*Params)(nil)
+var _ godfish.DSN = (*DSN)(nil)
+
+// Boot initializes the DSN from environment inputs.
+func (p *DSN) Boot(params godfish.ConnectionParams) error {
+	p.ConnectionParams = params
+	return nil
+}
 
 // NewDriver creates a new mysql driver.
-func (p Params) NewDriver(migConf *godfish.MigrationsConf) (godfish.Driver, error) {
-	return newMySQL(p)
+func (p *DSN) NewDriver(migConf *godfish.MigrationsConf) (godfish.Driver, error) {
+	return newMySQL(*p)
 }
 
 // String generates a data source name (or connection URL) based on the fields.
-func (p Params) String() string {
+func (p *DSN) String() string {
 	return fmt.Sprintf(
 		"%s:%s@tcp(%s:%s)/%s",
 		p.User, p.Pass, p.Host, p.Port, p.Name,
@@ -38,29 +39,29 @@ func (p Params) String() string {
 // driver implements the godfish.Driver interface for mysql databases.
 type driver struct {
 	connection *sql.DB
-	connParams Params
+	dsn        DSN
 }
 
 var _ godfish.Driver = (*driver)(nil)
 
-func newMySQL(connParams Params) (*driver, error) {
-	if connParams.Host == "" {
-		connParams.Host = "localhost"
+func newMySQL(dsn DSN) (*driver, error) {
+	if dsn.Host == "" {
+		dsn.Host = "localhost"
 	}
-	if connParams.Port == "" {
-		connParams.Port = "3306"
+	if dsn.Port == "" {
+		dsn.Port = "3306"
 	}
-	return &driver{connParams: connParams}, nil
+	return &driver{dsn: dsn}, nil
 }
 
-func (d *driver) Name() string                 { return "mysql" }
-func (d *driver) DSNParams() godfish.DSNParams { return d.connParams }
+func (d *driver) Name() string     { return "mysql" }
+func (d *driver) DSN() godfish.DSN { return &d.dsn }
 func (d *driver) Connect() (conn *sql.DB, err error) {
 	if d.connection != nil {
 		conn = d.connection
 		return
 	}
-	if conn, err = sql.Open(d.Name(), d.DSNParams().String()); err != nil {
+	if conn, err = sql.Open(d.Name(), d.DSN().String()); err != nil {
 		return
 	}
 	d.connection = conn
@@ -91,7 +92,7 @@ func (d *driver) CreateSchemaMigrationsTable() (err error) {
 }
 
 func (d *driver) DumpSchema() (err error) {
-	params := d.connParams
+	params := d.dsn
 	cmd := exec.Command(
 		"mysqldump",
 		"--user", params.User, "--password="+params.Pass, // skip password prompt by a omitting space

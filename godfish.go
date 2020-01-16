@@ -1,8 +1,5 @@
-// Package godfish is a database migration library built to support a CLI tool,
-// also called godfish. This documentation is available for development. To get
-// the CLI and/or get help with it:
-// 		go get -u bitbucket.org/rafaelespinoza/godfish
-// 		godfish -h
+// Package godfish is a database migration library built to support the command
+// line tool.
 package godfish
 
 import (
@@ -371,11 +368,25 @@ func runMigration(driver Driver, pathToFile string, mig Migration) (err error) {
 	return
 }
 
-// DSNParams describes a type which generates a data source name for connecting
-// to a database. The output will be passed to the standard library's sql.Open
-// method to connect to a database.
-type DSNParams interface {
+// ConnectionParams is what to use when initializing a DSN.
+type ConnectionParams struct {
+	Encoding string // Encoding is the client encoding for the connection.
+	Host     string // Host is the name of the host to connect to.
+	Name     string // Name is the database name.
+	Pass     string // Pass is the password to use for the connection.
+	Port     string // Port is the connection port.
+	User     string // User is the name of the user to connect as.
+}
+
+// DSN describes a type which generates a data source name for connecting to a
+// database. The output will be passed to the standard library's sql.Open method
+// to connect to a database.
+type DSN interface {
+	// Boot takes inputs from the host environment so it can create a Driver.
+	Boot(ConnectionParams) error
+	// NewDriver calls the constructor of the corresponding Driver.
 	NewDriver(*MigrationsConf) (Driver, error)
+	// String uses connection parameters to form the data source name.
 	String() string
 }
 
@@ -394,8 +405,8 @@ type Driver interface {
 	// connection (a *sql.DB) and if it's present, close it. Then reset the
 	// internal reference to that connection to nil.
 	Close() error
-	// DSNParams returns data source name info, ie: how do I connect?
-	DSNParams() DSNParams
+	// DSN returns data source name info, ie: how do I connect?
+	DSN() DSN
 
 	// AppliedVersions queries the schema migrations table for migration
 	// versions that have been executed against the database.
@@ -418,14 +429,13 @@ type Driver interface {
 
 // NewDriver initializes a Driver implementation by name and connection
 // parameters.
-func NewDriver(dsnParams DSNParams, migConf *MigrationsConf) (driver Driver, err error) {
-	return dsnParams.NewDriver(migConf)
+func NewDriver(dsn DSN, migConf *MigrationsConf) (driver Driver, err error) {
+	return dsn.NewDriver(migConf)
 }
 
 // MigrationsConf is intended to lend customizations such as specifying the path
 // to the migration files.
 type MigrationsConf struct {
-	DriverName  string `json:"driver_name"`
 	PathToFiles string `json:"path_to_files"`
 }
 

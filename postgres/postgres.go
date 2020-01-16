@@ -6,30 +6,31 @@ import (
 	"fmt"
 	"os/exec"
 
-	"bitbucket.org/rafaelespinoza/godfish/godfish"
+	"bitbucket.org/rafaelespinoza/godfish"
 	"github.com/lib/pq"
 )
 
-// Params implements the godfish.DSNParams interface and defines keys, values
-// needed to connect to a postgres database.
-type Params struct {
-	Encoding string // Encoding is the client encoding for the connection.
-	Host     string // Host is the name of the host to connect to.
-	Name     string // Name is the database name.
-	Pass     string // Pass is the password to use for the connection.
-	Port     string // Port is the connection port.
-	User     string // User is the name of the user to connect as.
+// DSN implements the godfish.DSN interface and defines keys, values needed to
+// connect to a postgres database.
+type DSN struct {
+	godfish.ConnectionParams
 }
 
-var _ godfish.DSNParams = (*Params)(nil)
+var _ godfish.DSN = (*DSN)(nil)
+
+// Boot initializes the DSN from environment inputs.
+func (p *DSN) Boot(params godfish.ConnectionParams) error {
+	p.ConnectionParams = params
+	return nil
+}
 
 // NewDriver creates a new postgres driver.
-func (p Params) NewDriver(migConf *godfish.MigrationsConf) (godfish.Driver, error) {
-	return newPostgres(p)
+func (p *DSN) NewDriver(migConf *godfish.MigrationsConf) (godfish.Driver, error) {
+	return newPostgres(*p)
 }
 
 // String generates a data source name (or connection URL) based on the fields.
-func (p Params) String() string {
+func (p *DSN) String() string {
 	return fmt.Sprintf(
 		"postgresql://%s:%s/%s?client_encoding=%s&sslmode=require",
 		p.Host, p.Port, p.Name, p.Encoding,
@@ -39,29 +40,29 @@ func (p Params) String() string {
 // driver implements the Driver interface for postgres databases.
 type driver struct {
 	connection *sql.DB
-	connParams Params
+	dsn        DSN
 }
 
 var _ godfish.Driver = (*driver)(nil)
 
-func newPostgres(connParams Params) (*driver, error) {
-	if connParams.Host == "" {
-		connParams.Host = "localhost"
+func newPostgres(dsn DSN) (*driver, error) {
+	if dsn.Host == "" {
+		dsn.Host = "localhost"
 	}
-	if connParams.Port == "" {
-		connParams.Port = "5432"
+	if dsn.Port == "" {
+		dsn.Port = "5432"
 	}
-	return &driver{connParams: connParams}, nil
+	return &driver{dsn: dsn}, nil
 }
 
-func (d *driver) Name() string                 { return "postgres" }
-func (d *driver) DSNParams() godfish.DSNParams { return d.connParams }
+func (d *driver) Name() string     { return "postgres" }
+func (d *driver) DSN() godfish.DSN { return &d.dsn }
 func (d *driver) Connect() (conn *sql.DB, err error) {
 	if d.connection != nil {
 		conn = d.connection
 		return
 	}
-	if conn, err = sql.Open(d.Name(), d.DSNParams().String()); err != nil {
+	if conn, err = sql.Open(d.Name(), d.DSN().String()); err != nil {
 		return
 	}
 	d.connection = conn
@@ -96,7 +97,7 @@ func (d *driver) DumpSchema() (err error) {
 	cmd := exec.Command(
 		"pg_dump",
 		"--schema-only", "--no-acl", "--no-owner", "--no-password",
-		d.connParams.Name,
+		d.dsn.Name,
 	)
 	cmd.Stdout = &out
 	if err = cmd.Run(); err != nil {

@@ -7,15 +7,26 @@ import (
 	"testing"
 	"time"
 
-	"bitbucket.org/rafaelespinoza/godfish/godfish"
+	"bitbucket.org/rafaelespinoza/godfish"
 )
 
 const baseTestOutputDir = "/tmp/godfish_test/driver"
 
 // RunDriverTests tests an implementation of the godfish.Driver interface.
-func RunDriverTests(t *testing.T, dsnParams godfish.DSNParams) {
+func RunDriverTests(t *testing.T, dsn godfish.DSN) {
 	t.Helper()
-	driver, err := godfish.NewDriver(dsnParams, nil)
+	connParams := godfish.ConnectionParams{
+		Encoding: "UTF8",
+		Host:     "localhost",
+		Name:     "godfish_test",
+		Pass:     os.Getenv("DB_PASSWORD"),
+		Port:     os.Getenv("DB_PORT"),
+		User:     "godfish",
+	}
+	if err := dsn.Boot(connParams); err != nil {
+		t.Fatal(err)
+	}
+	driver, err := godfish.NewDriver(dsn, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
