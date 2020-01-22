@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"os/exec"
 
-	"bitbucket.org/rafaelespinoza/godfish"
 	my "github.com/go-sql-driver/mysql"
+	"github.com/rafaelespinoza/godfish"
 )
 
 // DSN implements the godfish.DSN interface and defines keys, values needed to

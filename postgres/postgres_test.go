@@ -3,8 +3,8 @@ package postgres_test
 import (
 	"testing"
 
-	"bitbucket.org/rafaelespinoza/godfish/internal"
-	"bitbucket.org/rafaelespinoza/godfish/postgres"
+	"github.com/rafaelespinoza/godfish/internal"
+	"github.com/rafaelespinoza/godfish/postgres"
 )
 
 func Test(t *testing.T) {

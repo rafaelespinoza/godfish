@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"bitbucket.org/rafaelespinoza/godfish"
+	"github.com/rafaelespinoza/godfish"
 )
 
 const baseTestOutputDir = "/tmp/godfish_test"

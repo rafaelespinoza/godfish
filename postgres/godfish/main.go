@@ -4,8 +4,8 @@ import (
 	"log"
 	"os"
 
-	"bitbucket.org/rafaelespinoza/godfish/internal/commands"
-	"bitbucket.org/rafaelespinoza/godfish/postgres"
+	"github.com/rafaelespinoza/godfish/internal/commands"
+	"github.com/rafaelespinoza/godfish/postgres"
 )
 
 func main() {

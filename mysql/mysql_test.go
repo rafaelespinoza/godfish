@@ -3,8 +3,8 @@ package mysql_test
 import (
 	"testing"
 
-	"bitbucket.org/rafaelespinoza/godfish/internal"
-	"bitbucket.org/rafaelespinoza/godfish/mysql"
+	"github.com/rafaelespinoza/godfish/internal"
+	"github.com/rafaelespinoza/godfish/mysql"
 )
 
 func Test(t *testing.T) {

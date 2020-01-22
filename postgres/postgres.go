@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"os/exec"
 
-	"bitbucket.org/rafaelespinoza/godfish"
 	"github.com/lib/pq"
+	"github.com/rafaelespinoza/godfish"
 )
 
 // DSN implements the godfish.DSN interface and defines keys, values needed to

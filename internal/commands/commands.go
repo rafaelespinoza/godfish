@@ -10,7 +10,7 @@ import (
 	"sort"
 	"strings"
 
-	"bitbucket.org/rafaelespinoza/godfish"
+	"github.com/rafaelespinoza/godfish"
 )
 
 // arguments describes the CLI inputs and other configuration variables.

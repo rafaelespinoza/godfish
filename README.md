@@ -1,6 +1,6 @@
 # godfish
 
-[![GoDoc](https://godoc.org/bitbucket.org/rafaelespinoza/godfish?status.svg)](https://godoc.org/bitbucket.org/rafaelespinoza/godfish)
+[![GoDoc](https://godoc.org/github.com/rafaelespinoza/godfish?status.svg)](https://godoc.org/github.com/rafaelespinoza/godfish)
 
 `godfish` is a relational database migration manager. It's similar to the very
 good [`dogfish`](https://github.com/dwb/dogfish), but written in golang.
