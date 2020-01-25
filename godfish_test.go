@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strconv"
 	"testing"
 
 	"github.com/rafaelespinoza/godfish"
@@ -20,80 +21,114 @@ func TestMain(m *testing.M) {
 }
 
 func TestMigrationParams(t *testing.T) {
-	var testDir *os.File
-	var mig *godfish.MigrationParams
-	var err error
-	pathToTestDir := baseTestOutputDir + "/" + t.Name()
-	if err := os.MkdirAll(pathToTestDir, 0755); err != nil {
-		t.Fatalf("error creating test directory %s", pathToTestDir)
-		return
-	}
-	if testDir, err = os.Open(pathToTestDir); err != nil {
-		t.Error(err)
-		return
-	}
-	defer os.RemoveAll(pathToTestDir)
-	if mig, err = godfish.NewMigrationParams("foo", true, testDir); err != nil {
-		t.Error(err)
-		return
-	}
-	if mig.Forward.Direction() != godfish.DirForward {
-		t.Errorf(
-			"wrong Direction; expected %s, got %s",
-			godfish.DirForward, mig.Forward.Direction(),
-		)
-	}
-	if mig.Reverse.Direction() != godfish.DirReverse {
-		t.Errorf(
-			"wrong Direction; expected %s, got %s",
-			godfish.DirReverse, mig.Reverse.Direction(),
-		)
-	}
-	migrations := []godfish.Migration{mig.Forward, mig.Reverse}
-	for _, mig := range migrations {
-		if mig.Name() != "foo" {
-			t.Errorf(
-				"wrong Name; expected %s, got %s",
-				"foo", mig.Name(),
-			)
-		}
-		if mig.Timestamp().IsZero() {
-			t.Error("got empty Timestamp")
-		}
+	type testCase struct {
+		name       string
+		reversible bool
 	}
 
-	var filesBefore, filesAfter []string
-	if filesBefore, err = testDir.Readdirnames(0); err != nil {
-		t.Error(err)
-		return
-	}
-	if err = mig.GenerateFiles(); err != nil {
-		t.Error(err)
-		return
-	}
-	if filesAfter, err = testDir.Readdirnames(0); err != nil {
-		t.Error(err)
-		return
-	}
-	if len(filesAfter)-len(filesBefore) != 2 {
-		t.Errorf(
-			"expected to generate 2 files, got %d",
-			len(filesAfter)-len(filesBefore),
-		)
-		return
-	}
-	expectedDirections := []string{"reverse", "forward"}
-	for i, name := range filesAfter {
-		patt := fmt.Sprintf("%s-[0-9]*-foo.sql", expectedDirections[i])
-		if match, err := filepath.Match(patt, name); err != nil {
+	runTest := func(i int, test testCase, directory *os.File) {
+		mig, err := godfish.NewMigrationParams(test.name, test.reversible, directory)
+		if err != nil {
 			t.Error(err)
-			return
-		} else if !match {
+		}
+		if mig.Forward.Direction() != godfish.DirForward {
 			t.Errorf(
-				"expected filename %q to match pattern %q",
-				name, patt,
+				"test %d; wrong Direction; expected %s, got %s",
+				i, godfish.DirForward, mig.Forward.Direction(),
 			)
 		}
+		if test.reversible {
+			if mig.Reverse.Direction() != godfish.DirReverse {
+				t.Errorf(
+					"test %d; wrong Direction; expected %s, got %s",
+					i, godfish.DirReverse, mig.Reverse.Direction(),
+				)
+			}
+		}
+		migrations := []godfish.Migration{mig.Forward, mig.Reverse}
+		for j, mig := range migrations {
+			if j == 1 && !test.reversible {
+				continue
+			}
+			if mig.Name() != test.name {
+				t.Errorf("test [%d][%d]; Name should be unchanged", i, j)
+			}
+			if mig.Timestamp().IsZero() {
+				t.Errorf("test [%d][%d]; got empty Timestamp", i, j)
+			}
+		}
+
+		var filesBefore, filesAfter []string
+		if filesBefore, err = directory.Readdirnames(0); err != nil {
+			t.Fatalf("test %d; %v", err, i)
+		}
+		if err = mig.GenerateFiles(); err != nil {
+			t.Errorf("test %d; %v", i, err)
+		}
+		if filesAfter, err = directory.Readdirnames(0); err != nil {
+			t.Fatalf("test %d; %v", i, err)
+		}
+
+		actualNumFiles := len(filesAfter) - len(filesBefore)
+		numExpectedFiles := 1
+		expectedDirections := []string{"forward"}
+		if test.reversible {
+			numExpectedFiles++
+			// the list of filenames seem to be returned in ctime desc order...
+			expectedDirections = append([]string{"reverse"}, expectedDirections...)
+		}
+		if actualNumFiles != numExpectedFiles {
+			t.Errorf(
+				"test %d; expected to generate %d files, got %d",
+				i, numExpectedFiles,
+				actualNumFiles,
+			)
+			return
+		}
+		for j, name := range filesAfter {
+			if j == 1 && !test.reversible {
+				continue
+			}
+			patt := fmt.Sprintf("%s-[0-9]*-%s.sql", expectedDirections[j], test.name)
+			if match, err := filepath.Match(patt, name); err != nil {
+				t.Fatalf("test [%d][%d]; %v", i, j, err)
+			} else if !match {
+				t.Errorf(
+					"test [%d][%d]; expected filename %q to match pattern %q",
+					i, j, name, patt,
+				)
+			}
+		}
+		return
+	}
+
+	tests := []testCase{
+		{
+			name:       "foo",
+			reversible: true,
+		},
+		{
+			name:       "bar",
+			reversible: false,
+		},
+		{
+			name:       "foo-bar",
+			reversible: false,
+		},
+	}
+
+	for i, test := range tests {
+		var directory *os.File
+		var err error
+		pathToTestDir := baseTestOutputDir + "/" + t.Name() + "/" + strconv.Itoa(i)
+		if err = os.MkdirAll(pathToTestDir, 0755); err != nil {
+			t.Fatal(err)
+		}
+		if directory, err = os.Open(pathToTestDir); err != nil {
+			t.Fatal(err)
+		}
+		defer os.RemoveAll(directory.Name())
+		runTest(i, test, directory)
 	}
 }
 
