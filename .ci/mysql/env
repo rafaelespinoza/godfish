@@ -1,0 +1,4 @@
+MYSQL_DATABASE=godfish_test
+MYSQL_PASSWORD=password
+MYSQL_ROOT_PASSWORD=root_password
+MYSQL_USER=godfish

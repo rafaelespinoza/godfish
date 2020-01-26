@@ -1,0 +1,3 @@
+POSTGRES_DB=godfish_test
+POSTGRES_PASSWORD=password
+POSTGRES_USER=godfish

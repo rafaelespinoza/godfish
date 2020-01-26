@@ -2,6 +2,9 @@
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/rafaelespinoza/godfish.svg)](https://pkg.go.dev/github.com/rafaelespinoza/godfish)
 
+[![mysql](https://github.com/rafaelespinoza/godfish/actions/workflows/mysql.yml/badge.svg)](https://github.com/rafaelespinoza/godfish/actions/workflows/mysql.yml)
+[![postgres](https://github.com/rafaelespinoza/godfish/actions/workflows/postgres.yml/badge.svg)](https://github.com/rafaelespinoza/godfish/actions/workflows/postgres.yml)
+
 `godfish` is a relational database migration manager, similar to the very
 good [`dogfish`](https://github.com/dwb/dogfish), but written in golang.
 
@@ -137,3 +140,19 @@ Comments line lengths should be limited to 80 characters wide. Try not to make
 source code lines too long. More lines is fine with the exception of
 declarations of exported identifiers; they should be on one line, otherwise the
 generated godoc looks weird. There are also tests, those should pass.
+
+## tests
+
+Docker and docker-compose are used to create environments and run the tests
+against a live database. Each database has a separate configuration. All of this
+lives in `Makefile.docker` and the `.ci/` directory.
+
+```sh
+# Build environments and run tests
+make -f Makefile.docker ci-mysql-up
+make -f Makefile.docker ci-postgres-up
+
+# Teardown
+make -f Makefile.docker ci-mysql-down
+make -f Makefile.docker ci-postgres-down
+```

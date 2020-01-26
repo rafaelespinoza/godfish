@@ -27,10 +27,6 @@ postgres:
 		./drivers/postgres/godfish
 postgres-test:
 	$(GO) test $(ARGS) ./drivers/postgres
-postgres-test-teardown:
-	dropdb --if-exists $(TEST_DB_NAME)
-postgres-test-setup:
-	createdb -E utf8 $(TEST_DB_NAME)
 
 mysql:
 	$(GO) build -o $(BIN) -v \
@@ -39,9 +35,3 @@ mysql:
 		./drivers/mysql/godfish
 mysql-test:
 	$(GO) test $(ARGS) ./drivers/mysql
-mysql-test-teardown:
-	mysql -u $(DB_USER) -h $(DB_HOST) \
-		-e "DROP DATABASE IF EXISTS ${TEST_DB_NAME}"
-mysql-test-setup:
-	mysql -u $(DB_USER) -h $(DB_HOST) \
-		-e "CREATE DATABASE IF NOT EXISTS ${TEST_DB_NAME}"

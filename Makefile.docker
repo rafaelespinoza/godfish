@@ -1,0 +1,51 @@
+BASENAME=godfish_test
+CI_DIR=./.ci
+
+#
+# Build CI environment, run test suite against a live DB.
+# NOTE: The client entrypoints require the other Makefile.
+#
+ci-mysql-up: build-mysql
+	docker-compose -f $(CI_DIR)/mysql/docker-compose.yml -- up --exit-code-from client
+ci-postgres-up: build-postgres
+	docker-compose -f $(CI_DIR)/postgres/docker-compose.yml -- up --exit-code-from client
+ci-mysql-down:
+	docker-compose -f $(CI_DIR)/mysql/docker-compose.yml -- down --rmi all --volumes
+ci-postgres-down:
+	docker-compose -f $(CI_DIR)/postgres/docker-compose.yml -- down --rmi all --volumes
+
+#
+# Build and tag images.
+#
+# Create a temporary directory, save the name to a variable.
+build-base: $(eval BUILD_DIR=$(shell mktemp -d -p /tmp $(BASENAME)_XXXXXX))
+build-base:
+	git clone --depth=1 file://$(PWD) $(BUILD_DIR)
+	docker image build -f $(CI_DIR)/client_base.Dockerfile -t $(BASENAME)/client_base $(BUILD_DIR)
+build-mysql: build-base
+	docker image build -f $(CI_DIR)/mysql/client.Dockerfile -t $(BASENAME)/mysql/client $(BUILD_DIR)
+	docker image build -f $(CI_DIR)/mysql/server.Dockerfile -t $(BASENAME)/mysql/server $(BUILD_DIR)
+	rm -rf $(BUILD_DIR)
+build-postgres: build-base
+	docker image build -f $(CI_DIR)/postgres/client.Dockerfile -t $(BASENAME)/postgres/client $(BUILD_DIR)
+	docker image build -f $(CI_DIR)/postgres/server.Dockerfile -t $(BASENAME)/postgres/server $(BUILD_DIR)
+	rm -rf $(BUILD_DIR)
+
+#
+# More cleanup stuff.
+#
+rm-mysql:
+	docker container rm $(shell docker container ls -aq --filter ancestor=$(BASENAME)/mysql/client)
+	docker container rm $(shell docker container ls -aq --filter ancestor=$(BASENAME)/mysql/server)
+rm-postgres:
+	docker container rm $(shell docker container ls -aq --filter ancestor=$(BASENAME)/postgres/client)
+	docker container rm $(shell docker container ls -aq --filter ancestor=$(BASENAME)/postgres/server)
+
+rmi-mysql:
+	docker image rmi $(shell docker image ls -aq $(BASENAME)/mysql/client)
+	docker image rmi $(shell docker image ls -aq $(BASENAME)/mysql/server)
+rmi-postgres:
+	docker image rmi $(shell docker image ls -aq $(BASENAME)/postgres/client)
+	docker image rmi $(shell docker image ls -aq $(BASENAME)/postgres/server)
+rmi-base:
+	docker image rmi $(shell docker image ls -aq $(BASENAME)/client_base)
