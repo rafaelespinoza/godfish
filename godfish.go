@@ -409,7 +409,9 @@ type Driver interface {
 	DSN() DSN
 
 	// AppliedVersions queries the schema migrations table for migration
-	// versions that have been executed against the database.
+	// versions that have been executed against the database. If the schema
+	// migrations table does not exist, the returned error should be
+	// ErrSchemaMigrationsDoesNotExist.
 	AppliedVersions() (AppliedVersions, error)
 	// CreateSchemaMigrationsTable should create a table to record migration
 	// versions once they've been applied. The version should be a timestamp as
