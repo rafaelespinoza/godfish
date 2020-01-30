@@ -80,12 +80,12 @@ func (d *driver) Close() (err error) {
 }
 
 func (d *driver) Execute(query string, args ...interface{}) (err error) {
-	_, err = d.connection.Query(query)
+	_, err = d.connection.Exec(query)
 	return
 }
 
 func (d *driver) CreateSchemaMigrationsTable() (err error) {
-	_, err = d.connection.Query(
+	_, err = d.connection.Exec(
 		`CREATE TABLE IF NOT EXISTS schema_migrations (
 			migration_id VARCHAR(128) PRIMARY KEY NOT NULL
 		)`)
@@ -112,7 +112,8 @@ func (d *driver) AppliedVersions() (out godfish.AppliedVersions, err error) {
 		`SELECT migration_id FROM schema_migrations ORDER BY migration_id ASC`,
 	)
 	if ierr, ok := err.(*pq.Error); ok {
-		if ierr.Message == "relation \"schema_migrations\" does not exist" {
+		// https://www.postgresql.org/docs/current/errcodes-appendix.html
+		if ierr.Code == "42P01" {
 			err = godfish.ErrSchemaMigrationsDoesNotExist
 		}
 	}

@@ -2,7 +2,7 @@
 
 [![GoDoc](https://godoc.org/github.com/rafaelespinoza/godfish?status.svg)](https://godoc.org/github.com/rafaelespinoza/godfish)
 
-`godfish` is a relational database migration manager. It's similar to the very
+`godfish` is a relational database migration manager, similar to the very
 good [`dogfish`](https://github.com/dwb/dogfish), but written in golang.
 
 It's been tested w/ golang v1.12 on linux systems.
@@ -20,19 +20,12 @@ Make a CLI binary for the DB you want to use. This tool comes with a couple of
 driver implementations (mysql, postgres at the moment). Build one like so:
 
 ```
-make mysql
-make postgres
+go build -i -o godfish_pg    github.com/rafaelespinoza/godfish/postgres/godfish
+go build -i -o godfish_mysql github.com/rafaelespinoza/godfish/mysql/godfish
 ```
 
-This outputs a binary, named `godfish`, which would only import from libraries
-of your targeted DBMS. From there you could move it to `$GOPATH/bin`, move it
-to your project or whatever else you need to do.
-
-One goal of this project is to minimize dependencies outside of the golang
-standard library *yet* also support many DBMSs. As far as I know, it's more
-common to have one DBMS in a project. The point is that you don't need to
-install `fooDB` for your `barDB` project.  But if you do need `fooDB` and
-`barDB` in the same project, build both and take care of the naming yourself.
+From there you could move it to `$GOPATH/bin`, move it to your project or
+whatever else you need to do.
 
 ## usage
 
@@ -42,15 +35,10 @@ godfish -h
 godfish <command> -h
 ```
 
-Make your life easier by creating a configuration file.
-
-```
-godfish init
-```
-
 Configuration options are read from command line flags first. If those are not
 set, then it checks the configuration file.
 
+#### connecting to the db
 
 Database connection parameters are always read from environment variables. The
 ones to set are:
@@ -61,6 +49,60 @@ DB_NAME=
 DB_PASSWORD=
 DB_PORT=
 DB_USER=
+```
+
+#### configure file paths
+
+Manually set path to db migration files.
+
+```sh
+godfish -files db/migrations <command>
+```
+
+Make your life easier by creating a configuration file by invoking `godfish
+init`. This creates a file at `.godfish.json`, where you can configure things.
+
+Change the path to the configuration file.
+
+```sh
+mv .godfish.json foo.json
+godfish -conf foo.json
+```
+
+#### everything else
+
+```sh
+cat .godfish.json
+# { "path_to_files": "db/migrations" }
+
+godfish create-migration -name alpha
+# outputs:
+# db/migrations/forward-20200128070010-alpha.sql
+# db/migrations/reverse-20200128070010-alpha.sql
+
+godfish create-migration -name bravo -reversible=false
+# outputs:
+# db/migrations/forward-20200128070106-bravo.sql
+
+#
+# ... write the sql in those files ...
+#
+
+# apply migrations
+godfish migrate
+# apply migrations to up a specific version
+godfish migrate -version 20060102150405
+
+# show status
+godfish info
+
+# apply a reverse migration
+godfish rollback
+
+# rollback and re-apply the last migration
+godfish remigrate
+
+godfish dump-schema > db/schema.sql
 ```
 
 ## other minutiae

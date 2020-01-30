@@ -1,6 +1,6 @@
 BIN=godfish
-DB_USER=godfish
-DB_HOST=localhost
+DB_USER ?= godfish
+DB_HOST ?= localhost
 TEST_DB_NAME=godfish_test
 
 # Register database drivers to make. For every item in this array, there should
@@ -23,7 +23,7 @@ SETUPS=$(addsuffix -test-setup, $(DRIVERS))
 TEARDOWNS=$(addsuffix -test-teardown, $(DRIVERS))
 
 test: test-teardowns test-setups
-	go test $(ARGS) . $(addprefix ./, $(DRIVERS))
+	go test $(ARGS) . ./internal/stub $(addprefix ./, $(DRIVERS))
 test-setups: $(SETUPS)
 test-teardowns: $(TEARDOWNS)
 

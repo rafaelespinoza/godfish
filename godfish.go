@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -39,79 +40,170 @@ const (
 	// TimeFormat provides a consistent timestamp layout for migration
 	// filenames. Formatting time in go works a little differently than in other
 	// languages. Read more at: https://golang.org/pkg/time/#pkg-constants.
-	TimeFormat        = "20060102150405"
-	filenameDelimeter = "-"
+	TimeFormat = "20060102150405"
+
+	filenameDelimeter   = "-"
+	unixTimestampSecLen = len("1574079194")
 )
 
+var timeformatMatcher = regexp.MustCompile(`\d{4,14}`)
+
+type (
+	// Indirection associates a label with a migration direction. It helps with
+	// interpreting filenames.
+	Indirection struct {
+		Value Direction
+		Label string
+	}
+
+	// Version is for comparing migrations to each other.
+	Version interface {
+		Before(u Version) bool
+		String() string
+		Value() int64
+	}
+
+	timestamp struct {
+		value int64
+		label string
+	}
+)
+
+var _ Version = (*timestamp)(nil)
+
+func (v *timestamp) Before(u Version) bool {
+	// Until there's more than 1 interface implementation, this is fine. So,
+	// panic here?  Yeah, maybe. Fail loudly, not silently.
+	w := u.(*timestamp)
+	return v.value < w.value
+}
+
+func (v *timestamp) String() string {
+	if v.label == "" {
+		return strconv.FormatInt(int64(v.value), 10)
+	}
+	return v.label
+}
+
+func (v *timestamp) Value() int64 { return v.value }
+
 // filename is just a string with a specific format to migration files. One part
-// has a generated timestamp, one part has a direction, another has a name.
+// has a generated timestamp, one part has a direction, another has a label.
 type filename string
 
 // makeFilename creates a filename based on the independent parts. Format:
-// "${direction}-${version}-${name}.sql"
-func makeFilename(version string, direction Direction, name string) (filename, error) {
-	vLen := len(version)
-	if vLen < len(TimeFormat) {
-		return "", fmt.Errorf("version must have length %d", len(TimeFormat))
-	} else if vLen > len(TimeFormat) {
-		version = version[:len(TimeFormat)]
-	}
-	if match, err := regexp.MatchString(`\d{14}`, version); err != nil {
-		return "", fmt.Errorf("developer error %v", err)
-	} else if !match {
-		return "", fmt.Errorf("version %q does not match pattern", version)
+// "${direction}-${version}-${label}.sql"
+func makeFilename(version string, indirection Indirection, label string) (filename, error) {
+	var dir string
+	if indirection.Value == DirUnknown {
+		dir = "*" + filenameDelimeter
+	} else {
+		dir = strings.ToLower(indirection.Label) + filenameDelimeter
 	}
 
-	if direction == DirUnknown {
-		return "", fmt.Errorf("cannot have unknown direction")
+	// the length will top out at the high quantifier for this regexp.
+	ver := timeformatMatcher.FindString(version) + filenameDelimeter
+	return filename(dir + ver + label + ".sql"), nil
+}
+
+var (
+	forwardDirections = []string{
+		strings.ToLower(DirForward.String()),
+		"migrate",
+		"up",
+	}
+	reverseDirections = []string{
+		strings.ToLower(DirReverse.String()),
+		"rollback",
+		"down",
+	}
+)
+
+func parseDirection(basename string) (dir Indirection) {
+	lo := strings.ToLower(basename)
+	for _, pre := range forwardDirections {
+		if strings.HasPrefix(lo, pre) {
+			dir.Value = DirForward
+			dir.Label = pre
+			return
+		}
+	}
+	for _, pre := range reverseDirections {
+		if strings.HasPrefix(lo, pre) {
+			dir.Value = DirReverse
+			dir.Label = pre
+			return
+		}
+	}
+	return
+}
+
+func parseVersion(basename string) (version Version, err error) {
+	written := timeformatMatcher.FindString(basename)
+	if ts, perr := time.Parse(TimeFormat, written); perr != nil {
+		err = perr // keep going
+	} else {
+		version = &timestamp{value: ts.UTC().Unix(), label: written}
+		return
 	}
 
-	dir := strings.ToLower(direction.String()) + filenameDelimeter
-	ver := version + filenameDelimeter
-	return filename(dir + ver + name + ".sql"), nil
+	if perr, ok := err.(*time.ParseError); ok {
+		if len(perr.Value) < len(TimeFormat) {
+			ts, qerr := time.Parse(TimeFormat[:len(perr.Value)], perr.Value)
+			if qerr == nil {
+				version = &timestamp{value: ts.UTC().Unix(), label: perr.Value}
+				err = nil
+				return
+			}
+		}
+	}
+
+	// try parsing as unix epoch timestamp
+	num, err := strconv.ParseInt(written[:unixTimestampSecLen], 10, 64)
+	if err != nil {
+		return
+	}
+	version = &timestamp{value: num, label: written}
+	return
 }
 
 func parseMigration(name filename) (mig Migration, err error) {
-	var ts time.Time
-	var dir Direction
-	base := filepath.Base(string(name))
-
-	if strings.HasPrefix(base, strings.ToLower(DirForward.String())) {
-		dir = DirForward
-	} else if strings.HasPrefix(base, strings.ToLower(DirReverse.String())) {
-		dir = DirReverse
-	} else {
+	basename := filepath.Base(string(name))
+	direction := parseDirection(basename)
+	if direction.Value == DirUnknown {
 		err = errInvalidFilename
 		return
 	}
+
 	// index of the start of timestamp
-	i := len(dir.String()) + len(filenameDelimeter)
-	timestamp := string(base[i : i+len(TimeFormat)])
-	if ts, err = time.Parse(TimeFormat, timestamp); err != nil {
+	i := len(direction.Label) + len(filenameDelimeter)
+	version, err := parseVersion(basename)
+	if err != nil {
+		err = fmt.Errorf("%w; %v", errInvalidFilename, err)
 		return
 	}
-	// index of the start of migration name
-	j := i + len(timestamp) + len(filenameDelimeter)
 
+	// index of the start of migration label
+	j := i + len(version.String()) + len(filenameDelimeter)
 	mig, err = newMutation(
-		ts,
-		dir,
-		strings.TrimSuffix(string(base[j:]), ".sql"),
+		version,
+		direction,
+		strings.TrimSuffix(string(basename[j:]), ".sql"),
 	)
 	return
 }
 
 // A Migration is a database change with a direction name and timestamp.
 // Typically, a Migration with a DirForward Direction is paired with another
-// migration of DirReverse that has the same name.
+// migration of DirReverse that has the same label.
 type Migration interface {
-	Direction() Direction
-	Name() string
-	Timestamp() time.Time
+	Indirection() Indirection
+	Label() string
+	Version() Version
 }
 
 // Basename generates a migration file's basename. The output format is:
-// "${direction}-${timestamp}-${name}.sql".
+// "${direction}-${timestamp}-${label}.sql".
 func Basename(mig Migration) (string, error) {
 	out, err := makeMigrationFilename(mig)
 	if err != nil {
@@ -122,29 +214,29 @@ func Basename(mig Migration) (string, error) {
 
 // mutation implements the Migration interface.
 type mutation struct {
-	direction Direction
-	name      string
-	timestamp time.Time
+	indirection Indirection
+	label       string
+	timestamp   Version
 }
 
 var _ Migration = (*mutation)(nil)
 
 // newMutation constructs a mutation and returns a pointer. Its internal
 // timestamp field is set to UTC.
-func newMutation(ts time.Time, dir Direction, name string) (*mutation, error) {
-	if dir == DirUnknown {
+func newMutation(version Version, ind Indirection, label string) (*mutation, error) {
+	if ind.Value == DirUnknown {
 		return nil, fmt.Errorf("cannot have unknown direction")
 	}
 	return &mutation{
-		direction: dir,
-		name:      name,
-		timestamp: ts.UTC(),
+		indirection: ind,
+		label:       label,
+		timestamp:   version,
 	}, nil
 }
 
-func (m *mutation) Direction() Direction { return m.direction }
-func (m *mutation) Name() string         { return m.name }
-func (m *mutation) Timestamp() time.Time { return m.timestamp }
+func (m *mutation) Indirection() Indirection { return m.indirection }
+func (m *mutation) Label() string            { return m.label }
+func (m *mutation) Version() Version         { return m.timestamp }
 
 // MigrationParams collects inputs needed to generate migration files. Setting
 // Reversible to true will generate a migration file for each direction.
@@ -161,7 +253,7 @@ type MigrationParams struct {
 // in true for reversible means that a complementary SQL file will be made for
 // rolling back. The directory parameter specifies which directory to output the
 // files to.
-func NewMigrationParams(name string, reversible bool, directory *os.File) (*MigrationParams, error) {
+func NewMigrationParams(label string, reversible bool, directory *os.File) (*MigrationParams, error) {
 	var out MigrationParams
 	var err error
 	var info os.FileInfo
@@ -173,13 +265,14 @@ func NewMigrationParams(name string, reversible bool, directory *os.File) (*Migr
 	out.Directory = directory
 
 	out.Reversible = reversible
-	timestamp := time.Now()
+	now := time.Now().UTC()
+	version := &timestamp{value: now.Unix(), label: now.Format(TimeFormat)}
 	var mut *mutation
-	if mut, err = newMutation(timestamp, DirForward, name); err != nil {
+	if mut, err = newMutation(version, Indirection{Value: DirForward, Label: "forward"}, label); err != nil {
 		return nil, err
 	}
 	out.Forward = mut
-	if mut, err = newMutation(timestamp, DirReverse, name); err != nil {
+	if mut, err = newMutation(version, Indirection{Value: DirReverse, Label: "reverse"}, label); err != nil {
 		return nil, err
 	}
 	out.Reverse = mut
@@ -224,21 +317,10 @@ func newMigrationFile(m Migration, baseDir string) (*os.File, error) {
 // error could be returned if m is found to be an unsuitable filename.
 func makeMigrationFilename(m Migration) (filename, error) {
 	return makeFilename(
-		m.Timestamp().Format(TimeFormat),
-		m.Direction(),
-		m.Name(),
+		m.Version().String(),
+		m.Indirection(),
+		m.Label(),
 	)
-}
-
-// pathToMigrationFile is a convenience function for prepending a directory path
-// to the base filename of a migration. An error could be returned if the
-// Migration's fields are unsuitable for a filename.
-func pathToMigrationFile(dir string, mig Migration) (string, error) {
-	filename, err := makeMigrationFilename(mig)
-	if err != nil {
-		return "", err
-	}
-	return dir + "/" + string(filename), nil
 }
 
 var (
@@ -260,15 +342,22 @@ func Migrate(driver Driver, directoryPath string, direction Direction, finishAtV
 	if _, err = driver.Connect(); err != nil {
 		return
 	}
-	if migrations, err = listMigrationsToApply(driver, directoryPath, direction, finishAtVersion, false); err != nil {
+	finder := migrationFinder{
+		direction:       direction,
+		directoryPath:   directoryPath,
+		finishAtVersion: finishAtVersion,
+		verbose:         false,
+	}
+	if migrations, err = finder.query(driver); err != nil {
 		return
 	}
 
 	for _, mig := range migrations {
-		var pathToFile string
-		if pathToFile, err = pathToMigrationFile(directoryPath, mig); err != nil {
+		fn, ierr := makeMigrationFilename(mig)
+		if ierr != nil {
 			return
 		}
+		pathToFile := directoryPath + "/" + string(fn)
 		if err = runMigration(driver, pathToFile, mig); err != nil {
 			return
 		}
@@ -303,18 +392,24 @@ func ApplyMigration(driver Driver, directoryPath string, direction Direction, ve
 	}
 	if version == "" {
 		// attempt to find the next version to apply in the direction
-		limit := maxVersion
-		if direction == DirReverse {
-			limit = minVersion
+		var limit string
+		if direction == DirForward {
+			limit = maxVersion
 		}
-		if toApply, ierr := listMigrationsToApply(driver, directoryPath, direction, limit, false); ierr != nil {
+		finder := migrationFinder{
+			direction:       direction,
+			directoryPath:   directoryPath,
+			finishAtVersion: limit,
+			verbose:         false,
+		}
+		if toApply, ierr := finder.query(driver); ierr != nil {
 			err = fmt.Errorf("specified no version; error attempting to find one; %v", ierr)
 			return
 		} else if len(toApply) < 1 {
 			err = ErrNoVersionFound
 			return
 		} else {
-			version = toApply[0].Timestamp().Format(TimeFormat)
+			version = toApply[0].Version().String()
 		}
 	}
 
@@ -332,20 +427,34 @@ func ApplyMigration(driver Driver, directoryPath string, direction Direction, ve
 func figureOutBasename(directoryPath string, direction Direction, version string) (f string, e error) {
 	var baseGlob filename
 	var filenames []string
-	if baseGlob, e = makeFilename(version, direction, "*"); e != nil {
+	// glob as many filenames as possible that match the "version" segment, then
+	// narrow it down from there.
+	if baseGlob, e = makeFilename(version, Indirection{}, "*"); e != nil {
 		return
 	}
 	glob := directoryPath + "/" + string(baseGlob)
 	if filenames, e = filepath.Glob(glob); e != nil {
 		return
-	} else if len(filenames) == 0 {
-		e = ErrNoFilesFound
-		return
-	} else if len(filenames) > 1 {
-		e = fmt.Errorf("need 1 matching filename; got %v", filenames)
-		return
 	}
-	f = filenames[0]
+
+	var directionNames []string
+	if direction == DirForward {
+		directionNames = forwardDirections
+	} else if direction == DirReverse {
+		directionNames = reverseDirections
+	}
+
+	for _, fn := range filenames {
+		for _, alias := range directionNames {
+			if strings.HasPrefix(filepath.Base(fn), alias) {
+				f = fn
+				return
+			}
+		}
+	}
+	if f == "" {
+		e = ErrNoFilesFound
+	}
 	return
 }
 
@@ -372,8 +481,8 @@ func runMigration(driver Driver, pathToFile string, mig Migration) (err error) {
 		return
 	}
 	err = driver.UpdateSchemaMigrations(
-		mig.Direction(),
-		mig.Timestamp().Format(TimeFormat),
+		mig.Indirection().Value,
+		mig.Version().String(),
 	)
 	return
 }
@@ -490,13 +599,13 @@ func Info(driver Driver, directoryPath string, direction Direction, finishAtVers
 		return err
 	}
 	defer driver.Close()
-	_, err = listMigrationsToApply(
-		driver,
-		directoryPath,
-		direction,
-		finishAtVersion,
-		true,
-	)
+	finder := migrationFinder{
+		direction:       direction,
+		directoryPath:   directoryPath,
+		finishAtVersion: finishAtVersion,
+		verbose:         true,
+	}
+	_, err = finder.query(driver)
 	return
 }
 
@@ -522,89 +631,90 @@ func Init(pathToFile string) (err error) {
 	)
 }
 
-func listMigrationsToApply(driver Driver, directoryPath string, direction Direction, finishAtVersion string, verbose bool) (out []Migration, err error) {
-	var available, applied, toApply []Migration
-	var finish time.Time
-	if available, err = listAvailableMigrations(directoryPath, direction); err != nil {
+// migrationFinder is a collection of named parameters to use when searching
+// for migrations to apply.
+type migrationFinder struct {
+	direction       Direction
+	directoryPath   string
+	finishAtVersion string
+	verbose         bool
+}
+
+// query returns a list of Migrations to apply.
+func (m *migrationFinder) query(driver Driver) (out []Migration, err error) {
+	available, err := m.available()
+	if err != nil {
 		return
 	}
-	if verbose {
+	if m.verbose {
 		fmt.Println("-- All available migrations")
 		printMigrations(available)
 		fmt.Println()
 	}
-	if err = scanAppliedVersions(driver, func(rows AppliedVersions) (e error) {
-		var version, basename string
-		var mig Migration
-		if e = rows.Scan(&version); e != nil {
-			return
-		}
-		if basename, e = figureOutBasename(directoryPath, direction, version); e != nil {
-			return
-		}
-		if mig, e = parseMigration(filename(basename)); e != nil {
-			return
-		}
-		applied = append(applied, mig)
-		return
-	}); err == ErrSchemaMigrationsDoesNotExist {
+
+	applied, err := scanAppliedVersions(driver, m.directoryPath)
+	if err == ErrSchemaMigrationsDoesNotExist {
 		// The next invocation of CreateSchemaMigrationsTable should fix this.
 		// We can continue with zero value for now.
-		if verbose {
+		if m.verbose {
 			fmt.Printf("no migrations applied yet; %v\n", err)
 		}
 	} else if err != nil {
 		return
 	}
-	if verbose {
+	if m.verbose {
 		fmt.Println("-- Applied migrations")
 		printMigrations(applied)
 		fmt.Println()
 	}
-	if toApply, err = selectMigrationsToApply(
-		direction,
-		applied,
-		available,
-	); err != nil {
+
+	toApply, err := m.filter(applied, available)
+	if err != nil {
 		return
 	}
-	if finishAtVersion == "" && direction == DirForward {
-		finishAtVersion = maxVersion
-	} else if finishAtVersion == "" && direction == DirReverse {
-		finishAtVersion = minVersion
+	var useDefaultRollbackVersion bool
+	if m.finishAtVersion == "" && m.direction == DirForward {
+		m.finishAtVersion = maxVersion
+	} else if m.finishAtVersion == "" && m.direction == DirReverse {
+		if len(toApply) == 0 {
+			return
+		}
+		useDefaultRollbackVersion = true
+		m.finishAtVersion = toApply[0].Version().String()
 	}
-	if finish, err = time.Parse(TimeFormat, finishAtVersion); err != nil {
+	var finish Version
+	if finish, err = parseVersion(m.finishAtVersion); err != nil {
 		return
 	}
 	for _, mig := range toApply {
-		timestamp := mig.Timestamp()
-		if direction == DirForward && timestamp.After(finish) {
+		timestamp := mig.Version()
+		if m.direction == DirForward && finish.Before(timestamp) {
 			break
 		}
-		if direction == DirReverse && timestamp.Before(finish) {
-			break
+		if m.direction == DirReverse {
+			if timestamp.Before(finish) {
+				break
+			}
+			if !useDefaultRollbackVersion && timestamp.Before(finish) {
+				break
+			}
 		}
 		out = append(out, mig)
 	}
-	if verbose {
+	if m.verbose {
 		fmt.Println("-- Migrations to apply")
 		printMigrations(out)
 	}
 	return
 }
 
-// listAvailableMigrations returns a list of Migration values at directoryPath in
-// a specified direction.
-func listAvailableMigrations(directoryPath string, direction Direction) (out []Migration, err error) {
-	if direction == DirUnknown {
-		err = fmt.Errorf("unknown Direction %q", direction)
-		return
-	}
+// available returns a list of Migration values in a specified direction.
+func (m *migrationFinder) available() (out []Migration, err error) {
 	var fileDir *os.File
 	var filenames []string
-	if fileDir, err = os.Open(directoryPath); err != nil {
+	if fileDir, err = os.Open(m.directoryPath); err != nil {
 		if _, ok := err.(*os.PathError); ok {
-			err = fmt.Errorf("path to migration files %q not found", directoryPath)
+			err = fmt.Errorf("path to migration files %q not found", m.directoryPath)
 		}
 		return
 	}
@@ -612,7 +722,7 @@ func listAvailableMigrations(directoryPath string, direction Direction) (out []M
 	if filenames, err = fileDir.Readdirnames(0); err != nil {
 		return
 	}
-	if direction == DirForward {
+	if m.direction == DirForward {
 		sort.Strings(filenames)
 	} else {
 		sort.Sort(sort.Reverse(sort.StringSlice(filenames)))
@@ -626,8 +736,8 @@ func listAvailableMigrations(directoryPath string, direction Direction) (out []M
 			err = ierr
 			return
 		}
-		dir := mig.Direction()
-		if dir != direction {
+		dir := mig.Indirection().Value
+		if dir != m.direction {
 			continue
 		}
 		out = append(out, mig)
@@ -635,36 +745,47 @@ func listAvailableMigrations(directoryPath string, direction Direction) (out []M
 	return
 }
 
-func scanAppliedVersions(driver Driver, scan func(AppliedVersions) error) (err error) {
+func scanAppliedVersions(driver Driver, directoryPath string) (out []Migration, err error) {
 	var rows AppliedVersions
 	if rows, err = driver.AppliedVersions(); err != nil {
 		return
 	}
 	defer rows.Close()
 	for rows.Next() {
-		if err = scan(rows); err != nil {
+		var version, basename string
+		var mig Migration
+		if err = rows.Scan(&version); err != nil {
 			return
+		}
+		basename, err = figureOutBasename(directoryPath, DirForward, version)
+		if err == ErrNoFilesFound {
+			err = nil // swallow error and continue
+		} else if err != nil {
+			return
+		}
+		mig, err = parseMigration(filename(basename))
+		if err == errInvalidFilename {
+			err = nil // swallow error and continue
+		} else if mig != nil {
+			out = append(out, mig)
 		}
 	}
 	return
 }
 
-func selectMigrationsToApply(direction Direction, applied, available []Migration) (out []Migration, err error) {
-	if direction == DirUnknown {
-		err = fmt.Errorf("unknown Direction %q", direction)
-		return
-	}
-
+// filter compares lists of applied and available migrations, then selects a
+// list of migrations to apply.
+func (m *migrationFinder) filter(applied, available []Migration) (out []Migration, err error) {
 	allVersions := make(map[int64]Migration)
 	uniqueToApplied := make(map[int64]Migration)
 	for _, mig := range applied {
-		version := mig.Timestamp().Unix()
+		version := mig.Version().Value()
 		uniqueToApplied[version] = mig
 		allVersions[version] = mig
 	}
 	uniqueToAvailable := make(map[int64]Migration)
 	for _, mig := range available {
-		version := mig.Timestamp().Unix()
+		version := mig.Version().Value()
 		if _, ok := uniqueToApplied[version]; ok {
 			delete(uniqueToApplied, version)
 		} else {
@@ -673,7 +794,7 @@ func selectMigrationsToApply(direction Direction, applied, available []Migration
 		}
 	}
 
-	if direction == DirForward {
+	if m.direction == DirForward {
 		for version, mig := range allVersions {
 			_, isApplied := uniqueToApplied[version]
 			_, isAvailable := uniqueToAvailable[version]
@@ -686,29 +807,56 @@ func selectMigrationsToApply(direction Direction, applied, available []Migration
 			_, appliedOK := uniqueToApplied[version]
 			_, availableOK := uniqueToAvailable[version]
 			if !appliedOK && !availableOK {
-				out = append(out, mig)
+				// The Migration direction is artificially set to Forward from a
+				// previous step. Here, we correct it. Also, we're guessing what
+				// the original filename was, by assuming that the list of
+				// forward directions is in the same order as the corresponding
+				// reverse directions. It's kind of hacky, I know.
+				mut, ierr := newMutation(mig.Version(), Indirection{Value: DirReverse}, mig.Label())
+				if ierr != nil {
+					err = ierr
+					return
+				}
+				for i, fwd := range forwardDirections {
+					// Another assumption, the filename format will never
+					// change. If it does change, for example: it is
+					// "${version}-${direction}-${label}", instead of
+					// "${direction}-${version}-${label}", then this won't work.
+					if mig.Indirection().Label == fwd {
+						mut.indirection.Label = reverseDirections[i]
+						break
+					}
+				}
+				if mut.indirection.Label == "" {
+					err = fmt.Errorf(
+						"direction.Label empty; direction.Value: %q, version: %v, label: %q",
+						mut.indirection.Value, mut.timestamp, mut.label,
+					)
+					return
+				}
+				out = append(out, mut)
 			}
 		}
 	}
-	if direction == DirForward {
+	if m.direction == DirForward {
 		sort.Slice(out, func(i, j int) bool {
-			return out[i].Timestamp().Before(out[j].Timestamp())
+			return out[i].Version().Before(out[j].Version())
 		})
 	} else {
 		sort.Slice(out, func(i, j int) bool {
-			return out[j].Timestamp().Before(out[i].Timestamp())
+			return out[j].Version().Before(out[i].Version())
 		})
 	}
 	return
 }
 
 func printMigrations(migrations []Migration) {
-	fmt.Printf("\t%-10s | %-20s | %-s\n", "direction", "version", "name")
+	fmt.Printf("\t%-10s | %-20s | %-s\n", "direction", "version", "label")
 	fmt.Printf("\t%-10s | %-20s | %-s\n", "---------", "-------", "----")
 	for _, mig := range migrations {
 		fmt.Printf(
 			"\t%-10s | %-20s | %-s\n",
-			mig.Direction(), mig.Timestamp().Format(TimeFormat), mig.Name(),
+			mig.Indirection().Value, mig.Version().String(), mig.Label(),
 		)
 	}
 }

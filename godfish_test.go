@@ -22,21 +22,21 @@ func TestMain(m *testing.M) {
 
 func TestMigrationParams(t *testing.T) {
 	type testCase struct {
-		name       string
+		label      string
 		reversible bool
 	}
 
 	tests := []testCase{
 		{
-			name:       "foo",
+			label:      "foo",
 			reversible: true,
 		},
 		{
-			name:       "bar",
+			label:      "bar",
 			reversible: false,
 		},
 		{
-			name:       "foo-bar",
+			label:      "foo-bar",
 			reversible: false,
 		},
 	}
@@ -53,21 +53,21 @@ func TestMigrationParams(t *testing.T) {
 		}
 		defer os.RemoveAll(directory.Name())
 
-		mig, err := godfish.NewMigrationParams(test.name, test.reversible, directory)
+		mig, err := godfish.NewMigrationParams(test.label, test.reversible, directory)
 		if err != nil {
 			t.Error(err)
 		}
-		if mig.Forward.Direction() != godfish.DirForward {
+		if mig.Forward.Indirection().Value != godfish.DirForward {
 			t.Errorf(
 				"test %d; wrong Direction; expected %s, got %s",
-				i, godfish.DirForward, mig.Forward.Direction(),
+				i, godfish.DirForward, mig.Forward.Indirection().Value,
 			)
 		}
 		if test.reversible {
-			if mig.Reverse.Direction() != godfish.DirReverse {
+			if mig.Reverse.Indirection().Value != godfish.DirReverse {
 				t.Errorf(
 					"test %d; wrong Direction; expected %s, got %s",
-					i, godfish.DirReverse, mig.Reverse.Direction(),
+					i, godfish.DirReverse, mig.Reverse.Indirection().Value,
 				)
 			}
 		}
@@ -76,10 +76,10 @@ func TestMigrationParams(t *testing.T) {
 			if j > 0 && !test.reversible {
 				continue
 			}
-			if mig.Name() != test.name {
+			if mig.Label() != test.label {
 				t.Errorf("test [%d][%d]; Name should be unchanged", i, j)
 			}
-			if mig.Timestamp().IsZero() {
+			if mig.Version().String() == "" { // TODO: think of better test
 				t.Errorf("test [%d][%d]; got empty Timestamp", i, j)
 			}
 		}
@@ -115,7 +115,7 @@ func TestMigrationParams(t *testing.T) {
 			if j > 0 && !test.reversible {
 				continue
 			}
-			patt := fmt.Sprintf("%s-[0-9]*-%s.sql", expectedDirections[j], test.name)
+			patt := fmt.Sprintf("%s-[0-9]*-%s.sql", expectedDirections[j], test.label)
 			if match, err := filepath.Match(patt, name); err != nil {
 				t.Fatalf("test [%d][%d]; %v", i, j, err)
 			} else if !match {
