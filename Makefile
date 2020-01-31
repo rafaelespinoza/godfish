@@ -17,13 +17,13 @@ TEST_DB_NAME=godfish_test
 # One should have a target suffix "-test-teardown", another should have the
 # target suffix "-test-setup" and the last one is just named after the DBMS,
 # which builds the CLI binary.
-DRIVERS=postgres mysql
+DRIVERS ?= postgres mysql
 
 SETUPS=$(addsuffix -test-setup, $(DRIVERS))
 TEARDOWNS=$(addsuffix -test-teardown, $(DRIVERS))
 
-test:
-	go test ./... $(ARGS)
+test: test-teardowns test-setups
+	go test $(ARGS) . $(addprefix ./, $(DRIVERS))
 test-setups: $(SETUPS)
 test-teardowns: $(TEARDOWNS)
 

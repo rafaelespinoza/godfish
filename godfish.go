@@ -48,21 +48,24 @@ const (
 type filename string
 
 // makeFilename creates a filename based on the independent parts. Format:
-// "${direction}-2006010215040506-${name}.sql"
+// "${direction}-${version}-${name}.sql"
 func makeFilename(version string, direction Direction, name string) (filename, error) {
-	if len(version) != len(TimeFormat) {
+	vLen := len(version)
+	if vLen < len(TimeFormat) {
 		return "", fmt.Errorf("version must have length %d", len(TimeFormat))
-	} else if match, err := regexp.MatchString(`\d{14}`, version); err != nil {
+	} else if vLen > len(TimeFormat) {
+		version = version[:len(TimeFormat)]
+	}
+	if match, err := regexp.MatchString(`\d{14}`, version); err != nil {
 		return "", fmt.Errorf("developer error %v", err)
 	} else if !match {
 		return "", fmt.Errorf("version %q does not match pattern", version)
 	}
+
 	if direction == DirUnknown {
 		return "", fmt.Errorf("cannot have unknown direction")
 	}
-	if strings.Contains(name, filenameDelimeter) {
-		return "", fmt.Errorf("name %q cannot contain %q", name, filenameDelimeter)
-	}
+
 	dir := strings.ToLower(direction.String()) + filenameDelimeter
 	ver := version + filenameDelimeter
 	return filename(dir + ver + name + ".sql"), nil
@@ -72,23 +75,29 @@ func parseMigration(name filename) (mig Migration, err error) {
 	var ts time.Time
 	var dir Direction
 	base := filepath.Base(string(name))
-	parts := strings.Split(base, filenameDelimeter)
 
-	if strings.ToLower(parts[0]) == "forward" {
+	if strings.HasPrefix(base, strings.ToLower(DirForward.String())) {
 		dir = DirForward
-	} else if strings.ToLower(parts[0]) == "reverse" {
+	} else if strings.HasPrefix(base, strings.ToLower(DirReverse.String())) {
 		dir = DirReverse
 	} else {
-		err = fmt.Errorf("unknown Direction %q", parts[1])
+		err = errInvalidFilename
 		return
 	}
-
-	ts, err = time.Parse(TimeFormat, parts[1])
-	if err != nil {
+	// index of the start of timestamp
+	i := len(dir.String()) + len(filenameDelimeter)
+	timestamp := string(base[i : i+len(TimeFormat)])
+	if ts, err = time.Parse(TimeFormat, timestamp); err != nil {
 		return
 	}
+	// index of the start of migration name
+	j := i + len(timestamp) + len(filenameDelimeter)
 
-	mig, err = newMutation(ts, dir, strings.TrimSuffix(parts[2], ".sql"))
+	mig, err = newMutation(
+		ts,
+		dir,
+		strings.TrimSuffix(string(base[j:]), ".sql"),
+	)
 	return
 }
 
@@ -275,6 +284,7 @@ var (
 	// ErrSchemaMigrationsDoesNotExist means there is no database table to
 	// record migration status.
 	ErrSchemaMigrationsDoesNotExist = errors.New("table \"schema_migrations\" does not exist")
+	errInvalidFilename              = errors.New("invalid filename")
 )
 
 // ApplyMigration runs a migration at directoryPath with the specified version
@@ -409,7 +419,9 @@ type Driver interface {
 	DSN() DSN
 
 	// AppliedVersions queries the schema migrations table for migration
-	// versions that have been executed against the database.
+	// versions that have been executed against the database. If the schema
+	// migrations table does not exist, the returned error should be
+	// ErrSchemaMigrationsDoesNotExist.
 	AppliedVersions() (AppliedVersions, error)
 	// CreateSchemaMigrationsTable should create a table to record migration
 	// versions once they've been applied. The version should be a timestamp as
@@ -606,8 +618,12 @@ func listAvailableMigrations(directoryPath string, direction Direction) (out []M
 		sort.Sort(sort.Reverse(sort.StringSlice(filenames)))
 	}
 	for _, fn := range filenames {
-		var mig Migration
-		if mig, err = parseMigration(filename(fn)); err != nil {
+		mig, ierr := parseMigration(filename(fn))
+		if ierr == errInvalidFilename {
+			fmt.Println(ierr)
+			continue
+		} else if ierr != nil {
+			err = ierr
 			return
 		}
 		dir := mig.Direction()

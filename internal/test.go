@@ -17,11 +17,14 @@ func RunDriverTests(t *testing.T, dsn godfish.DSN) {
 	t.Helper()
 	connParams := godfish.ConnectionParams{
 		Encoding: "UTF8",
-		Host:     "localhost",
+		Host:     os.Getenv("DB_HOST"),
 		Name:     "godfish_test",
 		Pass:     os.Getenv("DB_PASSWORD"),
 		Port:     os.Getenv("DB_PORT"),
 		User:     "godfish",
+	}
+	if connParams.Host == "" {
+		connParams.Host = "localhost"
 	}
 	if err := dsn.Boot(connParams); err != nil {
 		t.Fatal(err)
@@ -30,90 +33,14 @@ func RunDriverTests(t *testing.T, dsn godfish.DSN) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	pathToTestDir := baseTestOutputDir + "/" + driver.Name() + "/" +
-		time.Now().Format(godfish.TimeFormat)
-	if err := os.MkdirAll(pathToTestDir, 0755); err != nil {
-		t.Fatal(err)
-	}
-	defer func() {
-		var err error
-		if err = godfish.Migrate(driver, pathToTestDir, godfish.DirReverse, "00000101000000"); err != nil {
-			t.Errorf("could not reset migrations; %v", err)
-		}
 
-		if _, err = driver.Connect(); err != nil {
-			t.Error(err)
-		}
-
-		if err = driver.Execute(`TRUNCATE TABLE schema_migrations`); err != nil {
-			t.Errorf("could not truncate schema_migrations table; %v", err)
-		}
-		os.RemoveAll(pathToTestDir)
-		driver.Close()
-	}()
-
-	if err := godfish.CreateSchemaMigrationsTable(driver); err != nil {
-		t.Errorf("could not create schema migrations table; %v", err)
-		return
-	}
-
-	t.Run("Migrate", func(t *testing.T) {
-		err := godfish.Migrate(driver, pathToTestDir, godfish.DirForward, "")
-		if err != nil {
-			t.Errorf("could not Migrate in %s Direction; %v", godfish.DirForward, err)
-		}
-
-		err = godfish.Migrate(driver, pathToTestDir, godfish.DirReverse, "")
-		if err != nil {
-			t.Errorf("could not Migrate in %s Direction; %v", godfish.DirReverse, err)
-		}
-	})
-
-	t.Run("Info", func(t *testing.T) {
-		err := godfish.Migrate(driver, pathToTestDir, godfish.DirForward, "")
-		if err != nil {
-			t.Errorf("could not setup test; %v", err)
+	setup := func(testName string, migrate bool) (path string, stubs []testDriverStub, err error) {
+		path = baseTestOutputDir + "/" + driver.Name() + "/" + testName
+		if err = os.MkdirAll(path, 0755); err != nil {
 			return
 		}
-
-		t.Run("forward", func(t *testing.T) {
-			err := godfish.Info(driver, pathToTestDir, godfish.DirForward, "")
-			if err != nil {
-				t.Errorf(
-					"could not output info in %s Direction; %v",
-					godfish.DirForward, err,
-				)
-			}
-		})
-		t.Run("reverse", func(t *testing.T) {
-			err := godfish.Info(driver, pathToTestDir, godfish.DirReverse, "")
-			if err != nil {
-				t.Errorf(
-					"could not output info in %s Direction; %v",
-					godfish.DirReverse, err,
-				)
-			}
-		})
-	})
-
-	t.Run("DumpSchema", func(t *testing.T) {
-		err := godfish.Migrate(driver, pathToTestDir, godfish.DirForward, "")
-		if err != nil {
-			t.Errorf("could not setup test; %v", err)
-			return
-		}
-		err = godfish.DumpSchema(driver)
-		if err != nil {
-			t.Errorf(
-				"test %q %q; could not dump schema; %v",
-				driver.Name(), t.Name(), err,
-			)
-		}
-	})
-
-	t.Run("ApplyMigration", func(t *testing.T) {
-		stubs, err := makeTestDriverStubs(
-			pathToTestDir,
+		stubs, err = makeTestDriverStubs(
+			path,
 			[]contentStub{
 				{
 					forward: `CREATE TABLE foos (id int);`,
@@ -131,9 +58,105 @@ func RunDriverTests(t *testing.T, dsn godfish.DSN) {
 			[]string{"12340102030405", "23450102030405", "34560102030405"},
 		)
 		if err != nil {
+			return
+		}
+		if migrate {
+			err = godfish.Migrate(driver, path, godfish.DirForward, "")
+		}
+		return
+	}
+
+	teardown := func(path string) {
+		var err error
+		if err = godfish.Migrate(driver, path, godfish.DirReverse, "00000101000000"); err != nil {
+			t.Errorf("could not reset migrations; %v", err)
+		}
+
+		if _, err = driver.Connect(); err != nil {
+			t.Error(err)
+		}
+		if err = driver.Execute(`TRUNCATE TABLE schema_migrations`); err != nil {
+			t.Errorf("could not truncate schema_migrations table; %v", err)
+		}
+		os.RemoveAll(path)
+		driver.Close()
+	}
+
+	// Tests for creating the schema migrations table are deliberately not
+	// included. It should be called as needed by other library functions.
+
+	t.Run("Migrate", func(t *testing.T) {
+		path, _, err := setup(t.Name(), false)
+		if err != nil {
 			t.Errorf("could not setup test; %v", err)
 			return
 		}
+		defer teardown(path)
+
+		err = godfish.Migrate(driver, path, godfish.DirForward, "")
+		if err != nil {
+			t.Errorf("could not Migrate in %s Direction; %v", godfish.DirForward, err)
+		}
+
+		err = godfish.Migrate(driver, path, godfish.DirReverse, "")
+		if err != nil {
+			t.Errorf("could not Migrate in %s Direction; %v", godfish.DirReverse, err)
+		}
+	})
+
+	t.Run("Info", func(t *testing.T) {
+		path, _, err := setup(t.Name(), true)
+		if err != nil {
+			t.Errorf("could not setup test; %v", err)
+			return
+		}
+		defer teardown(path)
+
+		t.Run("forward", func(t *testing.T) {
+			err := godfish.Info(driver, path, godfish.DirForward, "")
+			if err != nil {
+				t.Errorf(
+					"could not output info in %s Direction; %v",
+					godfish.DirForward, err,
+				)
+			}
+		})
+		t.Run("reverse", func(t *testing.T) {
+			err := godfish.Info(driver, path, godfish.DirReverse, "")
+			if err != nil {
+				t.Errorf(
+					"could not output info in %s Direction; %v",
+					godfish.DirReverse, err,
+				)
+			}
+		})
+	})
+
+	t.Run("DumpSchema", func(t *testing.T) {
+		path, _, err := setup(t.Name(), true)
+		if err != nil {
+			t.Errorf("could not setup test; %v", err)
+			return
+		}
+		defer teardown(path)
+
+		err = godfish.DumpSchema(driver)
+		if err != nil {
+			t.Errorf(
+				"test %q %q; could not dump schema; %v",
+				driver.Name(), t.Name(), err,
+			)
+		}
+	})
+
+	t.Run("ApplyMigration", func(t *testing.T) {
+		path, stubs, err := setup(t.Name(), false)
+		if err != nil {
+			t.Errorf("could not setup test; %v", err)
+			return
+		}
+		defer teardown(path)
+
 		versions := make([]string, len(stubs))
 		for i, stub := range stubs {
 			versions[i] = stub.version
@@ -144,7 +167,6 @@ func RunDriverTests(t *testing.T, dsn godfish.DSN) {
 			// without migrating forward.
 			onlyRollback bool
 			// setupVersion is where to start before calling ApplyMigration.
-			// Pass "-1" to not migrate forward at all during setup.
 			setupVersion   string
 			inputDirection godfish.Direction
 			// inputVersion is where to go when calling ApplyMigration.
@@ -227,12 +249,12 @@ func RunDriverTests(t *testing.T, dsn godfish.DSN) {
 		for i, test := range applyMigrationTests {
 			var err error
 			// Prepare state by rolling back all, then migrating forward a bit.
-			if err = godfish.Migrate(driver, pathToTestDir, godfish.DirReverse, "00000101000000"); err != nil {
+			if err = godfish.Migrate(driver, path, godfish.DirReverse, "00000101000000"); err != nil {
 				t.Errorf("test [%d]; could not reset migrations; %v", i, err)
 				continue
 			}
 			if !test.onlyRollback {
-				if err = godfish.Migrate(driver, pathToTestDir, godfish.DirForward, test.setupVersion); err != nil {
+				if err = godfish.Migrate(driver, path, godfish.DirForward, test.setupVersion); err != nil {
 					t.Errorf("test [%d]; could not setup migrations; %v", i, err)
 					continue
 				}
@@ -240,7 +262,7 @@ func RunDriverTests(t *testing.T, dsn godfish.DSN) {
 
 			if err = godfish.ApplyMigration(
 				driver,
-				pathToTestDir,
+				path,
 				test.inputDirection,
 				test.inputVersion,
 			); err != nil && test.expectedError == nil {
