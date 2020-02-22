@@ -5,8 +5,6 @@
 `godfish` is a relational database migration manager, similar to the very
 good [`dogfish`](https://github.com/dwb/dogfish), but written in golang.
 
-It's been tested w/ golang v1.12 on linux systems.
-
 ## goals
 
 - use SQL in the migration files, no other high-level DSLs

@@ -171,7 +171,10 @@ func parseMigration(name filename) (mig Migration, err error) {
 	basename := filepath.Base(string(name))
 	direction := parseDirection(basename)
 	if direction.Value == DirUnknown {
-		err = errInvalidFilename
+		err = fmt.Errorf(
+			"%w; could not parse Direction for filename %q",
+			errDataInvalid, name,
+		)
 		return
 	}
 
@@ -179,7 +182,10 @@ func parseMigration(name filename) (mig Migration, err error) {
 	i := len(direction.Label) + len(filenameDelimeter)
 	version, err := parseVersion(basename)
 	if err != nil {
-		err = fmt.Errorf("%w; %v", errInvalidFilename, err)
+		err = fmt.Errorf(
+			"%w, could not parse timestamp for filename %q; %v",
+			errDataInvalid, version, err,
+		)
 		return
 	}
 
@@ -366,14 +372,12 @@ func Migrate(driver Driver, directoryPath string, direction Direction, finishAtV
 }
 
 var (
-	// ErrNoFilesFound is returned when there are no migration files.
-	ErrNoFilesFound = errors.New("no files found")
-	// ErrNoVersionFound means no matching migration version is found.
-	ErrNoVersionFound = errors.New("no version found")
 	// ErrSchemaMigrationsDoesNotExist means there is no database table to
 	// record migration status.
-	ErrSchemaMigrationsDoesNotExist = errors.New("table \"schema_migrations\" does not exist")
-	errInvalidFilename              = errors.New("invalid filename")
+	ErrSchemaMigrationsDoesNotExist = errors.New("schema migrations table does not exist")
+
+	errNotFound    = errors.New("not found")
+	errDataInvalid = errors.New("data invalid")
 )
 
 // ApplyMigration runs a migration at directoryPath with the specified version
@@ -406,7 +410,7 @@ func ApplyMigration(driver Driver, directoryPath string, direction Direction, ve
 			err = fmt.Errorf("specified no version; error attempting to find one; %v", ierr)
 			return
 		} else if len(toApply) < 1 {
-			err = ErrNoVersionFound
+			err = fmt.Errorf("version %w", errNotFound)
 			return
 		} else {
 			version = toApply[0].Version().String()
@@ -453,7 +457,7 @@ func figureOutBasename(directoryPath string, direction Direction, version string
 		}
 	}
 	if f == "" {
-		e = ErrNoFilesFound
+		e = fmt.Errorf("files %w", errNotFound)
 	}
 	return
 }
@@ -714,7 +718,7 @@ func (m *migrationFinder) available() (out []Migration, err error) {
 	var filenames []string
 	if fileDir, err = os.Open(m.directoryPath); err != nil {
 		if _, ok := err.(*os.PathError); ok {
-			err = fmt.Errorf("path to migration files %q not found", m.directoryPath)
+			err = fmt.Errorf("path to migration files %q %w", m.directoryPath, errNotFound)
 		}
 		return
 	}
@@ -729,7 +733,7 @@ func (m *migrationFinder) available() (out []Migration, err error) {
 	}
 	for _, fn := range filenames {
 		mig, ierr := parseMigration(filename(fn))
-		if ierr == errInvalidFilename {
+		if errors.Is(ierr, errDataInvalid) {
 			fmt.Println(ierr)
 			continue
 		} else if ierr != nil {
@@ -758,13 +762,13 @@ func scanAppliedVersions(driver Driver, directoryPath string) (out []Migration, 
 			return
 		}
 		basename, err = figureOutBasename(directoryPath, DirForward, version)
-		if err == ErrNoFilesFound {
+		if errors.Is(err, errNotFound) {
 			err = nil // swallow error and continue
 		} else if err != nil {
 			return
 		}
 		mig, err = parseMigration(filename(basename))
-		if err == errInvalidFilename {
+		if errors.Is(err, errDataInvalid) {
 			err = nil // swallow error and continue
 		} else if mig != nil {
 			out = append(out, mig)

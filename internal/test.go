@@ -194,7 +194,7 @@ func RunDriverTests(t *testing.T, dsn godfish.DSN) {
 				},
 				expected: &expectedOutput{
 					appliedVersions: []string{},
-					err:             true, // godfish.ErrNoVersionFound,
+					err:             true, // no version found
 				},
 			},
 			{
@@ -207,7 +207,7 @@ func RunDriverTests(t *testing.T, dsn godfish.DSN) {
 				},
 				expected: &expectedOutput{
 					appliedVersions: []string{},
-					err:             true, // godfish.ErrNoVersionFound,
+					err:             true, // no version found
 				},
 			},
 			// setup state: do not migrate
@@ -235,7 +235,7 @@ func RunDriverTests(t *testing.T, dsn godfish.DSN) {
 				},
 				expected: &expectedOutput{
 					appliedVersions: []string{},
-					err:             true, // godfish.ErrNoVersionFound,
+					err:             true, // no version found
 				},
 			},
 			// setup state: go forward partway or all of the way.
@@ -277,7 +277,7 @@ func RunDriverTests(t *testing.T, dsn godfish.DSN) {
 				},
 				expected: &expectedOutput{
 					appliedVersions: []string{"12340102030405", "23450102030405", "34560102030405"},
-					err:             true, // godfish.ErrNoVersionFound,
+					err:             true, // no version found
 				},
 			},
 			// test reverse
@@ -318,7 +318,7 @@ func RunDriverTests(t *testing.T, dsn godfish.DSN) {
 				},
 				expected: &expectedOutput{
 					appliedVersions: []string{"12340102030405"},
-					err:             true, // godfish.ErrNoVersionFound,
+					err:             true, // no version found
 				},
 			},
 			// test reverse, available migration at end of range.
@@ -367,7 +367,7 @@ func RunDriverTests(t *testing.T, dsn godfish.DSN) {
 				},
 				expected: &expectedOutput{
 					appliedVersions: []string{"12340102030405", "23450102030405", "34560102030405"},
-					err:             true, // godfish.ErrNoFilesFound,
+					err:             true, // no files found
 				},
 			},
 			{
@@ -381,7 +381,7 @@ func RunDriverTests(t *testing.T, dsn godfish.DSN) {
 				},
 				expected: &expectedOutput{
 					appliedVersions: []string{"12340102030405", "23450102030405", "34560102030405"},
-					err:             true, // godfish.ErrNoFilesFound,
+					err:             true, // no files found
 				},
 			},
 			{
@@ -397,7 +397,7 @@ func RunDriverTests(t *testing.T, dsn godfish.DSN) {
 				},
 				expected: &expectedOutput{
 					appliedVersions: []string{"12340102030405", "23450102030405", "34560102030405"},
-					err:             true, // godfish.ErrNoFilesFound,
+					err:             true, // no files found
 				},
 			},
 			{
@@ -413,7 +413,7 @@ func RunDriverTests(t *testing.T, dsn godfish.DSN) {
 				},
 				expected: &expectedOutput{
 					appliedVersions: []string{"12340102030405", "23450102030405", "34560102030405"},
-					err:             true, // godfish.ErrNoFilesFound,
+					err:             true, // no files found
 				},
 			},
 			// test error during migration execution
@@ -433,7 +433,7 @@ func RunDriverTests(t *testing.T, dsn godfish.DSN) {
 				},
 				expected: &expectedOutput{
 					appliedVersions: []string{"12340102030405", "23450102030405", "34560102030405"},
-					err:             true, // godfish.ErrExecutionFailed
+					err:             true, // error executing SQL
 				},
 			},
 			// test short version
