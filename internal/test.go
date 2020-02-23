@@ -600,7 +600,7 @@ const (
 
 // setup prepares state before running a test.
 func setup(driver godfish.Driver, testName string, stubs []testDriverStub, migrateTo string) (path string, err error) {
-	path = "/tmp/godfish_test/driver/" + driver.Name() + "/" + testName
+	path = "/tmp/godfish_test/drivers/" + driver.Name() + "/" + testName
 	if err = os.MkdirAll(path, 0755); err != nil {
 		return
 	}

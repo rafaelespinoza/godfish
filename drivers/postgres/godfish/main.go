@@ -4,8 +4,8 @@ import (
 	"log"
 	"os"
 
+	"github.com/rafaelespinoza/godfish/drivers/postgres"
 	"github.com/rafaelespinoza/godfish/internal/commands"
-	"github.com/rafaelespinoza/godfish/postgres"
 )
 
 func main() {

@@ -18,8 +18,12 @@ Make a CLI binary for the DB you want to use. This tool comes with a couple of
 driver implementations (mysql, postgres at the moment). Build one like so:
 
 ```
-go build -i -o godfish_pg    github.com/rafaelespinoza/godfish/postgres/godfish
-go build -i -o godfish_mysql github.com/rafaelespinoza/godfish/mysql/godfish
+go build -i -o godfish_pg    github.com/rafaelespinoza/godfish/drivers/postgres/godfish
+go build -i -o godfish_mysql github.com/rafaelespinoza/godfish/drivers/mysql/godfish
+
+# OR
+make postgres
+make mysql
 ```
 
 From there you could move it to `$GOPATH/bin`, move it to your project or

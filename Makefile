@@ -23,7 +23,7 @@ SETUPS=$(addsuffix -test-setup, $(DRIVERS))
 TEARDOWNS=$(addsuffix -test-teardown, $(DRIVERS))
 
 test: test-teardowns test-setups
-	go test $(ARGS) . ./internal/stub $(addprefix ./, $(DRIVERS))
+	go test $(ARGS) . ./internal/stub $(addprefix ./drivers/, $(DRIVERS))
 test-setups: $(SETUPS)
 test-teardowns: $(TEARDOWNS)
 
@@ -32,14 +32,14 @@ clean:
 	rm $(BIN)
 
 postgres:
-	go build -o $(BIN) -i -v ./$@/godfish
+	go build -o $(BIN) -i -v ./drivers/$@/godfish
 postgres-test-teardown:
 	dropdb --if-exists $(TEST_DB_NAME)
 postgres-test-setup:
 	createdb -E utf8 $(TEST_DB_NAME)
 
 mysql:
-	go build -o $(BIN) -i -v ./$@/godfish
+	go build -o $(BIN) -i -v ./drivers/$@/godfish
 mysql-test-teardown:
 	mysql -u $(DB_USER) -h $(DB_HOST) \
 		-e "DROP DATABASE IF EXISTS ${TEST_DB_NAME}"
