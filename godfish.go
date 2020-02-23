@@ -465,21 +465,20 @@ func figureOutBasename(directoryPath string, direction Direction, version string
 // runMigration executes a migration against the database. The input, pathToFile
 // should be relative to the current working directory.
 func runMigration(driver Driver, pathToFile string, mig Migration) (err error) {
-	var file *os.File
-	var info os.FileInfo
-	defer file.Close()
-	if file, err = os.Open(pathToFile); err != nil {
+	var data []byte
+	if data, err = ioutil.ReadFile(pathToFile); err != nil {
 		return
 	}
-	if info, err = file.Stat(); err != nil {
-		return
-	}
-	data := make([]byte, int(info.Size()))
-	if _, err = file.Read(data); err != nil {
-		return
-	}
-	if err = driver.Execute(string(data)); err != nil {
-		return
+	// Attempt to support migration files with 1 or more statements. AFAIK, the
+	// standard library does not support executing multiple statements at once.
+	// As a workaround, guess that each SQL statement is delimited like this.
+	for _, query := range strings.Split(string(data), ";\n") {
+		if len(query) < 1 {
+			continue
+		}
+		if err = driver.Execute(query); err != nil {
+			return
+		}
 	}
 	if err = driver.CreateSchemaMigrationsTable(); err != nil {
 		return

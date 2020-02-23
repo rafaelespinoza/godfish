@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/rafaelespinoza/godfish"
@@ -468,6 +469,31 @@ func RunDriverTests(t *testing.T, dsn godfish.DSN) {
 				},
 				expected: &expectedOutput{
 					appliedVersions: []string{"1234", "2345", "3456"},
+				},
+			},
+			// test migration with multiple statements
+			{
+				setup: &testSetupState{
+					migrateTo: _SkipMigration,
+					stubs: []testDriverStub{
+						{
+							content: struct{ forward, reverse string }{
+								forward: strings.Join([]string{
+									"CREATE TABLE foos (id int);",
+									"CREATE TABLE bars (id int);",
+									"ALTER TABLE foos ADD COLUMN a varchar(255);",
+								}, "\n"),
+							},
+							version: formattedTime("12340102030405"),
+						},
+					},
+				},
+				input: &testInput{
+					direction: godfish.DirForward,
+					version:   "12340102030405",
+				},
+				expected: &expectedOutput{
+					appliedVersions: []string{"12340102030405"},
 				},
 			},
 			// test alternative filenames, directions: migrate, rollback
