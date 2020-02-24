@@ -743,7 +743,6 @@ func generateMigrationFiles(pathToTestDir string, stubs []testDriverStub) error 
 		return err
 	}
 	for i, stub := range stubs {
-		var filename string
 		var file *os.File
 		var err error
 		var params *godfish.MigrationParams
@@ -781,11 +780,11 @@ func generateMigrationFiles(pathToTestDir string, stubs []testDriverStub) error 
 				continue
 			}
 
-			if filename, err = godfish.Basename(mig); err != nil {
-				return err
-			}
 			if file, err = os.OpenFile(
-				pathToTestDir+"/"+filename,
+				fmt.Sprintf(
+					"%s/%s-%s-%s.sql",
+					pathToTestDir, mig.Indirection().Label, mig.Version().String(), mig.Label(),
+				),
 				os.O_RDWR|os.O_CREATE,
 				0755,
 			); err != nil {

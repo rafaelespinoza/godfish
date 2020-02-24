@@ -12,7 +12,7 @@ func main() {
 	var dsn postgres.DSN
 	err := commands.Run(&dsn)
 	if err != nil {
-		log.Printf("%#v\n", err)
+		log.Println(err)
 		os.Exit(1)
 	}
 }

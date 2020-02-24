@@ -92,11 +92,11 @@ func mustMakeMigration(version string, indirection Indirection, label string) Mi
 	if err != nil {
 		panic(err)
 	}
-	mut, err := newMutation(ver, indirection, label)
-	if err != nil {
-		panic(err)
+	return &mutation{
+		indirection: indirection,
+		label:       label,
+		version:     ver,
 	}
-	return mut
 }
 
 func TestParseMigration(t *testing.T) {

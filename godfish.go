@@ -22,7 +22,7 @@ import (
 type Direction uint8
 
 const (
-	// DirUnknown is a fallback value for an invalid direction.
+	// DirUnknown is a fallback value for an undetermined direction.
 	DirUnknown Direction = iota
 	// DirForward is like migrate up, typically the change you want to apply to
 	// the DB.
@@ -119,19 +119,19 @@ var (
 	}
 )
 
-func parseDirection(basename string) (dir Indirection) {
+func parseIndirection(basename string) (ind Indirection) {
 	lo := strings.ToLower(basename)
 	for _, pre := range forwardDirections {
 		if strings.HasPrefix(lo, pre) {
-			dir.Value = DirForward
-			dir.Label = pre
+			ind.Value = DirForward
+			ind.Label = pre
 			return
 		}
 	}
 	for _, pre := range reverseDirections {
 		if strings.HasPrefix(lo, pre) {
-			dir.Value = DirReverse
-			dir.Label = pre
+			ind.Value = DirReverse
+			ind.Label = pre
 			return
 		}
 	}
@@ -169,8 +169,8 @@ func parseVersion(basename string) (version Version, err error) {
 
 func parseMigration(name filename) (mig Migration, err error) {
 	basename := filepath.Base(string(name))
-	direction := parseDirection(basename)
-	if direction.Value == DirUnknown {
+	indirection := parseIndirection(basename)
+	if indirection.Value == DirUnknown {
 		err = fmt.Errorf(
 			"%w; could not parse Direction for filename %q",
 			errDataInvalid, name,
@@ -179,11 +179,11 @@ func parseMigration(name filename) (mig Migration, err error) {
 	}
 
 	// index of the start of timestamp
-	i := len(direction.Label) + len(filenameDelimeter)
+	i := len(indirection.Label) + len(filenameDelimeter)
 	version, err := parseVersion(basename)
 	if err != nil {
 		err = fmt.Errorf(
-			"%w, could not parse timestamp for filename %q; %v",
+			"%w, could not parse version for filename %q; %v",
 			errDataInvalid, version, err,
 		)
 		return
@@ -191,11 +191,11 @@ func parseMigration(name filename) (mig Migration, err error) {
 
 	// index of the start of migration label
 	j := i + len(version.String()) + len(filenameDelimeter)
-	mig, err = newMutation(
-		version,
-		direction,
-		strings.TrimSuffix(string(basename[j:]), ".sql"),
-	)
+	mig = &mutation{
+		indirection: indirection,
+		label:       strings.TrimSuffix(string(basename[j:]), ".sql"),
+		version:     version,
+	}
 	return
 }
 
@@ -208,41 +208,18 @@ type Migration interface {
 	Version() Version
 }
 
-// Basename generates a migration file's basename. The output format is:
-// "${direction}-${timestamp}-${label}.sql".
-func Basename(mig Migration) (string, error) {
-	out, err := makeMigrationFilename(mig)
-	if err != nil {
-		return "", err
-	}
-	return string(out), nil
-}
-
 // mutation implements the Migration interface.
 type mutation struct {
 	indirection Indirection
 	label       string
-	timestamp   Version
+	version     Version
 }
 
 var _ Migration = (*mutation)(nil)
 
-// newMutation constructs a mutation and returns a pointer. Its internal
-// timestamp field is set to UTC.
-func newMutation(version Version, ind Indirection, label string) (*mutation, error) {
-	if ind.Value == DirUnknown {
-		return nil, fmt.Errorf("cannot have unknown direction")
-	}
-	return &mutation{
-		indirection: ind,
-		label:       label,
-		timestamp:   version,
-	}, nil
-}
-
 func (m *mutation) Indirection() Indirection { return m.indirection }
 func (m *mutation) Label() string            { return m.label }
-func (m *mutation) Version() Version         { return m.timestamp }
+func (m *mutation) Version() Version         { return m.version }
 
 // MigrationParams collects inputs needed to generate migration files. Setting
 // Reversible to true will generate a migration file for each direction.
@@ -273,15 +250,16 @@ func NewMigrationParams(label string, reversible bool, directory *os.File) (*Mig
 	out.Reversible = reversible
 	now := time.Now().UTC()
 	version := &timestamp{value: now.Unix(), label: now.Format(TimeFormat)}
-	var mut *mutation
-	if mut, err = newMutation(version, Indirection{Value: DirForward, Label: "forward"}, label); err != nil {
-		return nil, err
+	out.Forward = &mutation{
+		indirection: Indirection{Value: DirForward, Label: forwardDirections[0]},
+		label:       label,
+		version:     version,
 	}
-	out.Forward = mut
-	if mut, err = newMutation(version, Indirection{Value: DirReverse, Label: "reverse"}, label); err != nil {
-		return nil, err
+	out.Reverse = &mutation{
+		indirection: Indirection{Value: DirReverse, Label: reverseDirections[0]},
+		label:       label,
+		version:     version,
 	}
-	out.Reverse = mut
 	return &out, nil
 }
 
@@ -690,15 +668,15 @@ func (m *migrationFinder) query(driver Driver) (out []Migration, err error) {
 		return
 	}
 	for _, mig := range toApply {
-		timestamp := mig.Version()
-		if m.direction == DirForward && finish.Before(timestamp) {
+		version := mig.Version()
+		if m.direction == DirForward && finish.Before(version) {
 			break
 		}
 		if m.direction == DirReverse {
-			if timestamp.Before(finish) {
+			if version.Before(finish) {
 				break
 			}
-			if !useDefaultRollbackVersion && timestamp.Before(finish) {
+			if !useDefaultRollbackVersion && version.Before(finish) {
 				break
 			}
 		}
@@ -815,10 +793,10 @@ func (m *migrationFinder) filter(applied, available []Migration) (out []Migratio
 				// the original filename was, by assuming that the list of
 				// forward directions is in the same order as the corresponding
 				// reverse directions. It's kind of hacky, I know.
-				mut, ierr := newMutation(mig.Version(), Indirection{Value: DirReverse}, mig.Label())
-				if ierr != nil {
-					err = ierr
-					return
+				mut := &mutation{
+					indirection: Indirection{Value: DirReverse},
+					label:       mig.Label(),
+					version:     mig.Version(),
 				}
 				for i, fwd := range forwardDirections {
 					// Another assumption, the filename format will never
@@ -833,7 +811,7 @@ func (m *migrationFinder) filter(applied, available []Migration) (out []Migratio
 				if mut.indirection.Label == "" {
 					err = fmt.Errorf(
 						"direction.Label empty; direction.Value: %q, version: %v, label: %q",
-						mut.indirection.Value, mut.timestamp, mut.label,
+						mut.indirection.Value, mut.version, mut.label,
 					)
 					return
 				}
