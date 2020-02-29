@@ -4,6 +4,8 @@ import (
 	"database/sql"
 	"fmt"
 	"os/exec"
+	"regexp"
+	"strings"
 
 	my "github.com/go-sql-driver/mysql"
 	"github.com/rafaelespinoza/godfish"
@@ -78,9 +80,33 @@ func (d *driver) Close() (err error) {
 	return
 }
 
+var statementDelimiter = regexp.MustCompile(`;\s*\n`)
+
 func (d *driver) Execute(query string, args ...interface{}) (err error) {
-	_, err = d.connection.Exec(query)
-	return
+	// Attempt to support migrations with 1 or more statements. AFAIK, the
+	// standard library does not support executing multiple statements at once.
+	// As a workaround, break them up and apply them.
+	statements := statementDelimiter.Split(query, -1)
+	if len(statements) < 1 {
+		return
+	}
+	tx, err := d.connection.Begin()
+	if err != nil {
+		return
+	}
+	for _, q := range statements {
+		if len(strings.TrimSpace(q)) < 1 {
+			continue
+		}
+		_, err = tx.Exec(q)
+		if err != nil {
+			if rerr := tx.Rollback(); rerr != nil {
+				return fmt.Errorf("%w; %v", err, rerr)
+			}
+			return
+		}
+	}
+	return tx.Commit()
 }
 
 func (d *driver) CreateSchemaMigrationsTable() (err error) {

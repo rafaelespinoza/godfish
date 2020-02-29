@@ -4,6 +4,7 @@ package stub
 import (
 	"database/sql"
 	"fmt"
+	"strings"
 
 	"github.com/rafaelespinoza/godfish"
 )
@@ -30,7 +31,7 @@ func (d *Driver) CreateSchemaMigrationsTable() error {
 }
 func (d *Driver) DumpSchema() error { return d.err }
 func (d *Driver) Execute(q string, a ...interface{}) error {
-	if q == "invalid SQL" {
+	if strings.Contains(q, "invalid SQL") {
 		return fmt.Errorf(q)
 	}
 	return d.errorOnExecute

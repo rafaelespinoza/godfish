@@ -480,8 +480,12 @@ func RunDriverTests(t *testing.T, dsn godfish.DSN) {
 							content: struct{ forward, reverse string }{
 								forward: strings.Join([]string{
 									"CREATE TABLE foos (id int);",
-									"CREATE TABLE bars (id int);",
-									"ALTER TABLE foos ADD COLUMN a varchar(255);",
+									"",
+									"CREATE TABLE bars (id int);  ",
+									"",
+									"ALTER TABLE foos ADD COLUMN a varchar(255) ;",
+									"  ",
+									"",
 								}, "\n"),
 							},
 							version: formattedTime("12340102030405"),
@@ -494,6 +498,31 @@ func RunDriverTests(t *testing.T, dsn godfish.DSN) {
 				},
 				expected: &expectedOutput{
 					appliedVersions: []string{"12340102030405"},
+				},
+			},
+			{
+				setup: &testSetupState{
+					migrateTo: _SkipMigration,
+					stubs: []testDriverStub{
+						{
+							content: struct{ forward, reverse string }{
+								forward: strings.Join([]string{
+									"CREATE TABLE foos (id int);",
+									"invalid SQL;",
+									"ALTER TABLE foos ADD COLUMN a varchar(255);",
+								}, "\n"),
+							},
+							version: formattedTime("12340102030405"),
+						},
+					},
+				},
+				input: &testInput{
+					direction: godfish.DirForward,
+					version:   "12340102030405",
+				},
+				expected: &expectedOutput{
+					appliedVersions: []string{},
+					err:             true,
 				},
 			},
 			// test alternative filenames, directions: migrate, rollback

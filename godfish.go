@@ -447,16 +447,8 @@ func runMigration(driver Driver, pathToFile string, mig Migration) (err error) {
 	if data, err = ioutil.ReadFile(pathToFile); err != nil {
 		return
 	}
-	// Attempt to support migration files with 1 or more statements. AFAIK, the
-	// standard library does not support executing multiple statements at once.
-	// As a workaround, guess that each SQL statement is delimited like this.
-	for _, query := range strings.Split(string(data), ";\n") {
-		if len(query) < 1 {
-			continue
-		}
-		if err = driver.Execute(query); err != nil {
-			return
-		}
+	if err = driver.Execute(string(data)); err != nil {
+		return
 	}
 	if err = driver.CreateSchemaMigrationsTable(); err != nil {
 		return
