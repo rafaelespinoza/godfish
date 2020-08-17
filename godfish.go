@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -93,7 +92,7 @@ type filename string
 
 // makeFilename creates a filename based on the independent parts. Format:
 // "${direction}-${version}-${label}.sql"
-func makeFilename(version string, indirection Indirection, label string) (filename, error) {
+func makeFilename(version string, indirection Indirection, label string) string {
 	var dir string
 	if indirection.Value == DirUnknown {
 		dir = "*" + filenameDelimeter
@@ -103,7 +102,7 @@ func makeFilename(version string, indirection Indirection, label string) (filena
 
 	// the length will top out at the high quantifier for this regexp.
 	ver := timeformatMatcher.FindString(version) + filenameDelimeter
-	return filename(dir + ver + label + ".sql"), nil
+	return dir + ver + label + ".sql"
 }
 
 var (
@@ -277,29 +276,25 @@ func (m *MigrationParams) GenerateFiles() (err error) {
 	if forwardFile, err = newMigrationFile(m.Forward, baseDir); err != nil {
 		return
 	}
-	log.Println("created forward file, ", forwardFile.Name())
+	fmt.Println("created forward file:", forwardFile.Name())
 	if !m.Reversible {
-		log.Println("migration marked irreversible, did not create reverse file")
+		fmt.Println("migration marked irreversible, did not create reverse file")
 		return
 	}
 	if reverseFile, err = newMigrationFile(m.Reverse, baseDir); err != nil {
 		return
 	}
-	log.Println("created reverse file, ", reverseFile.Name())
+	fmt.Println("created reverse file:", reverseFile.Name())
 	return
 }
 
 func newMigrationFile(m Migration, baseDir string) (*os.File, error) {
-	filename, err := makeMigrationFilename(m)
-	if err != nil {
-		return nil, err
-	}
-	return os.Create(baseDir + "/" + string(filename))
+	return os.Create(baseDir + "/" + makeMigrationFilename(m))
 }
 
 // makeMigrationFilename passes in a Migration's fields to create a filename. An
 // error could be returned if m is found to be an unsuitable filename.
-func makeMigrationFilename(m Migration) (filename, error) {
+func makeMigrationFilename(m Migration) string {
 	return makeFilename(
 		m.Version().String(),
 		m.Indirection(),
@@ -337,11 +332,7 @@ func Migrate(driver Driver, directoryPath string, direction Direction, finishAtV
 	}
 
 	for _, mig := range migrations {
-		fn, ierr := makeMigrationFilename(mig)
-		if ierr != nil {
-			return
-		}
-		pathToFile := directoryPath + "/" + string(fn)
+		pathToFile := directoryPath + "/" + makeMigrationFilename(mig)
 		if err = runMigration(driver, pathToFile, mig); err != nil {
 			return
 		}
@@ -407,14 +398,10 @@ func ApplyMigration(driver Driver, directoryPath string, direction Direction, ve
 }
 
 func figureOutBasename(directoryPath string, direction Direction, version string) (f string, e error) {
-	var baseGlob filename
 	var filenames []string
 	// glob as many filenames as possible that match the "version" segment, then
 	// narrow it down from there.
-	if baseGlob, e = makeFilename(version, Indirection{}, "*"); e != nil {
-		return
-	}
-	glob := directoryPath + "/" + string(baseGlob)
+	glob := directoryPath + "/" + makeFilename(version, Indirection{}, "*")
 	if filenames, e = filepath.Glob(glob); e != nil {
 		return
 	}
@@ -440,6 +427,19 @@ func figureOutBasename(directoryPath string, direction Direction, version string
 	return
 }
 
+type runMigrationError struct {
+	driverName    string
+	originalError error
+	path          string
+}
+
+func (e *runMigrationError) Error() string {
+	return fmt.Sprintf(
+		"driver: %q, path: %q, error: %v",
+		e.driverName, e.path, e.originalError,
+	)
+}
+
 // runMigration executes a migration against the database. The input, pathToFile
 // should be relative to the current working directory.
 func runMigration(driver Driver, pathToFile string, mig Migration) (err error) {
@@ -447,7 +447,18 @@ func runMigration(driver Driver, pathToFile string, mig Migration) (err error) {
 	if data, err = ioutil.ReadFile(pathToFile); err != nil {
 		return
 	}
+	gerund := "migrating"
+	if mig.Indirection().Value == DirReverse {
+		gerund = "rolling back"
+	}
+	fmt.Printf("%s version %q ... ", gerund, mig.Version().String())
+
 	if err = driver.Execute(string(data)); err != nil {
+		err = &runMigrationError{
+			driverName:    driver.Name(),
+			originalError: err,
+			path:          pathToFile,
+		}
 		return
 	}
 	if err = driver.CreateSchemaMigrationsTable(); err != nil {
@@ -457,6 +468,9 @@ func runMigration(driver Driver, pathToFile string, mig Migration) (err error) {
 		mig.Indirection().Value,
 		mig.Version().String(),
 	)
+	if err == nil {
+		fmt.Println("ok")
+	}
 	return
 }
 
@@ -824,12 +838,9 @@ func (m *migrationFinder) filter(applied, available []Migration) (out []Migratio
 }
 
 func printMigrations(migrations []Migration) {
-	fmt.Printf("\t%-10s | %-20s | %-s\n", "direction", "version", "label")
-	fmt.Printf("\t%-10s | %-20s | %-s\n", "---------", "-------", "----")
+	fmt.Printf("\t%-20s | %-s\n", "version", "basename")
+	fmt.Printf("\t%-20s | %-s\n", "-------", "--------")
 	for _, mig := range migrations {
-		fmt.Printf(
-			"\t%-10s | %-20s | %-s\n",
-			mig.Indirection().Value, mig.Version().String(), mig.Label(),
-		)
+		fmt.Printf("\t%-20s | %-s\n", mig.Version().String(), makeMigrationFilename(mig))
 	}
 }

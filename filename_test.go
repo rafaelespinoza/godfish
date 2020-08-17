@@ -10,7 +10,6 @@ func TestFilename(t *testing.T) {
 		direction Indirection
 		label     string
 		expOut    filename
-		expErr    bool
 	}{
 		{
 			version:   "20191118121314",
@@ -72,13 +71,8 @@ func TestFilename(t *testing.T) {
 		},
 	}
 	for i, test := range tests {
-		out, err := makeFilename(test.version, test.direction, test.label)
-		if !test.expErr && err != nil {
-			t.Errorf("test %d; unexpected error; %v", i, err)
-		} else if test.expErr && err == nil {
-			t.Errorf("test %d; expected error but did not get one", i)
-		}
-		if out != test.expOut {
+		out := makeFilename(test.version, test.direction, test.label)
+		if out != string(test.expOut) {
 			t.Errorf(
 				"test %d; wrong filename; got %q, expected %q",
 				i, out, test.expOut,
