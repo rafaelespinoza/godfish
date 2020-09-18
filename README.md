@@ -105,6 +105,10 @@ godfish rollback
 godfish remigrate
 
 godfish dump-schema > db/schema.sql
+
+# show build metadata
+godfish version
+godfish version -json
 ```
 
 ## other minutiae

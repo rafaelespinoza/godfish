@@ -409,6 +409,7 @@ var subcommands = map[string]*subcommand{
 			return err
 		},
 	},
+	"version": _Version,
 }
 
 func bootDriver(dsn godfish.DSN) (driver godfish.Driver, err error) {
