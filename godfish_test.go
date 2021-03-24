@@ -3,7 +3,6 @@ package godfish_test
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -141,7 +140,7 @@ func TestInit(t *testing.T) {
 		t.Fatalf("something else is wrong with setup; %v", err)
 	}
 	var conf godfish.MigrationsConf
-	if data, err := ioutil.ReadFile(pathToFile); err != nil {
+	if data, err := os.ReadFile(pathToFile); err != nil {
 		t.Fatal(err)
 	} else if err = json.Unmarshal(data, &conf); err != nil {
 		t.Fatal(err)
@@ -152,7 +151,7 @@ func TestInit(t *testing.T) {
 	if data, err := json.MarshalIndent(conf, "", "\t"); err != nil {
 		t.Fatal(err)
 	} else {
-		ioutil.WriteFile(
+		os.WriteFile(
 			pathToFile,
 			append(data, byte('\n')),
 			os.FileMode(0644),
@@ -162,7 +161,7 @@ func TestInit(t *testing.T) {
 		t.Fatal(err)
 	}
 	var conf2 godfish.MigrationsConf
-	if data, err := ioutil.ReadFile(pathToFile); err != nil {
+	if data, err := os.ReadFile(pathToFile); err != nil {
 		t.Fatal(err)
 	} else if err = json.Unmarshal(data, &conf2); err != nil {
 		t.Fatal(err)

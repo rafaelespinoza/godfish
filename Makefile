@@ -43,7 +43,7 @@ clean:
 	rm $(BIN)
 
 postgres:
-	go build -o $(BIN) -i -v \
+	go build -o $(BIN) -v \
 		-ldflags "$(LDFLAGS) \
 		-X $(PKG_IMPORT_PATH)/internal/version.Driver=postgres" \
 		./drivers/postgres/godfish
@@ -53,7 +53,7 @@ postgres-test-setup:
 	createdb -E utf8 $(TEST_DB_NAME)
 
 mysql:
-	go build -o $(BIN) -i -v \
+	go build -o $(BIN) -v \
 		-ldflags "$(LDFLAGS) \
 		-X $(PKG_IMPORT_PATH)/internal/version.Driver=mysql" \
 		./drivers/mysql/godfish

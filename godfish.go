@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"sort"
@@ -150,7 +149,7 @@ func (e *runMigrationError) Error() string {
 // should be relative to the current working directory.
 func runMigration(driver Driver, pathToFile string, mig Migration) (err error) {
 	var data []byte
-	if data, err = ioutil.ReadFile(pathToFile); err != nil {
+	if data, err = os.ReadFile(pathToFile); err != nil {
 		return
 	}
 	gerund := "migrating"
@@ -231,7 +230,7 @@ func Init(pathToFile string) (err error) {
 	if data, err = json.MarshalIndent(MigrationsConf{}, "", "\t"); err != nil {
 		return err
 	}
-	return ioutil.WriteFile(
+	return os.WriteFile(
 		pathToFile,
 		append(data, byte('\n')),
 		os.FileMode(0644),

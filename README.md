@@ -1,6 +1,6 @@
 # godfish
 
-[![GoDoc](https://godoc.org/github.com/rafaelespinoza/godfish?status.svg)](https://godoc.org/github.com/rafaelespinoza/godfish)
+[![Go Reference](https://pkg.go.dev/badge/github.com/rafaelespinoza/godfish.svg)](https://pkg.go.dev/github.com/rafaelespinoza/godfish)
 
 `godfish` is a relational database migration manager, similar to the very
 good [`dogfish`](https://github.com/dwb/dogfish), but written in golang.
@@ -18,8 +18,8 @@ Make a CLI binary for the DB you want to use. This tool comes with a couple of
 driver implementations (mysql, postgres at the moment). Build one like so:
 
 ```
-go build -i -o godfish_pg    github.com/rafaelespinoza/godfish/drivers/postgres/godfish
-go build -i -o godfish_mysql github.com/rafaelespinoza/godfish/drivers/mysql/godfish
+go build -o godfish_pg    github.com/rafaelespinoza/godfish/drivers/postgres/godfish
+go build -o godfish_mysql github.com/rafaelespinoza/godfish/drivers/mysql/godfish
 
 # OR
 make postgres
@@ -139,7 +139,7 @@ reverse-20191205031405-update_more_stuff.sql
 ## contributing
 
 These are welcome. To get you started, the code has some documentation, a godoc
-page, at least one implementation of each interface and tests. `gofmt` or gtfo.
+page, at least one implementation of each interface and tests.
 
 Comments line lengths should be limited to 80 characters wide. Try not to make
 source code lines too long. More lines is fine with the exception of

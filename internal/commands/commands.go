@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"sort"
 	"strings"
@@ -129,7 +128,7 @@ func initSubcommand(positionalArgs []string, a *arguments) (subcmd *subcommand, 
 
 	// Read configuration file, if present. Negotiate with Args.
 	var conf godfish.MigrationsConf
-	if data, ierr := ioutil.ReadFile(a.Conf); ierr != nil {
+	if data, ierr := os.ReadFile(a.Conf); ierr != nil {
 		// probably no config file present, rely on Args instead.
 	} else if ierr = json.Unmarshal(data, &conf); ierr != nil {
 		err = ierr
