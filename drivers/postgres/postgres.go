@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"database/sql"
 	"fmt"
+	"os"
 	"os/exec"
 
 	"github.com/lib/pq"
@@ -31,10 +32,7 @@ func (p *DSN) NewDriver(migConf *godfish.MigrationsConf) (godfish.Driver, error)
 
 // String generates a data source name (or connection URL) based on the fields.
 func (p *DSN) String() string {
-	return fmt.Sprintf(
-		"postgresql://%s:%s/%s?client_encoding=%s&sslmode=require",
-		p.Host, p.Port, p.Name, p.Encoding,
-	)
+	return os.Getenv("DB_DSN")
 }
 
 // driver implements the Driver interface for postgres databases.

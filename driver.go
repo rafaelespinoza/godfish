@@ -51,6 +51,8 @@ func NewDriver(dsn DSN, migConf *MigrationsConf) (driver Driver, err error) {
 // output will be passed to the standard library's sql.Open method.
 type DSN interface {
 	// Boot takes inputs from the host environment so it can create a Driver.
+	//
+	// Deprecated: Set the DB_DSN environment variable instead of using this.
 	Boot(ConnectionParams) error
 	// NewDriver calls the constructor of the corresponding Driver.
 	NewDriver(*MigrationsConf) (Driver, error)
@@ -59,6 +61,8 @@ type DSN interface {
 }
 
 // ConnectionParams is what to use when initializing a DSN.
+//
+// Deprecated: Set the DB_DSN environment variable instead of using this.
 type ConnectionParams struct {
 	Encoding string // Encoding is the client encoding for the connection.
 	Host     string // Host is the name of the host to connect to.

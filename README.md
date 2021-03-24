@@ -42,15 +42,9 @@ set, then it checks the configuration file.
 
 #### connecting to the db
 
-Database connection parameters are always read from environment variables. The
-ones to set are:
-
+Database connection parameters are always read from environment variables. Set:
 ```
-DB_HOST=
-DB_NAME=
-DB_PASSWORD=
-DB_PORT=
-DB_USER=
+DB_DSN=
 ```
 
 #### configure file paths

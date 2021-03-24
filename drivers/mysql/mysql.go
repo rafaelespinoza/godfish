@@ -3,6 +3,7 @@ package mysql
 import (
 	"database/sql"
 	"fmt"
+	"os"
 	"os/exec"
 	"regexp"
 	"strings"
@@ -32,10 +33,7 @@ func (p *DSN) NewDriver(migConf *godfish.MigrationsConf) (godfish.Driver, error)
 
 // String generates a data source name (or connection URL) based on the fields.
 func (p *DSN) String() string {
-	return fmt.Sprintf(
-		"%s:%s@tcp(%s:%s)/%s",
-		p.User, p.Pass, p.Host, p.Port, p.Name,
-	)
+	return os.Getenv("DB_DSN")
 }
 
 // driver implements the godfish.Driver interface for mysql databases.

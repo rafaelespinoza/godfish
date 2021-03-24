@@ -76,12 +76,8 @@ Description:
 	Configuration options are set with flags or with a configuration file. Options
 	specified via flags will take precedence over the config file.
 
-	Specify database connection params with environment variables:
-		DB_HOST=
-		DB_NAME=
-		DB_PASSWORD=
-		DB_PORT=
-		DB_USER=
+	Specify database connection params with environment variable:
+		DB_DSN=
 
 	The following flags should go before the command.`,
 			bin)
