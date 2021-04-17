@@ -197,11 +197,7 @@ var subcommands = map[string]*subcommand{
 			return flags
 		},
 		run: func(a arguments) error {
-			dir, err := os.Open(a.Files)
-			if err != nil {
-				return err
-			}
-			migration, err := godfish.NewMigrationParams(a.Name, a.Reversible, dir)
+			migration, err := godfish.NewMigrationParams(a.Name, a.Reversible, a.Files)
 			if err != nil {
 				return err
 			}

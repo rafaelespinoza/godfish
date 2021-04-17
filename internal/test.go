@@ -767,10 +767,6 @@ func (m *migrationStub) Label() string                    { return m.label }
 func (m *migrationStub) Version() godfish.Version         { return m.version }
 
 func generateMigrationFiles(pathToTestDir string, stubs []testDriverStub) error {
-	testDir, err := os.Open(pathToTestDir)
-	if err != nil {
-		return err
-	}
 	for i, stub := range stubs {
 		var file *os.File
 		var err error
@@ -790,7 +786,7 @@ func generateMigrationFiles(pathToTestDir string, stubs []testDriverStub) error 
 		if params, err = godfish.NewMigrationParams(
 			name,
 			reversible,
-			testDir,
+			pathToTestDir,
 		); err != nil {
 			return err
 		}

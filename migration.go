@@ -70,38 +70,51 @@ type MigrationParams struct {
 	Forward    Migration
 	Reverse    Migration
 	Reversible bool
-	Directory  *os.File
+	Dirpath    string
+	directory  *os.File
 }
 
 // NewMigrationParams constructs a MigrationParams that's ready to use. Passing
 // in true for reversible means that a complementary SQL file will be made for
-// rolling back. The directory parameter specifies which directory to output the
-// files to.
-func NewMigrationParams(label string, reversible bool, directory *os.File) (*MigrationParams, error) {
-	var out MigrationParams
-	var err error
-	var info os.FileInfo
+// rolling back. The dirpath is the path to the directory for the files. An
+// error is returned if dirpath doesn't actually represent a directory.
+func NewMigrationParams(label string, reversible bool, dirpath string) (*MigrationParams, error) {
+	var (
+		err       error
+		info      os.FileInfo
+		directory *os.File
+		now       time.Time
+		version   timestamp
+	)
+
+	if directory, err = os.Open(dirpath); err != nil {
+		return nil, err
+	}
+	defer directory.Close()
 	if info, err = directory.Stat(); err != nil {
 		return nil, err
 	} else if !info.IsDir() {
-		return nil, fmt.Errorf("input dir %q should be a directory", info.Name())
+		return nil, fmt.Errorf("dirpath %q should be a path to a directory", dirpath)
 	}
-	out.Directory = directory
 
-	out.Reversible = reversible
-	now := time.Now().UTC()
-	version := &timestamp{value: now.Unix(), label: now.Format(TimeFormat)}
-	out.Forward = &mutation{
-		indirection: Indirection{Value: DirForward, Label: forwardDirections[0]},
-		label:       label,
-		version:     version,
-	}
-	out.Reverse = &mutation{
-		indirection: Indirection{Value: DirReverse, Label: reverseDirections[0]},
-		label:       label,
-		version:     version,
-	}
-	return &out, nil
+	now = time.Now().UTC()
+	version = timestamp{value: now.Unix(), label: now.Format(TimeFormat)}
+
+	return &MigrationParams{
+		Reversible: reversible,
+		Dirpath:    dirpath,
+		Forward: &mutation{
+			indirection: Indirection{Value: DirForward, Label: forwardDirections[0]},
+			label:       label,
+			version:     &version,
+		},
+		Reverse: &mutation{
+			indirection: Indirection{Value: DirReverse, Label: reverseDirections[0]},
+			label:       label,
+			version:     &version,
+		},
+		directory: directory,
+	}, nil
 }
 
 // GenerateFiles creates the migration files. If the migration is reversible it
@@ -114,7 +127,8 @@ func (m *MigrationParams) GenerateFiles() (err error) {
 		forwardFile.Close()
 		reverseFile.Close()
 	}()
-	baseDir := m.Directory.Name()
+	baseDir := m.directory.Name()
+
 	if forwardFile, err = newMigrationFile(m.Forward, baseDir); err != nil {
 		return
 	}
