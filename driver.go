@@ -29,8 +29,6 @@ type Driver interface {
 	// versions once they've been applied. The version should be a timestamp as
 	// a string, formatted as the TimeFormat variable in this package.
 	CreateSchemaMigrationsTable() error
-	// DumpSchema should output the database structure to stdout.
-	DumpSchema() error
 	// Execute runs the schema change and commits it to the database. The query
 	// parameter is a SQL string and may contain placeholders for the values in
 	// args. Input should be passed to conn so it could be sanitized, escaped.

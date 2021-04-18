@@ -200,28 +200,6 @@ var subcommands = map[string]*subcommand{
 			return migration.GenerateFiles()
 		},
 	},
-	"dump-schema": &subcommand{
-		description: "generate a sql file describing the db schema",
-		setup: func(a *arguments) *flag.FlagSet {
-			flags := flag.NewFlagSet("dump-schema", flag.ExitOnError)
-			flags.Usage = func() {
-				fmt.Printf(`Usage: %s dump-schema
-
-	Print a database structure file to standard output.`,
-					bin)
-				printFlagDefaults(flags)
-			}
-			return flags
-		},
-		run: func(a arguments) error {
-			driver, err := bootDriver(a.DSN)
-			if err != nil {
-				return err
-			}
-			godfish.DumpSchema(driver)
-			return nil
-		},
-	},
 	"info": &subcommand{
 		description: "output current state of migrations",
 		setup: func(a *arguments) *flag.FlagSet {

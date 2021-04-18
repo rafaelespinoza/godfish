@@ -98,8 +98,6 @@ godfish rollback
 # rollback and re-apply the last migration
 godfish remigrate
 
-godfish dump-schema > db/schema.sql
-
 # show build metadata
 godfish version
 godfish version -json

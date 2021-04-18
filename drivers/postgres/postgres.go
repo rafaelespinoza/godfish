@@ -1,11 +1,8 @@
 package postgres
 
 import (
-	"bytes"
 	"database/sql"
-	"fmt"
 	"os"
-	"os/exec"
 
 	"github.com/lib/pq"
 	"github.com/rafaelespinoza/godfish"
@@ -87,21 +84,6 @@ func (d *driver) CreateSchemaMigrationsTable() (err error) {
 		`CREATE TABLE IF NOT EXISTS schema_migrations (
 			migration_id VARCHAR(128) PRIMARY KEY NOT NULL
 		)`)
-	return
-}
-
-func (d *driver) DumpSchema() (err error) {
-	var out bytes.Buffer
-	cmd := exec.Command(
-		"pg_dump",
-		"--schema-only", "--no-acl", "--no-owner", "--no-password",
-		d.dsn.Name,
-	)
-	cmd.Stdout = &out
-	if err = cmd.Run(); err != nil {
-		return
-	}
-	fmt.Println(out.String())
 	return
 }
 

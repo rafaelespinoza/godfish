@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"fmt"
 	"os"
-	"os/exec"
 	"regexp"
 	"strings"
 
@@ -112,27 +111,6 @@ func (d *driver) CreateSchemaMigrationsTable() (err error) {
 		`CREATE TABLE IF NOT EXISTS schema_migrations (
 			migration_id VARCHAR(128) PRIMARY KEY NOT NULL
 		)`)
-	return
-}
-
-func (d *driver) DumpSchema() (err error) {
-	params := d.dsn
-	cmd := exec.Command(
-		"mysqldump",
-		"--user", params.User, "--password="+params.Pass, // skip password prompt by a omitting space
-		"--host", params.Host, "--port", params.Port,
-		"--comments", "--no-data", "--routines", "--triggers", "--tz-utc",
-		"--skip-add-drop-table", "--add-locks", "--create-options", "--set-charset",
-		params.Name,
-	)
-
-	out, err := cmd.Output()
-	if val, ok := err.(*exec.ExitError); ok {
-		fmt.Println(string(val.Stderr))
-		err = val
-		return
-	}
-	fmt.Println(string(out))
 	return
 }
 

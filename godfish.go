@@ -190,15 +190,6 @@ func CreateSchemaMigrationsTable(driver Driver) (err error) {
 	return driver.CreateSchemaMigrationsTable()
 }
 
-// DumpSchema describes the database structure and outputs to standard out.
-func DumpSchema(driver Driver) (err error) {
-	if _, err = driver.Connect(); err != nil {
-		return err
-	}
-	defer driver.Close()
-	return driver.DumpSchema()
-}
-
 // Info displays the outputs of various helper functions.
 func Info(driver Driver, directoryPath string, direction Direction, finishAtVersion string) (err error) {
 	if _, err = driver.Connect(); err != nil {

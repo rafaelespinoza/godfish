@@ -29,7 +29,6 @@ func (d *Driver) CreateSchemaMigrationsTable() error {
 	}
 	return d.err
 }
-func (d *Driver) DumpSchema() error { return d.err }
 func (d *Driver) Execute(q string, a ...interface{}) error {
 	if strings.Contains(q, "invalid SQL") {
 		return fmt.Errorf(q)

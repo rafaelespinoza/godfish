@@ -133,23 +133,6 @@ func RunDriverTests(t *testing.T, dsn godfish.DSN) {
 		})
 	})
 
-	t.Run("DumpSchema", func(t *testing.T) {
-		path, err := setup(driver, t.Name(), _DefaultTestDriverStubs, "34560102030405")
-		if err != nil {
-			t.Errorf("could not setup test; %v", err)
-			return
-		}
-		defer teardown(driver, path, "foos", "bars")
-
-		err = godfish.DumpSchema(driver)
-		if err != nil {
-			t.Errorf(
-				"test %q %q; could not dump schema; %v",
-				driver.Name(), t.Name(), err,
-			)
-		}
-	})
-
 	t.Run("ApplyMigration", func(t *testing.T) {
 		// testSetupState describes the state of the database before calling
 		// ApplyMigration.
