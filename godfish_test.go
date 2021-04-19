@@ -33,7 +33,7 @@ func TestInit(t *testing.T) {
 	if err = godfish.Init(pathToFile); err != nil {
 		t.Fatalf("something else is wrong with setup; %v", err)
 	}
-	var conf godfish.MigrationsConf
+	var conf godfish.Config
 	if data, err := os.ReadFile(pathToFile); err != nil {
 		t.Fatal(err)
 	} else if err = json.Unmarshal(data, &conf); err != nil {
@@ -54,7 +54,7 @@ func TestInit(t *testing.T) {
 	if err := godfish.Init(pathToFile); err != nil {
 		t.Fatal(err)
 	}
-	var conf2 godfish.MigrationsConf
+	var conf2 godfish.Config
 	if data, err := os.ReadFile(pathToFile); err != nil {
 		t.Fatal(err)
 	} else if err = json.Unmarshal(data, &conf2); err != nil {

@@ -2,62 +2,26 @@ package postgres
 
 import (
 	"database/sql"
-	"os"
 
 	"github.com/lib/pq"
 	"github.com/rafaelespinoza/godfish"
 )
 
-// DSN implements the godfish.DSN interface and defines keys, values needed to
-// connect to a postgres database.
-type DSN struct {
-	godfish.ConnectionParams
-}
-
-var _ godfish.DSN = (*DSN)(nil)
-
-// Boot initializes the DSN from environment inputs.
-func (p *DSN) Boot(params godfish.ConnectionParams) error {
-	p.ConnectionParams = params
-	return nil
-}
-
 // NewDriver creates a new postgres driver.
-func (p *DSN) NewDriver(migConf *godfish.MigrationsConf) (godfish.Driver, error) {
-	return newPostgres(*p)
-}
-
-// String generates a data source name (or connection URL) based on the fields.
-func (p *DSN) String() string {
-	return os.Getenv("DB_DSN")
-}
+func NewDriver() godfish.Driver { return &driver{} }
 
 // driver implements the Driver interface for postgres databases.
 type driver struct {
 	connection *sql.DB
-	dsn        DSN
 }
 
-var _ godfish.Driver = (*driver)(nil)
-
-func newPostgres(dsn DSN) (*driver, error) {
-	if dsn.Host == "" {
-		dsn.Host = "localhost"
-	}
-	if dsn.Port == "" {
-		dsn.Port = "5432"
-	}
-	return &driver{dsn: dsn}, nil
-}
-
-func (d *driver) Name() string     { return "postgres" }
-func (d *driver) DSN() godfish.DSN { return &d.dsn }
-func (d *driver) Connect() (conn *sql.DB, err error) {
+func (d *driver) Name() string { return "postgres" }
+func (d *driver) Connect(dsn string) (conn *sql.DB, err error) {
 	if d.connection != nil {
 		conn = d.connection
 		return
 	}
-	if conn, err = sql.Open(d.Name(), d.DSN().String()); err != nil {
+	if conn, err = sql.Open(d.Name(), dsn); err != nil {
 		return
 	}
 	d.connection = conn

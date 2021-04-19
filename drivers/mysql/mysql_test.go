@@ -8,5 +8,5 @@ import (
 )
 
 func Test(t *testing.T) {
-	internal.RunDriverTests(t, &mysql.DSN{})
+	internal.RunDriverTests(t, mysql.NewDriver())
 }

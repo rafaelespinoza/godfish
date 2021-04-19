@@ -8,5 +8,6 @@ import (
 )
 
 func Test(t *testing.T) {
-	internal.RunDriverTests(t, &stub.DSN{})
+	var driver stub.Driver
+	internal.RunDriverTests(t, &driver)
 }

@@ -10,7 +10,6 @@ import (
 )
 
 type Driver struct {
-	dsn             DSN
 	connection      *sql.DB
 	appliedVersions godfish.AppliedVersions
 	err             error
@@ -19,10 +18,9 @@ type Driver struct {
 
 var _ godfish.Driver = (*Driver)(nil)
 
-func (d *Driver) Name() string              { return "stub" }
-func (d *Driver) Connect() (*sql.DB, error) { return d.connection, d.err }
-func (d *Driver) Close() error              { return d.err }
-func (d *Driver) DSN() godfish.DSN          { return &d.dsn }
+func (d *Driver) Name() string                        { return "stub" }
+func (d *Driver) Connect(dsn string) (*sql.DB, error) { return d.connection, d.err }
+func (d *Driver) Close() error                        { return d.err }
 func (d *Driver) CreateSchemaMigrationsTable() error {
 	if d.appliedVersions == nil {
 		d.appliedVersions = MakeAppliedVersions()
@@ -76,19 +74,6 @@ func (d *Driver) AppliedVersions() (godfish.AppliedVersions, error) {
 func (d *Driver) Teardown() {
 	d.appliedVersions = MakeAppliedVersions()
 }
-
-type DSN struct{ godfish.ConnectionParams }
-
-func (d DSN) Boot(params godfish.ConnectionParams) error {
-	d.ConnectionParams = params
-	return nil
-}
-func (d DSN) NewDriver(migConf *godfish.MigrationsConf) (godfish.Driver, error) {
-	return &Driver{dsn: d}, nil
-}
-func (d DSN) String() string { return "this://is.a/test" }
-
-var _ godfish.DSN = (*DSN)(nil)
 
 type AppliedVersions struct {
 	counter  int

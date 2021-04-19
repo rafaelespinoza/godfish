@@ -13,30 +13,7 @@ import (
 )
 
 // RunDriverTests tests an implementation of the godfish.Driver interface.
-func RunDriverTests(t *testing.T, dsn godfish.DSN) {
-	t.Helper()
-	connParams := godfish.ConnectionParams{
-		Encoding: "UTF8",
-		Host:     os.Getenv("DB_HOST"),
-		Name:     "godfish_test",
-		Pass:     os.Getenv("DB_PASSWORD"),
-		Port:     os.Getenv("DB_PORT"),
-		User:     os.Getenv("DB_USER"),
-	}
-	if connParams.Host == "" {
-		connParams.Host = "localhost"
-	}
-	if connParams.User == "" {
-		connParams.User = "godfish"
-	}
-	if err := dsn.Boot(connParams); err != nil {
-		t.Fatal(err)
-	}
-	driver, err := godfish.NewDriver(dsn, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-
+func RunDriverTests(t *testing.T, driver godfish.Driver) {
 	// Tests for creating the schema migrations table are deliberately not
 	// included. It should be called as needed by other library functions.
 
@@ -605,6 +582,16 @@ func RunDriverTests(t *testing.T, dsn godfish.DSN) {
 	})
 }
 
+const dsnKey = "DB_DSN"
+
+func mustDSN() string {
+	dsn := os.Getenv(dsnKey)
+	if dsn == "" {
+		panic("empty environment variable " + dsnKey)
+	}
+	return dsn
+}
+
 // Magic option values for test setup and teardown.
 const (
 	_SkipMigration = "-"
@@ -628,7 +615,7 @@ func setup(driver godfish.Driver, testName string, stubs []testDriverStub, migra
 // teardown clears state after running a test.
 func teardown(driver godfish.Driver, path string, tablesToDrop ...string) {
 	var err error
-	if _, err = driver.Connect(); err != nil {
+	if _, err = driver.Connect(mustDSN()); err != nil {
 		panic(err)
 	}
 
@@ -824,7 +811,7 @@ func generateMigrationFiles(pathToTestDir string, stubs []testDriverStub) error 
 func collectAppliedVersions(driver godfish.Driver) (out []string, err error) {
 	// Collect output of AppliedVersions.
 	// Reconnect here because ApplyMigration closes the connection.
-	if _, err = driver.Connect(); err != nil {
+	if _, err = driver.Connect(mustDSN()); err != nil {
 		return
 	}
 	defer driver.Close()

@@ -17,7 +17,7 @@ type arguments struct {
 	Conf       string
 	Debug      bool
 	Direction  string
-	DSN        godfish.DSN
+	Driver     godfish.Driver
 	Files      string
 	Name       string
 	Reversible bool
@@ -32,9 +32,9 @@ var (
 )
 
 // Run does all the CLI things.
-func Run(dsn godfish.DSN) (err error) {
+func Run(driver godfish.Driver) (err error) {
 	flag.Parse()
-	args.DSN = dsn
+	args.Driver = driver
 
 	var cmd *subcommand
 
@@ -123,7 +123,7 @@ func initSubcommand(positionalArgs []string, a *arguments) (subcmd *subcommand, 
 	}
 
 	// Read configuration file, if present. Negotiate with Args.
-	var conf godfish.MigrationsConf
+	var conf godfish.Config
 	if data, ierr := os.ReadFile(a.Conf); ierr != nil {
 		// probably no config file present, rely on Args instead.
 	} else if ierr = json.Unmarshal(data, &conf); ierr != nil {
@@ -225,12 +225,8 @@ var subcommands = map[string]*subcommand{
 			return flags
 		},
 		run: func(a arguments) error {
-			driver, err := bootDriver(a.DSN)
-			if err != nil {
-				return err
-			}
 			direction := whichDirection(a)
-			return godfish.Info(driver, a.Files, direction, a.Version)
+			return godfish.Info(a.Driver, a.Files, direction, a.Version)
 		},
 	},
 	"init": &subcommand{
@@ -281,13 +277,8 @@ var subcommands = map[string]*subcommand{
 			return flags
 		},
 		run: func(a arguments) error {
-			driver, err := bootDriver(a.DSN)
-			if err != nil {
-				return err
-			}
-
-			err = godfish.Migrate(
-				driver,
+			err := godfish.Migrate(
+				a.Driver,
 				a.Files,
 				godfish.DirForward,
 				a.Version,
@@ -311,24 +302,11 @@ var subcommands = map[string]*subcommand{
 			return flags
 		},
 		run: func(a arguments) error {
-			driver, err := bootDriver(a.DSN)
+			err := godfish.ApplyMigration(a.Driver, a.Files, godfish.DirReverse, "")
 			if err != nil {
 				return err
 			}
-			if err = godfish.ApplyMigration(
-				driver,
-				a.Files,
-				godfish.DirReverse,
-				"",
-			); err != nil {
-				return err
-			}
-			return godfish.ApplyMigration(
-				driver,
-				a.Files,
-				godfish.DirForward,
-				"",
-			)
+			return godfish.ApplyMigration(a.Driver, a.Files, godfish.DirForward, "")
 		},
 	},
 	"rollback": &subcommand{
@@ -356,20 +334,17 @@ var subcommands = map[string]*subcommand{
 			return flags
 		},
 		run: func(a arguments) error {
-			driver, err := bootDriver(a.DSN)
-			if err != nil {
-				return err
-			}
+			var err error
 			if a.Version == "" {
 				err = godfish.ApplyMigration(
-					driver,
+					a.Driver,
 					a.Files,
 					godfish.DirReverse,
 					a.Version,
 				)
 			} else {
 				err = godfish.Migrate(
-					driver,
+					a.Driver,
 					a.Files,
 					godfish.DirReverse,
 					a.Version,
@@ -379,21 +354,6 @@ var subcommands = map[string]*subcommand{
 		},
 	},
 	"version": _Version,
-}
-
-func bootDriver(dsn godfish.DSN) (driver godfish.Driver, err error) {
-	connParams := godfish.ConnectionParams{
-		Host: os.Getenv("DB_HOST"),
-		Name: os.Getenv("DB_NAME"),
-		Pass: os.Getenv("DB_PASSWORD"),
-		Port: os.Getenv("DB_PORT"),
-		User: os.Getenv("DB_USER"),
-	}
-	if err = dsn.Boot(connParams); err != nil {
-		return
-	}
-	driver, err = dsn.NewDriver(nil)
-	return
 }
 
 func whichDirection(a arguments) (direction godfish.Direction) {

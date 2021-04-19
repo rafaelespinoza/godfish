@@ -14,7 +14,16 @@ import (
 
 // Migrate executes all migrations at directoryPath in the specified direction.
 func Migrate(driver Driver, directoryPath string, direction Direction, finishAtVersion string) (err error) {
-	var migrations []Migration
+	var (
+		dsn        string
+		migrations []Migration
+	)
+	if dsn, err = getDSN(); err != nil {
+		return
+	}
+	if _, err = driver.Connect(dsn); err != nil {
+		return
+	}
 	defer driver.Close()
 
 	if finishAtVersion == "" && direction == DirForward {
@@ -23,9 +32,6 @@ func Migrate(driver Driver, directoryPath string, direction Direction, finishAtV
 		finishAtVersion = minVersion
 	}
 
-	if _, err = driver.Connect(); err != nil {
-		return
-	}
 	finder := migrationFinder{
 		direction:       direction,
 		directoryPath:   directoryPath,
@@ -57,17 +63,25 @@ var (
 // ApplyMigration runs a migration at directoryPath with the specified version
 // and direction.
 func ApplyMigration(driver Driver, directoryPath string, direction Direction, version string) (err error) {
-	var mig Migration
-	var pathToFile string
+	var (
+		dsn        string
+		pathToFile string
+		mig        Migration
+	)
+
+	if dsn, err = getDSN(); err != nil {
+		return
+	}
+	if _, err = driver.Connect(dsn); err != nil {
+		return
+	}
 	defer driver.Close()
 
 	if direction == DirUnknown {
 		err = fmt.Errorf("unknown Direction %q", direction)
 		return
 	}
-	if _, err = driver.Connect(); err != nil {
-		return
-	}
+
 	if version == "" {
 		// attempt to find the next version to apply in the direction
 		var limit string
@@ -183,7 +197,11 @@ func runMigration(driver Driver, pathToFile string, mig Migration) (err error) {
 // the database. Running any migration will create the table, so you don't
 // usually need to call this function.
 func CreateSchemaMigrationsTable(driver Driver) (err error) {
-	if _, err = driver.Connect(); err != nil {
+	var dsn string
+	if dsn, err = getDSN(); err != nil {
+		return
+	}
+	if _, err = driver.Connect(dsn); err != nil {
 		return err
 	}
 	defer driver.Close()
@@ -192,7 +210,11 @@ func CreateSchemaMigrationsTable(driver Driver) (err error) {
 
 // Info displays the outputs of various helper functions.
 func Info(driver Driver, directoryPath string, direction Direction, finishAtVersion string) (err error) {
-	if _, err = driver.Connect(); err != nil {
+	var dsn string
+	if dsn, err = getDSN(); err != nil {
+		return
+	}
+	if _, err = driver.Connect(dsn); err != nil {
 		return err
 	}
 	defer driver.Close()
@@ -204,6 +226,11 @@ func Info(driver Driver, directoryPath string, direction Direction, finishAtVers
 	}
 	_, err = finder.query(driver)
 	return
+}
+
+// Config is for various runtime settings.
+type Config struct {
+	PathToFiles string `json:"path_to_files"`
 }
 
 // Init creates a configuration file at pathToFile unless it already exists.
@@ -218,7 +245,7 @@ func Init(pathToFile string) (err error) {
 	}
 
 	var data []byte
-	if data, err = json.MarshalIndent(MigrationsConf{}, "", "\t"); err != nil {
+	if data, err = json.MarshalIndent(Config{}, "", "\t"); err != nil {
 		return err
 	}
 	return os.WriteFile(
@@ -453,4 +480,14 @@ func printMigrations(migrations []Migration) {
 	for _, mig := range migrations {
 		fmt.Printf("\t%-20s | %-s\n", mig.Version().String(), makeMigrationFilename(mig))
 	}
+}
+
+const dsnKey = "DB_DSN"
+
+func getDSN() (dsn string, err error) {
+	dsn = os.Getenv(dsnKey)
+	if dsn == "" {
+		err = fmt.Errorf("missing environment variable: %s", dsnKey)
+	}
+	return
 }
