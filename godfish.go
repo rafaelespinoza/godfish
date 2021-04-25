@@ -36,14 +36,13 @@ func Migrate(driver Driver, directoryPath string, direction Direction, finishAtV
 		direction:       direction,
 		directoryPath:   directoryPath,
 		finishAtVersion: finishAtVersion,
-		verbose:         false,
 	}
 	if migrations, err = finder.query(driver); err != nil {
 		return
 	}
 
 	for _, mig := range migrations {
-		pathToFile := directoryPath + "/" + makeMigrationFilename(mig)
+		pathToFile := directoryPath + "/" + MakeMigrationFilename(mig)
 		if err = runMigration(driver, pathToFile, mig); err != nil {
 			return
 		}
@@ -92,7 +91,6 @@ func ApplyMigration(driver Driver, directoryPath string, direction Direction, ve
 			direction:       direction,
 			directoryPath:   directoryPath,
 			finishAtVersion: limit,
-			verbose:         false,
 		}
 		if toApply, ierr := finder.query(driver); ierr != nil {
 			err = fmt.Errorf("specified no version; error attempting to find one; %v", ierr)
@@ -209,7 +207,7 @@ func CreateSchemaMigrationsTable(driver Driver) (err error) {
 }
 
 // Info displays the outputs of various helper functions.
-func Info(driver Driver, directoryPath string, direction Direction, finishAtVersion string) (err error) {
+func Info(driver Driver, directoryPath string, direction Direction, finishAtVersion string, p InfoPrinter) (err error) {
 	var dsn string
 	if dsn, err = getDSN(); err != nil {
 		return
@@ -222,7 +220,7 @@ func Info(driver Driver, directoryPath string, direction Direction, finishAtVers
 		direction:       direction,
 		directoryPath:   directoryPath,
 		finishAtVersion: finishAtVersion,
-		verbose:         true,
+		infoPrinter:     p,
 	}
 	_, err = finder.query(driver)
 	return
@@ -261,7 +259,7 @@ type migrationFinder struct {
 	direction       Direction
 	directoryPath   string
 	finishAtVersion string
-	verbose         bool
+	infoPrinter     InfoPrinter
 }
 
 // query returns a list of Migrations to apply.
@@ -270,26 +268,19 @@ func (m *migrationFinder) query(driver Driver) (out []Migration, err error) {
 	if err != nil {
 		return
 	}
-	if m.verbose {
-		fmt.Println("-- All available migrations")
-		printMigrations(available)
-		fmt.Println()
-	}
 
 	applied, err := scanAppliedVersions(driver, m.directoryPath)
 	if err == ErrSchemaMigrationsDoesNotExist {
 		// The next invocation of CreateSchemaMigrationsTable should fix this.
 		// We can continue with zero value for now.
-		if m.verbose {
-			fmt.Printf("no migrations applied yet; %v\n", err)
-		}
+		fmt.Fprintf(os.Stderr, "no migrations applied yet; %v\n", err)
 	} else if err != nil {
 		return
 	}
-	if m.verbose {
-		fmt.Println("-- Applied migrations")
-		printMigrations(applied)
-		fmt.Println()
+	if m.infoPrinter != nil {
+		if err = printMigrations(m.infoPrinter, "up", applied); err != nil {
+			return
+		}
 	}
 
 	toApply, err := m.filter(applied, available)
@@ -325,9 +316,10 @@ func (m *migrationFinder) query(driver Driver) (out []Migration, err error) {
 		}
 		out = append(out, mig)
 	}
-	if m.verbose {
-		fmt.Println("-- Migrations to apply")
-		printMigrations(out)
+	if m.infoPrinter != nil {
+		if err = printMigrations(m.infoPrinter, "down", out); err != nil {
+			return
+		}
 	}
 	return
 }
@@ -474,12 +466,18 @@ func (m *migrationFinder) filter(applied, available []Migration) (out []Migratio
 	return
 }
 
-func printMigrations(migrations []Migration) {
-	fmt.Printf("\t%-20s | %-s\n", "version", "basename")
-	fmt.Printf("\t%-20s | %-s\n", "-------", "--------")
-	for _, mig := range migrations {
-		fmt.Printf("\t%-20s | %-s\n", mig.Version().String(), makeMigrationFilename(mig))
+type InfoPrinter interface {
+	PrintInfo(state string, migration Migration) error
+}
+
+func printMigrations(p InfoPrinter, state string, migrations []Migration) (err error) {
+	for i, mig := range migrations {
+		if err = p.PrintInfo(state, mig); err != nil {
+			err = fmt.Errorf("%w; item %d", err, i)
+			return
+		}
 	}
+	return
 }
 
 const dsnKey = "DB_DSN"

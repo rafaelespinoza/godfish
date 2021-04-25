@@ -4,14 +4,17 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"io"
+	"os"
 	"strings"
 
 	"github.com/rafaelespinoza/alf"
 	"github.com/rafaelespinoza/godfish"
+	"github.com/rafaelespinoza/godfish/internal/info"
 )
 
 func makeInfo(name string) alf.Directive {
-	var direction, version string
+	var direction, format, version string
 
 	return &alf.Command{
 		Description: "output applied migrations, migrations to apply",
@@ -22,6 +25,12 @@ func makeInfo(name string) alf.Directive {
 				"direction",
 				"forward",
 				"which way to look? (forward|reverse)",
+			)
+			flags.StringVar(
+				&format,
+				"format",
+				"tsv",
+				"output format, one of (json|tsv)",
 			)
 			flags.StringVar(
 				&version,
@@ -40,9 +49,8 @@ func makeInfo(name string) alf.Directive {
 
 	Migrations are categorized as:
 
-	- Available. Known to godfish, either already applied, or can be applied.
-	- Applied. They have been migrated against the DB.
-	- To Apply. They haven't been applied yet, but can be.
+	- up: Has been migrated against the DB.
+	- down: Available to migrate, but hasn't yet.
 
 	It also takes a "direction" flag if you want to know what would be applied
 	in a rollback or remigrate operation. The "version" flag can be used to
@@ -56,7 +64,8 @@ func makeInfo(name string) alf.Directive {
 		},
 		Run: func(_ context.Context) error {
 			direction := whichDirection(direction)
-			return godfish.Info(theDriver, commonArgs.Files, direction, version)
+			printer := choosePrinter(format, os.Stdout)
+			return godfish.Info(theDriver, commonArgs.Files, direction, version, printer)
 		},
 	}
 }
@@ -67,5 +76,18 @@ func whichDirection(input string) (direction godfish.Direction) {
 	if strings.HasPrefix(d, "rev") || strings.HasPrefix(d, "back") {
 		direction = godfish.DirReverse
 	}
+	return
+}
+
+func choosePrinter(format string, w io.Writer) (printer godfish.InfoPrinter) {
+	if format == "json" {
+		printer = info.NewJSON(w)
+		return
+	}
+
+	if format != "tsv" && format != "" {
+		fmt.Fprintf(os.Stderr, "unknown format %q, defaulting to tsv\n", format)
+	}
+	printer = info.NewTSV(w)
 	return
 }

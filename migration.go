@@ -145,11 +145,11 @@ func (m *MigrationParams) GenerateFiles() (err error) {
 }
 
 func newMigrationFile(m Migration, baseDir string) (*os.File, error) {
-	return os.Create(baseDir + "/" + makeMigrationFilename(m))
+	return os.Create(baseDir + "/" + MakeMigrationFilename(m))
 }
 
-// makeMigrationFilename passes in a Migration's fields to create a filename.
-func makeMigrationFilename(m Migration) string {
+// MakeMigrationFilename converts a Migration m to a filename.
+func MakeMigrationFilename(m Migration) string {
 	return makeFilename(
 		m.Version().String(),
 		m.Indirection(),
