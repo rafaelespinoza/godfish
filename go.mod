@@ -7,4 +7,5 @@ require (
 	github.com/gocql/gocql v0.0.0-20210504150947-558dfae50b5d
 	github.com/lib/pq v1.10.0
 	github.com/mattn/go-sqlite3 v1.14.7
+	github.com/rafaelespinoza/alf v0.2.0
 )

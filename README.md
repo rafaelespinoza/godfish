@@ -7,14 +7,14 @@
 [![postgres](https://github.com/rafaelespinoza/godfish/actions/workflows/postgres.yml/badge.svg)](https://github.com/rafaelespinoza/godfish/actions/workflows/postgres.yml)
 [![sqlite3](https://github.com/rafaelespinoza/godfish/actions/workflows/sqlite3.yml/badge.svg)](https://github.com/rafaelespinoza/godfish/actions/workflows/sqlite3.yml)
 
-`godfish` is a relational database migration manager, similar to the very
-good [`dogfish`](https://github.com/dwb/dogfish), but written in golang.
+`godfish` is a database migration manager, similar to the very good
+[`dogfish`](https://github.com/dwb/dogfish), but written in golang.
 
 ## goals
 
 - use the native query language in the migration files, no other high-level DSLs
 - interface with many DBs
-- as little dependencies outside of the standard library as possible
+- light on dependencies
 - not terrible error messages
 
 ## build

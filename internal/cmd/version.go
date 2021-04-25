@@ -1,31 +1,35 @@
-package commands
+package cmd
 
 import (
+	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
 
+	"github.com/rafaelespinoza/alf"
 	"github.com/rafaelespinoza/godfish/internal/version"
 )
 
-var _Version = func() *subcommand {
+func makeVersion(name string) alf.Directive {
 	var formatJSON bool
-	out := subcommand{
-		description: "show metadata about the build",
-		setup: func(a *arguments) *flag.FlagSet {
-			flags := flag.NewFlagSet("version", flag.ExitOnError)
+
+	return &alf.Command{
+		Description: "show metadata about the build",
+		Setup: func(p flag.FlagSet) *flag.FlagSet {
+			flags := flag.NewFlagSet(name, flag.ExitOnError)
 			flags.BoolVar(&formatJSON, "json", false, "format output as JSON")
 			flags.Usage = func() {
-				fmt.Printf(`Usage: %s version [-json]
+				fmt.Printf(`Usage: %s [flags]
 
-	Prints some versioning info to stdout. Pass the -json flag to get JSON.`,
-					bin,
+	Prints some versioning info to stdout. Pass the -json flag to get JSON.
+`,
+					name,
 				)
 				printFlagDefaults(flags)
 			}
 			return flags
 		},
-		run: func(a arguments) error {
+		Run: func(_ context.Context) error {
 			if !formatJSON {
 				fmt.Printf("BranchName:	%s\n", version.BranchName)
 				fmt.Printf("BuildTime: 	%s\n", version.BuildTime)
@@ -52,5 +56,4 @@ var _Version = func() *subcommand {
 			return nil
 		},
 	}
-	return &out
-}()
+}
