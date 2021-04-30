@@ -21,7 +21,7 @@ func Migrate(driver Driver, directoryPath string, direction Direction, finishAtV
 	if dsn, err = getDSN(); err != nil {
 		return
 	}
-	if _, err = driver.Connect(dsn); err != nil {
+	if err = driver.Connect(dsn); err != nil {
 		return
 	}
 	defer driver.Close()
@@ -72,7 +72,7 @@ func ApplyMigration(driver Driver, directoryPath string, direction Direction, ve
 	if dsn, err = getDSN(); err != nil {
 		return
 	}
-	if _, err = driver.Connect(dsn); err != nil {
+	if err = driver.Connect(dsn); err != nil {
 		return
 	}
 	defer driver.Close()
@@ -201,7 +201,7 @@ func CreateSchemaMigrationsTable(driver Driver) (err error) {
 	if dsn, err = getDSN(); err != nil {
 		return
 	}
-	if _, err = driver.Connect(dsn); err != nil {
+	if err = driver.Connect(dsn); err != nil {
 		return err
 	}
 	defer driver.Close()
@@ -214,7 +214,7 @@ func Info(driver Driver, directoryPath string, direction Direction, finishAtVers
 	if dsn, err = getDSN(); err != nil {
 		return
 	}
-	if _, err = driver.Connect(dsn); err != nil {
+	if err = driver.Connect(dsn); err != nil {
 		return err
 	}
 	defer driver.Close()

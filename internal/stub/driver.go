@@ -2,7 +2,6 @@
 package stub
 
 import (
-	"database/sql"
 	"fmt"
 	"strings"
 
@@ -10,7 +9,6 @@ import (
 )
 
 type Driver struct {
-	connection      *sql.DB
 	appliedVersions godfish.AppliedVersions
 	err             error
 	errorOnExecute  error
@@ -18,9 +16,9 @@ type Driver struct {
 
 var _ godfish.Driver = (*Driver)(nil)
 
-func (d *Driver) Name() string                        { return "stub" }
-func (d *Driver) Connect(dsn string) (*sql.DB, error) { return d.connection, d.err }
-func (d *Driver) Close() error                        { return d.err }
+func (d *Driver) Name() string             { return "stub" }
+func (d *Driver) Connect(dsn string) error { return d.err }
+func (d *Driver) Close() error             { return d.err }
 func (d *Driver) CreateSchemaMigrationsTable() error {
 	if d.appliedVersions == nil {
 		d.appliedVersions = MakeAppliedVersions()

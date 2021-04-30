@@ -16,12 +16,12 @@ type driver struct {
 }
 
 func (d *driver) Name() string { return "postgres" }
-func (d *driver) Connect(dsn string) (conn *sql.DB, err error) {
+func (d *driver) Connect(dsn string) (err error) {
 	if d.connection != nil {
-		conn = d.connection
 		return
 	}
-	if conn, err = sql.Open(d.Name(), dsn); err != nil {
+	conn, err := sql.Open(d.Name(), dsn)
+	if err != nil {
 		return
 	}
 	d.connection = conn

@@ -1,21 +1,13 @@
 package godfish
 
-import "database/sql"
-
-// A Driver describes what a database driver (anything at
-// https://github.com/golang/go/wiki/SQLDrivers) should be able to do.
+// Driver adapts a database implementation to use godfish.
 type Driver interface {
 	// Name should return the name of the driver: ie: postgres, mysql, etc
 	Name() string
 
-	// Connect should open a connection (a *sql.DB) to the database and save an
-	// internal reference to that connection for later use. This library might
-	// call this method multiple times, so use the internal reference if it's
-	// present instead of reconnecting to the database.
-	Connect(dsn string) (*sql.DB, error)
-	// Close should check if there's an internal reference to a database
-	// connection (a *sql.DB) and if it's present, close it. Then reset the
-	// internal reference to that connection to nil.
+	// Connect should open a connection to the database.
+	Connect(dsn string) error
+	// Close should close the database connection.
 	Close() error
 
 	// AppliedVersions queries the schema migrations table for migration
@@ -47,5 +39,3 @@ type AppliedVersions interface {
 	Next() bool
 	Scan(dest ...interface{}) error
 }
-
-var _ AppliedVersions = (*sql.Rows)(nil)

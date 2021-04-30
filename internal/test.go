@@ -615,7 +615,7 @@ func setup(driver godfish.Driver, testName string, stubs []testDriverStub, migra
 // teardown clears state after running a test.
 func teardown(driver godfish.Driver, path string, tablesToDrop ...string) {
 	var err error
-	if _, err = driver.Connect(mustDSN()); err != nil {
+	if err = driver.Connect(mustDSN()); err != nil {
 		panic(err)
 	}
 
@@ -811,7 +811,7 @@ func generateMigrationFiles(pathToTestDir string, stubs []testDriverStub) error 
 func collectAppliedVersions(driver godfish.Driver) (out []string, err error) {
 	// Collect output of AppliedVersions.
 	// Reconnect here because ApplyMigration closes the connection.
-	if _, err = driver.Connect(mustDSN()); err != nil {
+	if err = driver.Connect(mustDSN()); err != nil {
 		return
 	}
 	defer driver.Close()
