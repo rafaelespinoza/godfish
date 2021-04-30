@@ -1,0 +1,25 @@
+version: "3.9"
+
+services:
+    client:
+        image: godfish_test/cassandra/client:latest
+        container_name: godfish_ci_cassandra_client
+        depends_on:
+            - server
+        entrypoint: /client.sh server
+        environment:
+            CGO_ENABLED: 0
+            DB_DSN: "cassandra://server:9042/godfish_test?timeout_ms=2000&connect_timeout_ms=2000"
+        tty: true
+    server:
+        image: godfish_test/cassandra/server:latest
+        container_name: godfish_ci_cassandra_server
+        expose:
+            - "9042"
+        volumes:
+            -
+              type: volume
+              source: server
+              target: /var/lib/cassandra
+volumes:
+    server:

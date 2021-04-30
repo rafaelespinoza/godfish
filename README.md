@@ -2,6 +2,7 @@
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/rafaelespinoza/godfish.svg)](https://pkg.go.dev/github.com/rafaelespinoza/godfish)
 
+[![cassandra](https://github.com/rafaelespinoza/godfish/actions/workflows/cassandra.yml/badge.svg)](https://github.com/rafaelespinoza/godfish/actions/workflows/cassandra.yml)
 [![mysql](https://github.com/rafaelespinoza/godfish/actions/workflows/mysql.yml/badge.svg)](https://github.com/rafaelespinoza/godfish/actions/workflows/mysql.yml)
 [![postgres](https://github.com/rafaelespinoza/godfish/actions/workflows/postgres.yml/badge.svg)](https://github.com/rafaelespinoza/godfish/actions/workflows/postgres.yml)
 [![sqlite3](https://github.com/rafaelespinoza/godfish/actions/workflows/sqlite3.yml/badge.svg)](https://github.com/rafaelespinoza/godfish/actions/workflows/sqlite3.yml)
@@ -11,8 +12,8 @@ good [`dogfish`](https://github.com/dwb/dogfish), but written in golang.
 
 ## goals
 
-- use SQL in the migration files, no other high-level DSLs
-- interface with many RDBMSs
+- use the native query language in the migration files, no other high-level DSLs
+- interface with many DBs
 - as little dependencies outside of the standard library as possible
 - not terrible error messages
 
@@ -22,6 +23,7 @@ Make a CLI binary for the DB you want to use. This tool comes with some driver
 implementations. Build one like so:
 
 ```
+make cassandra
 make postgres
 make mysql
 make sqlite3
@@ -147,11 +149,13 @@ lives in `Makefile.docker` and the `.ci/` directory.
 
 ```sh
 # Build environments and run tests
+make -f Makefile.docker ci-cassandra-up
 make -f Makefile.docker ci-mysql-up
 make -f Makefile.docker ci-postgres-up
 make -f Makefile.docker ci-sqlite3-up
 
 # Teardown
+make -f Makefile.docker ci-cassandra-down
 make -f Makefile.docker ci-mysql-down
 make -f Makefile.docker ci-postgres-down
 make -f Makefile.docker ci-sqlite3-down

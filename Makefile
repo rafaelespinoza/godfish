@@ -20,6 +20,14 @@ test:
 clean:
 	rm $(BIN)
 
+cassandra:
+	$(GO) build -o $(BIN) -v \
+		-ldflags "$(LDFLAGS) \
+		-X $(PKG_IMPORT_PATH)/internal/version.Driver=cassandra" \
+		./drivers/cassandra/godfish
+cassandra-test:
+	$(GO) test $(ARGS) ./drivers/cassandra
+
 postgres:
 	$(GO) build -o $(BIN) -v \
 		-ldflags "$(LDFLAGS) \

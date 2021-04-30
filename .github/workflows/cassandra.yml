@@ -1,0 +1,12 @@
+name: cassandra
+on: [push, pull_request]
+jobs:
+  all:
+    runs-on: ubuntu-20.04
+    steps:
+    - name: Checkout repo
+      uses: actions/checkout@v1
+    - name: Build environment and run tests
+      run: make -f Makefile.docker ci-cassandra-up
+    - name: Teardown
+      run: make -f Makefile.docker ci-cassandra-down
