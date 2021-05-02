@@ -9,10 +9,13 @@ ci-mysql-up: build-mysql
 	docker-compose -f $(CI_DIR)/mysql/docker-compose.yml -- up --exit-code-from client
 ci-postgres-up: build-postgres
 	docker-compose -f $(CI_DIR)/postgres/docker-compose.yml -- up --exit-code-from client
+ci-sqlite3-up: build-sqlite3
+	docker container run --name=$(BASENAME)_sqlite3 -- $(BASENAME)/sqlite3
 ci-mysql-down:
 	docker-compose -f $(CI_DIR)/mysql/docker-compose.yml -- down --rmi all --volumes
 ci-postgres-down:
 	docker-compose -f $(CI_DIR)/postgres/docker-compose.yml -- down --rmi all --volumes
+ci-sqlite3-down: rm-sqlite3 rmi-sqlite3
 
 #
 # Build and tag images.
@@ -30,6 +33,9 @@ build-postgres: build-base
 	docker image build -f $(CI_DIR)/postgres/client.Dockerfile -t $(BASENAME)/postgres/client $(BUILD_DIR)
 	docker image build -f $(CI_DIR)/postgres/server.Dockerfile -t $(BASENAME)/postgres/server $(BUILD_DIR)
 	rm -rf $(BUILD_DIR)
+build-sqlite3: build-base
+	docker image build -f $(CI_DIR)/sqlite3/Dockerfile -t $(BASENAME)/sqlite3 $(BUILD_DIR)
+	rm -rf $(BUILD_DIR)
 
 #
 # More cleanup stuff.
@@ -40,6 +46,8 @@ rm-mysql:
 rm-postgres:
 	docker container rm $(shell docker container ls -aq --filter ancestor=$(BASENAME)/postgres/client)
 	docker container rm $(shell docker container ls -aq --filter ancestor=$(BASENAME)/postgres/server)
+rm-sqlite3:
+	docker container rm $(shell docker container ls -aq --filter ancestor=$(BASENAME)/sqlite3)
 
 rmi-mysql:
 	docker image rmi $(shell docker image ls -aq $(BASENAME)/mysql/client)
@@ -47,5 +55,7 @@ rmi-mysql:
 rmi-postgres:
 	docker image rmi $(shell docker image ls -aq $(BASENAME)/postgres/client)
 	docker image rmi $(shell docker image ls -aq $(BASENAME)/postgres/server)
+rmi-sqlite3:
+	docker image rmi $(shell docker image ls -aq $(BASENAME)/sqlite3)
 rmi-base:
 	docker image rmi $(shell docker image ls -aq $(BASENAME)/client_base)

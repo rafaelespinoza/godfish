@@ -4,6 +4,7 @@
 
 [![mysql](https://github.com/rafaelespinoza/godfish/actions/workflows/mysql.yml/badge.svg)](https://github.com/rafaelespinoza/godfish/actions/workflows/mysql.yml)
 [![postgres](https://github.com/rafaelespinoza/godfish/actions/workflows/postgres.yml/badge.svg)](https://github.com/rafaelespinoza/godfish/actions/workflows/postgres.yml)
+[![sqlite3](https://github.com/rafaelespinoza/godfish/actions/workflows/sqlite3.yml/badge.svg)](https://github.com/rafaelespinoza/godfish/actions/workflows/sqlite3.yml)
 
 `godfish` is a relational database migration manager, similar to the very
 good [`dogfish`](https://github.com/dwb/dogfish), but written in golang.
@@ -17,16 +18,13 @@ good [`dogfish`](https://github.com/dwb/dogfish), but written in golang.
 
 ## build
 
-Make a CLI binary for the DB you want to use. This tool comes with a couple of
-driver implementations (mysql, postgres at the moment). Build one like so:
+Make a CLI binary for the DB you want to use. This tool comes with some driver
+implementations. Build one like so:
 
 ```
-go build -o godfish_pg    github.com/rafaelespinoza/godfish/drivers/postgres/godfish
-go build -o godfish_mysql github.com/rafaelespinoza/godfish/drivers/mysql/godfish
-
-# OR
 make postgres
 make mysql
+make sqlite3
 ```
 
 From there you could move it to `$GOPATH/bin`, move it to your project or
@@ -151,8 +149,10 @@ lives in `Makefile.docker` and the `.ci/` directory.
 # Build environments and run tests
 make -f Makefile.docker ci-mysql-up
 make -f Makefile.docker ci-postgres-up
+make -f Makefile.docker ci-sqlite3-up
 
 # Teardown
 make -f Makefile.docker ci-mysql-down
 make -f Makefile.docker ci-postgres-down
+make -f Makefile.docker ci-sqlite3-down
 ```

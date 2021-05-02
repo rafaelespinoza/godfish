@@ -628,7 +628,15 @@ func teardown(driver godfish.Driver, path string, tablesToDrop ...string) {
 	if d, ok := driver.(*stub.Driver); ok {
 		d.Teardown()
 	}
-	if err = driver.Execute(`TRUNCATE TABLE schema_migrations`); err != nil {
+
+	var truncate string
+	switch driver.Name() {
+	case "sqlite3":
+		truncate = `DELETE FROM schema_migrations`
+	default:
+		truncate = `TRUNCATE TABLE schema_migrations`
+	}
+	if err = driver.Execute(truncate); err != nil {
 		panic(err)
 	}
 	os.RemoveAll(path)

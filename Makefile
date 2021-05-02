@@ -35,3 +35,11 @@ mysql:
 		./drivers/mysql/godfish
 mysql-test:
 	$(GO) test $(ARGS) ./drivers/mysql
+
+sqlite3:
+	CGO_ENABLED=1 $(GO) build -o $(BIN) -v \
+		-ldflags "$(LDFLAGS) \
+		-X $(PKG_IMPORT_PATH)/internal/version.Driver=sqlite3" \
+		./drivers/sqlite3/godfish
+sqlite3-test:
+	$(GO) test $(ARGS) ./drivers/sqlite3
