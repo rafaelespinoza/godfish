@@ -4,9 +4,9 @@ import (
 	"testing"
 
 	"github.com/rafaelespinoza/godfish/drivers/sqlite3"
-	"github.com/rafaelespinoza/godfish/internal"
+	"github.com/rafaelespinoza/godfish/internal/test"
 )
 
 func Test(t *testing.T) {
-	internal.RunDriverTests(t, sqlite3.NewDriver())
+	test.RunDriverTests(t, sqlite3.NewDriver())
 }

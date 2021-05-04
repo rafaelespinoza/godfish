@@ -3,11 +3,10 @@ package stub_test
 import (
 	"testing"
 
-	"github.com/rafaelespinoza/godfish/internal"
 	"github.com/rafaelespinoza/godfish/internal/stub"
+	"github.com/rafaelespinoza/godfish/internal/test"
 )
 
 func Test(t *testing.T) {
-	var driver stub.Driver
-	internal.RunDriverTests(t, &driver)
+	test.RunDriverTests(t, &stub.Driver{})
 }

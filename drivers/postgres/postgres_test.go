@@ -4,9 +4,9 @@ import (
 	"testing"
 
 	"github.com/rafaelespinoza/godfish/drivers/postgres"
-	"github.com/rafaelespinoza/godfish/internal"
+	"github.com/rafaelespinoza/godfish/internal/test"
 )
 
 func Test(t *testing.T) {
-	internal.RunDriverTests(t, postgres.NewDriver())
+	test.RunDriverTests(t, postgres.NewDriver())
 }
