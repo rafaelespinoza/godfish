@@ -8,5 +8,5 @@ import (
 )
 
 func Test(t *testing.T) {
-	test.RunDriverTests(t, sqlite3.NewDriver())
+	test.RunDriverTests(t, sqlite3.NewDriver(), test.DefaultQueries)
 }

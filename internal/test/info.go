@@ -6,8 +6,22 @@ import (
 	"github.com/rafaelespinoza/godfish"
 )
 
-func testInfo(t *testing.T, driver godfish.Driver) {
-	path, err := setup(driver, t.Name(), _DefaultTestDriverStubs, "34560102030405")
+func testInfo(t *testing.T, driver godfish.Driver, queries Queries) {
+	stubs := []testDriverStub{
+		{
+			content: queries.CreateFoos,
+			version: formattedTime("12340102030405"),
+		},
+		{
+			content: queries.AlterFoos,
+			version: formattedTime("23450102030405"),
+		},
+		{
+			content: queries.CreateBars,
+			version: formattedTime("34560102030405"),
+		},
+	}
+	path, err := setup(driver, t.Name(), stubs, "34560102030405")
 	if err != nil {
 		t.Errorf("could not setup test; %v", err)
 		return

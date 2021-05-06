@@ -11,11 +11,45 @@ import (
 )
 
 // RunDriverTests tests an implementation of the godfish.Driver interface.
-func RunDriverTests(t *testing.T, driver godfish.Driver) {
-	t.Run("Migrate", func(t *testing.T) { testMigrate(t, driver) })
-	t.Run("Info", func(t *testing.T) { testInfo(t, driver) })
-	t.Run("ApplyMigration", func(t *testing.T) { testApplyMigration(t, driver) })
+// Callers should supply a set of valid queries q; most DBs can just use the
+// DefaultQueries.
+func RunDriverTests(t *testing.T, d godfish.Driver, q Queries) {
+	for _, query := range []MigrationContent{q.CreateFoos, q.CreateBars, q.AlterFoos} {
+		if query.Forward == "" || query.Reverse == "" {
+			// Should also be valid queries, but the database will decide that.
+			t.Fatalf("all %T fields should be non-empty", query)
+		}
+	}
+
+	t.Run("Migrate", func(t *testing.T) { testMigrate(t, d, q) })
+	t.Run("Info", func(t *testing.T) { testInfo(t, d, q) })
+	t.Run("ApplyMigration", func(t *testing.T) { testApplyMigration(t, d, q) })
 }
+
+// Queries are named DB queries to use in the tests.
+type Queries struct {
+	CreateFoos MigrationContent
+	CreateBars MigrationContent
+	AlterFoos  MigrationContent
+}
+
+// DefaultQueries should be sufficient to use for most DBs in RunDriverTests.
+var DefaultQueries = Queries{
+	CreateFoos: MigrationContent{
+		Forward: "CREATE TABLE foos (id int);",
+		Reverse: "DROP TABLE foos;",
+	},
+	CreateBars: MigrationContent{
+		Forward: "CREATE TABLE bars (id int);  ",
+		Reverse: "DROP TABLE bars;",
+	},
+	AlterFoos: MigrationContent{
+		Forward: "ALTER TABLE foos ADD COLUMN a varchar(255) ;",
+		Reverse: "ALTER TABLE foos DROP COLUMN a;",
+	},
+}
+
+type MigrationContent struct{ Forward, Reverse string }
 
 const dsnKey = "DB_DSN"
 
@@ -78,56 +112,6 @@ func teardown(driver godfish.Driver, path string, tablesToDrop ...string) {
 	driver.Close()
 }
 
-var (
-	_DefaultTestDriverStubs = []testDriverStub{
-		{
-			content: struct{ forward, reverse string }{
-				forward: `CREATE TABLE foos (id int);`,
-			},
-			version: formattedTime("12340102030405"),
-		},
-		{
-			content: struct{ forward, reverse string }{
-				forward: `ALTER TABLE foos ADD COLUMN a varchar(255);`,
-				reverse: `ALTER TABLE foos DROP COLUMN a;`,
-			},
-			version: formattedTime("23450102030405"),
-		},
-		{
-			content: struct{ forward, reverse string }{
-				forward: `CREATE TABLE bars (id int);`,
-			},
-			version: formattedTime("34560102030405"),
-		},
-	}
-	_StubsWithMigrateRollbackIndirectives = []testDriverStub{
-		{
-			content: struct{ forward, reverse string }{
-				forward: "CREATE TABLE foos (id int);",
-				reverse: "DROP TABLE foos;",
-			},
-			indirectives: struct{ forward, reverse godfish.Indirection }{
-				forward: godfish.Indirection{Label: "migrate"},
-				reverse: godfish.Indirection{Label: "rollback"},
-			},
-			version: formattedTime("12340102030405"),
-		},
-	}
-	_StubsWithUpDownIndirectives = []testDriverStub{
-		{
-			content: struct{ forward, reverse string }{
-				forward: "CREATE TABLE foos (id int);",
-				reverse: "DROP TABLE foos;",
-			},
-			indirectives: struct{ forward, reverse godfish.Indirection }{
-				forward: godfish.Indirection{Label: "up"},
-				reverse: godfish.Indirection{Label: "down"},
-			},
-			version: formattedTime("12340102030405"),
-		},
-	}
-)
-
 type formattedTime string
 
 func (v formattedTime) Before(u godfish.Version) bool {
@@ -148,7 +132,7 @@ var _ godfish.Version = (*formattedTime)(nil)
 // testDriverStub encompasses some data to use with interface tests.
 type testDriverStub struct {
 	migration    godfish.Migration
-	content      struct{ forward, reverse string }
+	content      MigrationContent
 	indirectives struct{ forward, reverse godfish.Indirection }
 	version      godfish.Version
 }
@@ -185,9 +169,9 @@ func generateMigrationFiles(pathToTestDir string, stubs []testDriverStub) error 
 		var params *godfish.MigrationParams
 
 		var reversible bool
-		if stub.content.forward != "" && stub.content.reverse != "" {
+		if stub.content.Forward != "" && stub.content.Reverse != "" {
 			reversible = true
-		} else if stub.content.forward == "" {
+		} else if stub.content.Forward == "" {
 			panic(fmt.Errorf("test setup should have content in forward direction"))
 		}
 
@@ -224,12 +208,12 @@ func generateMigrationFiles(pathToTestDir string, stubs []testDriverStub) error 
 			// migrations where each Direction is in the order:
 			// [forward, reverse]
 			if j == 0 {
-				if _, err = file.WriteString(stub.content.forward); err != nil {
+				if _, err = file.WriteString(stub.content.Forward); err != nil {
 					return err
 				}
 				continue
 			}
-			if _, err = file.WriteString(stub.content.reverse); err != nil {
+			if _, err = file.WriteString(stub.content.Reverse); err != nil {
 				return err
 			}
 		}

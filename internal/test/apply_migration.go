@@ -7,7 +7,7 @@ import (
 	"github.com/rafaelespinoza/godfish"
 )
 
-func testApplyMigration(t *testing.T, driver godfish.Driver) {
+func testApplyMigration(t *testing.T, driver godfish.Driver, queries Queries) {
 	// testSetupState is the database state before calling ApplyMigration.
 	type testSetupState struct {
 		// migrateTo is the version that the DB should be at.
@@ -62,6 +62,21 @@ func testApplyMigration(t *testing.T, driver godfish.Driver) {
 		}
 	}
 
+	var defaultStubs = []testDriverStub{
+		{
+			content: queries.CreateFoos,
+			version: formattedTime("12340102030405"),
+		},
+		{
+			content: queries.AlterFoos,
+			version: formattedTime("23450102030405"),
+		},
+		{
+			content: queries.CreateBars,
+			version: formattedTime("34560102030405"),
+		},
+	}
+
 	t.Run("setup state: no migration files", func(t *testing.T) {
 		runTest(
 			t,
@@ -99,7 +114,7 @@ func testApplyMigration(t *testing.T, driver godfish.Driver) {
 			t,
 			testSetupState{
 				migrateTo: skipMigration,
-				stubs:     _DefaultTestDriverStubs,
+				stubs:     defaultStubs,
 			},
 			testInput{
 				direction: godfish.DirForward,
@@ -114,7 +129,7 @@ func testApplyMigration(t *testing.T, driver godfish.Driver) {
 			t,
 			testSetupState{
 				migrateTo: skipMigration,
-				stubs:     _DefaultTestDriverStubs,
+				stubs:     defaultStubs,
 			},
 			testInput{
 				direction: godfish.DirReverse,
@@ -133,7 +148,7 @@ func testApplyMigration(t *testing.T, driver godfish.Driver) {
 				t,
 				testSetupState{
 					migrateTo: "12340102030405",
-					stubs:     _DefaultTestDriverStubs,
+					stubs:     defaultStubs,
 				},
 				testInput{
 					direction: godfish.DirForward,
@@ -148,7 +163,7 @@ func testApplyMigration(t *testing.T, driver godfish.Driver) {
 				t,
 				testSetupState{
 					migrateTo: "23450102030405",
-					stubs:     _DefaultTestDriverStubs,
+					stubs:     defaultStubs,
 				},
 				testInput{
 					direction: godfish.DirForward,
@@ -163,7 +178,7 @@ func testApplyMigration(t *testing.T, driver godfish.Driver) {
 				t,
 				testSetupState{
 					migrateTo: "34560102030405",
-					stubs:     _DefaultTestDriverStubs,
+					stubs:     defaultStubs,
 				},
 				testInput{
 					direction: godfish.DirForward,
@@ -181,7 +196,7 @@ func testApplyMigration(t *testing.T, driver godfish.Driver) {
 				t,
 				testSetupState{
 					migrateTo: "34560102030405",
-					stubs:     _DefaultTestDriverStubs,
+					stubs:     defaultStubs,
 				},
 				testInput{
 					direction: godfish.DirReverse,
@@ -196,7 +211,7 @@ func testApplyMigration(t *testing.T, driver godfish.Driver) {
 				t,
 				testSetupState{
 					migrateTo: "23450102030405",
-					stubs:     _DefaultTestDriverStubs,
+					stubs:     defaultStubs,
 				},
 				testInput{
 					direction: godfish.DirReverse,
@@ -211,7 +226,23 @@ func testApplyMigration(t *testing.T, driver godfish.Driver) {
 				t,
 				testSetupState{
 					migrateTo: "12340102030405",
-					stubs:     _DefaultTestDriverStubs,
+					stubs: []testDriverStub{
+						{
+							content: MigrationContent{Forward: queries.CreateFoos.Forward},
+							version: formattedTime("12340102030405"),
+						},
+						{
+							content: MigrationContent{
+								Forward: queries.AlterFoos.Forward,
+								Reverse: queries.AlterFoos.Reverse,
+							},
+							version: formattedTime("23450102030405"),
+						},
+						{
+							content: MigrationContent{Forward: queries.CreateBars.Forward},
+							version: formattedTime("34560102030405"),
+						},
+					},
 				},
 				testInput{
 					direction: godfish.DirReverse,
@@ -233,22 +264,15 @@ func testApplyMigration(t *testing.T, driver godfish.Driver) {
 				migrateTo: "34560102030405",
 				stubs: []testDriverStub{
 					{
-						content: struct{ forward, reverse string }{
-							forward: `CREATE TABLE foos (id int);`,
-						},
+						content: queries.CreateFoos,
 						version: formattedTime("12340102030405"),
 					},
 					{
-						content: struct{ forward, reverse string }{
-							forward: `CREATE TABLE bars (id int);`,
-						},
+						content: queries.CreateBars,
 						version: formattedTime("23450102030405"),
 					},
 					{
-						content: struct{ forward, reverse string }{
-							forward: `ALTER TABLE foos ADD COLUMN a varchar(255);`,
-							reverse: `ALTER TABLE foos DROP COLUMN a;`,
-						},
+						content: queries.AlterFoos,
 						version: formattedTime("34560102030405"),
 					},
 				},
@@ -264,11 +288,29 @@ func testApplyMigration(t *testing.T, driver godfish.Driver) {
 	})
 
 	t.Run("migration file does not exist", func(t *testing.T) {
+		var stubs = []testDriverStub{
+			{
+				content: MigrationContent{Forward: queries.CreateFoos.Forward},
+				version: formattedTime("12340102030405"),
+			},
+			{
+				content: MigrationContent{
+					Forward: queries.AlterFoos.Forward,
+					Reverse: queries.AlterFoos.Reverse,
+				},
+				version: formattedTime("23450102030405"),
+			},
+			{
+				content: MigrationContent{Forward: queries.CreateBars.Forward},
+				version: formattedTime("34560102030405"),
+			},
+		}
+
 		runTest(
 			t,
 			testSetupState{
 				migrateTo: "34560102030405",
-				stubs:     _DefaultTestDriverStubs,
+				stubs:     stubs,
 			},
 			testInput{
 				direction: godfish.DirForward,
@@ -284,7 +326,7 @@ func testApplyMigration(t *testing.T, driver godfish.Driver) {
 			t,
 			testSetupState{
 				migrateTo: "34560102030405",
-				stubs:     _DefaultTestDriverStubs,
+				stubs:     stubs,
 			},
 			testInput{
 				direction: godfish.DirReverse,
@@ -296,17 +338,17 @@ func testApplyMigration(t *testing.T, driver godfish.Driver) {
 			},
 		)
 
+		// targeted migration only exists in forward direction.
+		// target > available.
 		runTest(
 			t,
 			testSetupState{
 				migrateTo: "34560102030405",
-				stubs:     _DefaultTestDriverStubs,
+				stubs:     stubs,
 			},
 			testInput{
 				direction: godfish.DirReverse,
-				// target migration only exists in forward direction.
-				// target > available.
-				version: "34560102030405",
+				version:   "34560102030405",
 			},
 			expectedOutput{
 				appliedVersions: []string{"12340102030405", "23450102030405", "34560102030405"},
@@ -314,17 +356,17 @@ func testApplyMigration(t *testing.T, driver godfish.Driver) {
 			},
 		)
 
+		// targeted migration only exists in forward direction.
+		// target < available.
 		runTest(
 			t,
 			testSetupState{
 				migrateTo: "34560102030405",
-				stubs:     _DefaultTestDriverStubs,
+				stubs:     stubs,
 			},
 			testInput{
 				direction: godfish.DirReverse,
-				// target migration only exists in forward direction.
-				// target < available.
-				version: "12340102030405",
+				version:   "12340102030405",
 			},
 			expectedOutput{
 				appliedVersions: []string{"12340102030405", "23450102030405", "34560102030405"},
@@ -334,13 +376,16 @@ func testApplyMigration(t *testing.T, driver godfish.Driver) {
 	})
 
 	t.Run("Error during migration execution", func(t *testing.T) {
+		stubs := make([]testDriverStub, len(defaultStubs))
+		copy(stubs, defaultStubs)
+
 		runTest(
 			t,
 			testSetupState{
 				migrateTo: "34560102030405",
-				stubs: append(_DefaultTestDriverStubs, testDriverStub{
-					content: struct{ forward, reverse string }{
-						forward: "invalid SQL",
+				stubs: append(stubs, testDriverStub{
+					content: MigrationContent{
+						Forward: "invalid SQL",
 					},
 					version: formattedTime("45670102030405"),
 				}),
@@ -363,22 +408,15 @@ func testApplyMigration(t *testing.T, driver godfish.Driver) {
 				migrateTo: "2345",
 				stubs: []testDriverStub{
 					{
-						content: struct{ forward, reverse string }{
-							forward: `CREATE TABLE foos (id int);`,
-						},
+						content: queries.CreateFoos,
 						version: formattedTime("1234"),
 					},
 					{
-						content: struct{ forward, reverse string }{
-							forward: `CREATE TABLE bars (id int);`,
-						},
+						content: queries.CreateBars,
 						version: formattedTime("2345"),
 					},
 					{
-						content: struct{ forward, reverse string }{
-							forward: `ALTER TABLE foos ADD COLUMN a varchar(255);`,
-							reverse: `ALTER TABLE foos DROP COLUMN a;`,
-						},
+						content: queries.AlterFoos,
 						version: formattedTime("3456"),
 					},
 				},
@@ -400,13 +438,13 @@ func testApplyMigration(t *testing.T, driver godfish.Driver) {
 				migrateTo: skipMigration,
 				stubs: []testDriverStub{
 					{
-						content: struct{ forward, reverse string }{
-							forward: strings.Join([]string{
-								"CREATE TABLE foos (id int);",
+						content: MigrationContent{
+							Forward: strings.Join([]string{
+								queries.CreateFoos.Forward,
 								"",
-								"CREATE TABLE bars (id int);  ",
+								queries.CreateBars.Forward,
 								"",
-								"ALTER TABLE foos ADD COLUMN a varchar(255) ;",
+								queries.AlterFoos.Forward,
 								"  ",
 								"",
 							}, "\n"),
@@ -431,11 +469,11 @@ func testApplyMigration(t *testing.T, driver godfish.Driver) {
 				migrateTo: skipMigration,
 				stubs: []testDriverStub{
 					{
-						content: struct{ forward, reverse string }{
-							forward: strings.Join([]string{
-								"CREATE TABLE foos (id int);",
+						content: MigrationContent{
+							Forward: strings.Join([]string{
+								queries.CreateFoos.Forward,
 								"invalid SQL;",
-								"ALTER TABLE foos ADD COLUMN a varchar(255);",
+								queries.AlterFoos.Forward,
 							}, "\n"),
 						},
 						version: formattedTime("12340102030405"),
@@ -455,11 +493,22 @@ func testApplyMigration(t *testing.T, driver godfish.Driver) {
 
 	t.Run("Alternate filenames", func(t *testing.T) {
 		t.Run("migrate rollback", func(t *testing.T) {
+			var stubs = []testDriverStub{
+				{
+					content: queries.CreateFoos,
+					indirectives: struct{ forward, reverse godfish.Indirection }{
+						forward: godfish.Indirection{Label: "migrate"},
+						reverse: godfish.Indirection{Label: "rollback"},
+					},
+					version: formattedTime("12340102030405"),
+				},
+			}
+
 			runTest(
 				t,
 				testSetupState{
 					migrateTo: skipMigration,
-					stubs:     _StubsWithMigrateRollbackIndirectives,
+					stubs:     stubs,
 				},
 				testInput{
 					direction: godfish.DirForward,
@@ -474,7 +523,7 @@ func testApplyMigration(t *testing.T, driver godfish.Driver) {
 				t,
 				testSetupState{
 					migrateTo: "12340102030405",
-					stubs:     _StubsWithMigrateRollbackIndirectives,
+					stubs:     stubs,
 				},
 				testInput{
 					direction: godfish.DirReverse,
@@ -487,11 +536,22 @@ func testApplyMigration(t *testing.T, driver godfish.Driver) {
 		})
 
 		t.Run("up down", func(t *testing.T) {
+			var stubs = []testDriverStub{
+				{
+					content: queries.CreateFoos,
+					indirectives: struct{ forward, reverse godfish.Indirection }{
+						forward: godfish.Indirection{Label: "up"},
+						reverse: godfish.Indirection{Label: "down"},
+					},
+					version: formattedTime("12340102030405"),
+				},
+			}
+
 			runTest(
 				t,
 				testSetupState{
 					migrateTo: skipMigration,
-					stubs:     _StubsWithUpDownIndirectives,
+					stubs:     stubs,
 				},
 				testInput{
 					direction: godfish.DirForward,
@@ -506,7 +566,7 @@ func testApplyMigration(t *testing.T, driver godfish.Driver) {
 				t,
 				testSetupState{
 					migrateTo: "12340102030405",
-					stubs:     _StubsWithUpDownIndirectives,
+					stubs:     stubs,
 				},
 				testInput{
 					direction: godfish.DirReverse,

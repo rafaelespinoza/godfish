@@ -6,27 +6,18 @@ import (
 	"github.com/rafaelespinoza/godfish"
 )
 
-func testMigrate(t *testing.T, driver godfish.Driver) {
+func testMigrate(t *testing.T, driver godfish.Driver, queries Queries) {
 	stubs := []testDriverStub{
 		{
-			content: struct{ forward, reverse string }{
-				forward: `CREATE TABLE foos (id int);`,
-				reverse: `DROP TABLE foos;`,
-			},
+			content: queries.CreateFoos,
 			version: formattedTime("12340102030405"),
 		},
 		{
-			content: struct{ forward, reverse string }{
-				forward: `CREATE TABLE bars (id int);`,
-				reverse: `DROP TABLE bars;`,
-			},
+			content: queries.CreateBars,
 			version: formattedTime("23450102030405"),
 		},
 		{
-			content: struct{ forward, reverse string }{
-				forward: `ALTER TABLE foos ADD COLUMN a varchar(255);`,
-				reverse: `ALTER TABLE foos DROP COLUMN a;`,
-			},
+			content: queries.AlterFoos,
 			version: formattedTime("34560102030405"),
 		},
 	}

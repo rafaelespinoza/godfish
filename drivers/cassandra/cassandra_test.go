@@ -8,5 +8,20 @@ import (
 )
 
 func Test(t *testing.T) {
-	test.RunDriverTests(t, cassandra.NewDriver())
+	queries := test.Queries{
+		CreateFoos: test.MigrationContent{
+			Forward: "CREATE TABLE foos (id int PRIMARY KEY);",
+			Reverse: "DROP TABLE foos;",
+		},
+		CreateBars: test.MigrationContent{
+			Forward: "CREATE TABLE bars (id int PRIMARY KEY);",
+			Reverse: "DROP TABLE bars;",
+		},
+		AlterFoos: test.MigrationContent{
+			Forward: "ALTER TABLE foos ADD a varchar;",
+			Reverse: "ALTER TABLE foos DROP a;",
+		},
+	}
+
+	test.RunDriverTests(t, cassandra.NewDriver(), queries)
 }
