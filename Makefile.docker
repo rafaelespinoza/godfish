@@ -7,6 +7,8 @@ CI_DIR=./.ci
 #
 ci-cassandra-up: build-cassandra
 	docker-compose -f $(CI_DIR)/cassandra/docker-compose.yml -- up --exit-code-from client
+ci-mssqlserver-up: build-mssqlserver
+	docker-compose -f $(CI_DIR)/mssqlserver/docker-compose.yml -- up --exit-code-from client
 ci-mysql-up: build-mysql
 	docker-compose -f $(CI_DIR)/mysql/docker-compose.yml -- up --exit-code-from client
 ci-postgres-up: build-postgres
@@ -15,6 +17,8 @@ ci-sqlite3-up: build-sqlite3
 	docker container run --name=$(BASENAME)_sqlite3 -- $(BASENAME)/sqlite3
 ci-cassandra-down:
 	docker-compose -f $(CI_DIR)/cassandra/docker-compose.yml -- down --rmi all --volumes
+ci-mssqlserver-down:
+	docker-compose -f $(CI_DIR)/mssqlserver/docker-compose.yml -- down --rmi all --volumes
 ci-mysql-down:
 	docker-compose -f $(CI_DIR)/mysql/docker-compose.yml -- down --rmi all --volumes
 ci-postgres-down:
@@ -32,6 +36,9 @@ build-base:
 build-cassandra: build-base
 	docker image build -f $(CI_DIR)/cassandra/client.Dockerfile -t $(BASENAME)/cassandra/client $(BUILD_DIR)
 	docker image build -f $(CI_DIR)/cassandra/server.Dockerfile -t $(BASENAME)/cassandra/server $(BUILD_DIR)
+build-mssqlserver: build-base
+	docker image build -f $(CI_DIR)/mssqlserver/client.Dockerfile -t $(BASENAME)/mssqlserver/client $(BUILD_DIR)
+	docker image build -f $(CI_DIR)/mssqlserver/server.Dockerfile -t $(BASENAME)/mssqlserver/server $(BUILD_DIR)
 	rm -rf $(BUILD_DIR)
 build-mysql: build-base
 	docker image build -f $(CI_DIR)/mysql/client.Dockerfile -t $(BASENAME)/mysql/client $(BUILD_DIR)
@@ -51,6 +58,9 @@ build-sqlite3: build-base
 rm-cassandra:
 	docker container rm $(shell docker container ls -aq --filter ancestor=$(BASENAME)/cassandra/client)
 	docker container rm $(shell docker container ls -aq --filter ancestor=$(BASENAME)/cassandra/server)
+rm-mssqlserver:
+	docker container rm $(shell docker container ls -aq --filter ancestor=$(BASENAME)/mssqlserver/client)
+	docker container rm $(shell docker container ls -aq --filter ancestor=$(BASENAME)/mssqlserver/server)
 rm-mysql:
 	docker container rm $(shell docker container ls -aq --filter ancestor=$(BASENAME)/mysql/client)
 	docker container rm $(shell docker container ls -aq --filter ancestor=$(BASENAME)/mysql/server)
@@ -63,6 +73,9 @@ rm-sqlite3:
 rmi-cassandra:
 	docker image rmi $(shell docker image ls -aq $(BASENAME)/cassandra/client)
 	docker image rmi $(shell docker image ls -aq $(BASENAME)/cassandra/server)
+rmi-mssqlserver:
+	docker image rmi $(shell docker image ls -aq $(BASENAME)/mssqlserver/client)
+	docker image rmi $(shell docker image ls -aq $(BASENAME)/mssqlserver/server)
 rmi-mysql:
 	docker image rmi $(shell docker image ls -aq $(BASENAME)/mysql/client)
 	docker image rmi $(shell docker image ls -aq $(BASENAME)/mysql/server)

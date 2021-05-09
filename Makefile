@@ -36,6 +36,14 @@ postgres:
 postgres-test:
 	$(GO) test $(ARGS) ./drivers/postgres
 
+mssqlserver:
+	$(GO) build -o $(BIN) -v \
+		-ldflags "$(LDFLAGS) \
+		-X $(PKG_IMPORT_PATH)/internal/version.Driver=mssqlserver" \
+		./drivers/mssqlserver/godfish
+mssqlserver-test:
+	$(GO) test $(ARGS) ./drivers/mssqlserver
+
 mysql:
 	$(GO) build -o $(BIN) -v \
 		-ldflags "$(LDFLAGS) \

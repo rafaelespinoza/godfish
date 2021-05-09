@@ -1,0 +1,19 @@
+version: "3.9"
+
+services:
+    client:
+        image: godfish_test/mssqlserver/client:latest
+        container_name: godfish_ci_mssqlserver_client
+        depends_on:
+          - server
+        entrypoint: /client.sh
+        environment:
+            CGO_ENABLED: 0
+            DB_DSN: "sqlserver://sa:1_complicated_password!@server"
+        tty: true
+    server:
+        image: godfish_test/mssqlserver/server:latest
+        container_name: godfish_ci_mssqlserver_server
+        environment:
+            ACCEPT_EULA: '1'
+            SA_PASSWORD: '1_complicated_password!'
