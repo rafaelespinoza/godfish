@@ -8,37 +8,40 @@ import (
 	"github.com/rafaelespinoza/godfish"
 )
 
-type Driver struct {
+type driver struct {
 	appliedVersions godfish.AppliedVersions
 	err             error
 	errorOnExecute  error
 }
 
-var _ godfish.Driver = (*Driver)(nil)
+func NewDriver() godfish.Driver { return &driver{} }
 
-func (d *Driver) Name() string             { return "stub" }
-func (d *Driver) Connect(dsn string) error { return d.err }
-func (d *Driver) Close() error             { return d.err }
-func (d *Driver) CreateSchemaMigrationsTable() error {
+func (d *driver) Name() string             { return "stub" }
+func (d *driver) Connect(dsn string) error { return d.err }
+func (d *driver) Close() error             { return d.err }
+
+func (d *driver) CreateSchemaMigrationsTable() error {
 	if d.appliedVersions == nil {
-		d.appliedVersions = MakeAppliedVersions()
+		d.appliedVersions = NewAppliedVersions()
 	}
 	return d.err
 }
-func (d *Driver) Execute(q string, a ...interface{}) error {
+
+func (d *driver) Execute(q string, a ...interface{}) error {
 	if strings.Contains(q, "invalid SQL") {
 		return fmt.Errorf(q)
 	}
 	return d.errorOnExecute
 }
-func (d *Driver) UpdateSchemaMigrations(direction godfish.Direction, version string) error {
-	var stubbedAV *AppliedVersions
+
+func (d *driver) UpdateSchemaMigrations(direction godfish.Direction, version string) error {
+	var stubbedAV *appliedVersions
 	av, err := d.AppliedVersions()
 	if err != nil {
 		return err
 	}
 	switch val := av.(type) {
-	case *AppliedVersions:
+	case *appliedVersions:
 		stubbedAV = val
 	case nil:
 		return godfish.ErrSchemaMigrationsDoesNotExist
@@ -62,49 +65,20 @@ func (d *Driver) UpdateSchemaMigrations(direction godfish.Direction, version str
 	d.appliedVersions = stubbedAV
 	return nil
 }
-func (d *Driver) AppliedVersions() (godfish.AppliedVersions, error) {
+
+func (d *driver) AppliedVersions() (godfish.AppliedVersions, error) {
 	if d.appliedVersions == nil {
 		return nil, godfish.ErrSchemaMigrationsDoesNotExist
 	}
 	return d.appliedVersions, d.err
 }
 
-func (d *Driver) Teardown() {
-	d.appliedVersions = MakeAppliedVersions()
-}
-
-type AppliedVersions struct {
-	counter  int
-	versions []string
-}
-
-var _ godfish.AppliedVersions = (*AppliedVersions)(nil)
-
-func MakeAppliedVersions(migrations ...godfish.Migration) godfish.AppliedVersions {
-	out := AppliedVersions{
-		versions: make([]string, len(migrations)),
+// Teardown resets the stub driver in tests. All other Driver implementations
+// pass through without effect.
+func Teardown(drv godfish.Driver) {
+	d, ok := drv.(*driver)
+	if !ok {
+		return
 	}
-	for i, mig := range migrations {
-		out.versions[i] = mig.Version().String()
-	}
-	return &out
-}
-
-func (r *AppliedVersions) Close() error {
-	r.counter = 0
-	return nil
-}
-func (r *AppliedVersions) Next() bool { return r.counter < len(r.versions) }
-func (r *AppliedVersions) Scan(dest ...interface{}) error {
-	var out *string
-	if s, ok := dest[0].(*string); !ok {
-		return fmt.Errorf("pass in *string; got %T", s)
-	} else if !r.Next() {
-		return fmt.Errorf("no more results")
-	} else {
-		out = s
-	}
-	*out = r.versions[r.counter]
-	r.counter++
-	return nil
+	d.appliedVersions = NewAppliedVersions()
 }

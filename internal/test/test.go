@@ -93,13 +93,12 @@ func teardown(driver godfish.Driver, path string, tablesToDrop ...string) {
 			panic(err)
 		}
 	}
-	// keep the stub test driver simple, just reset it.
-	if d, ok := driver.(*stub.Driver); ok {
-		d.Teardown()
-	}
 
 	var truncate string
 	switch driver.Name() {
+	case "stub":
+		stub.Teardown(driver)
+		truncate = `TRUNCATE TABLE schema_migrations`
 	case "sqlite3":
 		truncate = `DELETE FROM schema_migrations`
 	default:
@@ -112,22 +111,7 @@ func teardown(driver godfish.Driver, path string, tablesToDrop ...string) {
 	driver.Close()
 }
 
-type formattedTime string
-
-func (v formattedTime) Before(u godfish.Version) bool {
-	w := u.(formattedTime) // potential panic intended, keep tests simple
-	return string(v) < string(w)
-}
-func (v formattedTime) String() string { return string(v) }
-func (v formattedTime) Value() int64 {
-	i, e := strconv.ParseInt(v.String()[:4], 10, 64)
-	if e != nil {
-		panic(e)
-	}
-	return i
-}
-
-var _ godfish.Version = (*formattedTime)(nil)
+func formattedTime(v string) godfish.Version { return stub.NewVersion(v) }
 
 // testDriverStub encompasses some data to use with interface tests.
 type testDriverStub struct {
@@ -136,32 +120,6 @@ type testDriverStub struct {
 	indirectives struct{ forward, reverse godfish.Indirection }
 	version      godfish.Version
 }
-
-// migrationStub is a godfish.Migration implementation that's used to override
-// the version field so that the generated filename is "unique".
-type migrationStub struct {
-	indirection godfish.Indirection
-	label       string
-	version     godfish.Version
-}
-
-var _ godfish.Migration = (*migrationStub)(nil)
-
-func newMigrationStub(mig godfish.Migration, version godfish.Version, ind godfish.Indirection) godfish.Migration {
-	stub := migrationStub{
-		indirection: mig.Indirection(),
-		label:       mig.Label(),
-		version:     version,
-	}
-	if ind.Label != "" {
-		stub.indirection.Label = ind.Label
-	}
-	return &stub
-}
-
-func (m *migrationStub) Indirection() godfish.Indirection { return m.indirection }
-func (m *migrationStub) Label() string                    { return m.label }
-func (m *migrationStub) Version() godfish.Version         { return m.version }
 
 func generateMigrationFiles(pathToTestDir string, stubs []testDriverStub) error {
 	for i, stub := range stubs {
@@ -220,6 +178,10 @@ func generateMigrationFiles(pathToTestDir string, stubs []testDriverStub) error 
 	}
 
 	return nil
+}
+
+func newMigrationStub(mig godfish.Migration, version godfish.Version, ind godfish.Indirection) godfish.Migration {
+	return stub.NewMigration(mig, version, ind)
 }
 
 // collectAppliedVersions uses the Driver's AppliedVersions method to retreive

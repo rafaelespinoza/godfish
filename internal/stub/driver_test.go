@@ -8,5 +8,5 @@ import (
 )
 
 func Test(t *testing.T) {
-	test.RunDriverTests(t, &stub.Driver{}, test.DefaultQueries)
+	test.RunDriverTests(t, stub.NewDriver(), test.DefaultQueries)
 }
