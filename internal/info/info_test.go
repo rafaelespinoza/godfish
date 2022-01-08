@@ -115,7 +115,7 @@ func mustMakeMigrations(names ...string) []godfish.Migration {
 	out := make([]godfish.Migration, len(names))
 
 	for i := 0; i < len(names); i++ {
-		params, err := godfish.NewMigrationParams(names[i], false, dir)
+		params, err := godfish.NewMigrationParams(names[i], false, dir, "", "")
 		if err != nil {
 			panic(err)
 		}

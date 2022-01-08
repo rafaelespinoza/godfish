@@ -125,9 +125,9 @@ func figureOutBasename(directoryPath string, direction Direction, version string
 
 	var directionNames []string
 	if direction == DirForward {
-		directionNames = forwardDirections
+		directionNames = ForwardDirections
 	} else if direction == DirReverse {
-		directionNames = reverseDirections
+		directionNames = ReverseDirections
 	}
 
 	for _, fn := range filenames {
@@ -228,7 +228,9 @@ func Info(driver Driver, directoryPath string, direction Direction, finishAtVers
 
 // Config is for various runtime settings.
 type Config struct {
-	PathToFiles string `json:"path_to_files"`
+	PathToFiles  string `json:"path_to_files"`
+	ForwardLabel string `json:"forward_label"`
+	ReverseLabel string `json:"reverse_label"`
 }
 
 // Init creates a configuration file at pathToFile unless it already exists.
@@ -433,13 +435,13 @@ func (m *migrationFinder) filter(applied, available []Migration) (out []Migratio
 					label:       mig.Label(),
 					version:     mig.Version(),
 				}
-				for i, fwd := range forwardDirections {
+				for i, fwd := range ForwardDirections {
 					// Another assumption, the filename format will never
 					// change. If it does change, for example: it is
 					// "${version}-${direction}-${label}", instead of
 					// "${direction}-${version}-${label}", then this won't work.
 					if mig.Indirection().Label == fwd {
-						mut.indirection.Label = reverseDirections[i]
+						mut.indirection.Label = ReverseDirections[i]
 						break
 					}
 				}

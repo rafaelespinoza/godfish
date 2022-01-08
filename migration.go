@@ -77,8 +77,10 @@ type MigrationParams struct {
 // NewMigrationParams constructs a MigrationParams that's ready to use. Passing
 // in true for reversible means that a complementary SQL file will be made for
 // rolling back. The dirpath is the path to the directory for the files. An
-// error is returned if dirpath doesn't actually represent a directory.
-func NewMigrationParams(label string, reversible bool, dirpath string) (*MigrationParams, error) {
+// error is returned if dirpath doesn't actually represent a directory. Names
+// for directions in the filename could be overridden from their default values
+// (forward and reverse) with the input vars fwdLabel, revLabel when non-empty.
+func NewMigrationParams(name string, reversible bool, dirpath, fwdLabel, revLabel string) (*MigrationParams, error) {
 	var (
 		err       error
 		info      os.FileInfo
@@ -100,17 +102,23 @@ func NewMigrationParams(label string, reversible bool, dirpath string) (*Migrati
 	now = time.Now().UTC()
 	version = timestamp{value: now.Unix(), label: now.Format(TimeFormat)}
 
+	if fwdLabel == "" {
+		fwdLabel = ForwardDirections[0]
+	}
+	if revLabel == "" {
+		revLabel = ReverseDirections[0]
+	}
 	return &MigrationParams{
 		Reversible: reversible,
 		Dirpath:    dirpath,
 		Forward: &mutation{
-			indirection: Indirection{Value: DirForward, Label: forwardDirections[0]},
-			label:       label,
+			indirection: Indirection{Value: DirForward, Label: fwdLabel},
+			label:       name,
 			version:     &version,
 		},
 		Reverse: &mutation{
-			indirection: Indirection{Value: DirReverse, Label: reverseDirections[0]},
-			label:       label,
+			indirection: Indirection{Value: DirReverse, Label: revLabel},
+			label:       name,
 			version:     &version,
 		},
 		directory: directory,
@@ -118,7 +126,7 @@ func NewMigrationParams(label string, reversible bool, dirpath string) (*Migrati
 }
 
 // GenerateFiles creates the migration files. If the migration is reversible it
-// generates files in forward and reverse directions; otherwise is generates
+// generates files in forward and reverse directions; otherwise it generates
 // just one migration file in the forward direction. It closes each file handle
 // when it's done.
 func (m *MigrationParams) GenerateFiles() (err error) {

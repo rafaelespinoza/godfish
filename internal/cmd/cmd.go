@@ -14,10 +14,12 @@ import (
 )
 
 var (
-	// commonArgs are flag inputs for use in any subcommand.
+	// commonArgs values are read from a configuration file, if available. The
+	// subcommand code is written so that flag values may take precedence over
+	// values in here.
 	commonArgs struct {
-		Conf  string
-		Files string
+		Files                            string
+		DefaultFwdLabel, DefaultRevLabel string
 	}
 	// bin is the name of the binary.
 	bin = os.Args[0]
@@ -87,7 +89,8 @@ Examples:
 			strings.Join(del.DescribeSubcommands(), "\n\t"), bin)
 	}
 
-	rootFlags.StringVar(&commonArgs.Conf, "conf", ".godfish.json", "path to godfish config file")
+	var pathToConfig string
+	rootFlags.StringVar(&pathToConfig, "conf", ".godfish.json", "path to godfish config file")
 	rootFlags.StringVar(
 		&commonArgs.Files,
 		"files",
@@ -102,7 +105,7 @@ Examples:
 			// Look for config file and if present, merge those values with
 			// input flag values.
 			var conf godfish.Config
-			if data, ierr := os.ReadFile(commonArgs.Conf); ierr != nil {
+			if data, ierr := os.ReadFile(pathToConfig); ierr != nil {
 				// probably no config file present, rely on arguments instead.
 			} else if ierr = json.Unmarshal(data, &conf); ierr != nil {
 				return ierr
@@ -110,6 +113,10 @@ Examples:
 			if commonArgs.Files == "" && conf.PathToFiles != "" {
 				commonArgs.Files = conf.PathToFiles
 			}
+
+			// Subcommands may override these with their own flags.
+			commonArgs.DefaultFwdLabel = conf.ForwardLabel
+			commonArgs.DefaultRevLabel = conf.ReverseLabel
 
 			return nil
 		},

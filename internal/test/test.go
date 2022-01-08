@@ -133,7 +133,7 @@ func generateMigrationFiles(pathToTestDir string, stubs []testDriverStub) error 
 			panic(fmt.Errorf("test setup should have content in forward direction"))
 		}
 
-		if params, err = godfish.NewMigrationParams(strconv.Itoa(i), reversible, pathToTestDir); err != nil {
+		if params, err = godfish.NewMigrationParams(strconv.Itoa(i), reversible, pathToTestDir, "", ""); err != nil {
 			return err
 		}
 

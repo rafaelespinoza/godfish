@@ -17,17 +17,18 @@ const (
 )
 
 func (d Direction) String() string {
-	return [...]string{"Unknown", "Forward", "Reverse"}[d]
+	return [...]string{"unknown", "forward", "reverse"}[d]
 }
 
+// Allowed names for directions in migration filenames.
 var (
-	forwardDirections = []string{
-		strings.ToLower(DirForward.String()),
+	ForwardDirections = []string{
+		"forward",
 		"migrate",
 		"up",
 	}
-	reverseDirections = []string{
-		strings.ToLower(DirReverse.String()),
+	ReverseDirections = []string{
+		"reverse",
 		"rollback",
 		"down",
 	}
@@ -42,14 +43,14 @@ type Indirection struct {
 
 func parseIndirection(basename string) (ind Indirection) {
 	lo := strings.ToLower(basename)
-	for _, pre := range forwardDirections {
+	for _, pre := range ForwardDirections {
 		if strings.HasPrefix(lo, pre) {
 			ind.Value = DirForward
 			ind.Label = pre
 			return
 		}
 	}
-	for _, pre := range reverseDirections {
+	for _, pre := range ReverseDirections {
 		if strings.HasPrefix(lo, pre) {
 			ind.Value = DirReverse
 			ind.Label = pre
