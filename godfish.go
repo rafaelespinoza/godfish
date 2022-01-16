@@ -186,7 +186,7 @@ func runMigration(driver Driver, pathToFile string, mig internal.Migration) (err
 	if mig.Indirection().Value == internal.DirReverse {
 		gerund = "rolling back"
 	}
-	fmt.Printf("%s version %q ... ", gerund, mig.Version().String())
+	fmt.Fprintf(os.Stderr, "%s version %q ... ", gerund, mig.Version().String())
 
 	if err = driver.Execute(string(data)); err != nil {
 		err = &runMigrationError{
@@ -204,7 +204,7 @@ func runMigration(driver Driver, pathToFile string, mig internal.Migration) (err
 		mig.Version().String(),
 	)
 	if err == nil {
-		fmt.Println("ok")
+		fmt.Fprintln(os.Stderr, "ok")
 	}
 	return
 }
@@ -252,7 +252,7 @@ func choosePrinter(format string, w io.Writer) (out internal.InfoPrinter) {
 func Init(pathToFile string) (err error) {
 	_, err = os.Stat(pathToFile)
 	if err == nil {
-		fmt.Printf("config file %q already present\n", pathToFile)
+		fmt.Fprintf(os.Stderr, "config file %q already present\n", pathToFile)
 		return nil
 	}
 	if !os.IsNotExist(err) {
@@ -363,7 +363,7 @@ func (m *migrationFinder) available() (out []internal.Migration, err error) {
 	for _, fn := range filenames {
 		mig, ierr := internal.ParseMigration(internal.Filename(fn))
 		if errors.Is(ierr, internal.ErrDataInvalid) {
-			fmt.Println(ierr)
+			fmt.Fprintln(os.Stderr, ierr)
 			continue
 		} else if ierr != nil {
 			err = ierr

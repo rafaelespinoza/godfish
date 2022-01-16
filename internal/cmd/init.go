@@ -15,7 +15,7 @@ func makeInit(name string) alf.Directive {
 	return &alf.Command{
 		Description: "create godfish configuration file",
 		Setup: func(p flag.FlagSet) *flag.FlagSet {
-			flags := flag.NewFlagSet(name, flag.ExitOnError)
+			flags := newFlagSet(name)
 			flags.StringVar(
 				&conf,
 				"conf",
@@ -23,7 +23,7 @@ func makeInit(name string) alf.Directive {
 				"path to godfish config file",
 			)
 			flags.Usage = func() {
-				fmt.Printf(`Usage: %s [godfish-flags] %s [%s-flags]
+				fmt.Fprintf(flags.Output(), `Usage: %s [godfish-flags] %s [%s-flags]
 
 	Creates a configuration file, unless it already exists.
 `,

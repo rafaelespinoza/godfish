@@ -16,7 +16,7 @@ func makeMigrate(name string) alf.Directive {
 	return &alf.Command{
 		Description: "execute migration(s) in the forward direction",
 		Setup: func(p flag.FlagSet) *flag.FlagSet {
-			flags := flag.NewFlagSet(name, flag.ExitOnError)
+			flags := newFlagSet(name)
 			flags.StringVar(
 				&version,
 				"version",
@@ -24,7 +24,7 @@ func makeMigrate(name string) alf.Directive {
 				fmt.Sprintf("timestamp of migration, format: %s", internal.TimeFormat),
 			)
 			flags.Usage = func() {
-				fmt.Printf(`Usage: %s [godfish-flags] %s [%s-flags]
+				fmt.Fprintf(flags.Output(), `Usage: %s [godfish-flags] %s [%s-flags]
 
 	Execute migration(s) in the forward direction. If the "version" is left
 	unspecified, then all available migrations are executed. Otherwise,
@@ -57,9 +57,9 @@ func makeRemigrate(name string) alf.Directive {
 	return &alf.Command{
 		Description: "rollback and then re-apply the last migration",
 		Setup: func(p flag.FlagSet) *flag.FlagSet {
-			flags := flag.NewFlagSet(name, flag.ExitOnError)
+			flags := newFlagSet(name)
 			flags.Usage = func() {
-				fmt.Printf(`Usage: %s [godfish-flags] %s [%s-flags]
+				fmt.Fprintf(flags.Output(), `Usage: %s [godfish-flags] %s [%s-flags]
 
 	Execute the last migration in reverse (rollback) and then execute the same
 	one forward. This could be useful for development.
@@ -89,7 +89,7 @@ func makeRollback(name string) alf.Directive {
 	return &alf.Command{
 		Description: "execute migration(s) in the reverse direction",
 		Setup: func(p flag.FlagSet) *flag.FlagSet {
-			flags := flag.NewFlagSet(name, flag.ExitOnError)
+			flags := newFlagSet(name)
 			flags.StringVar(
 				&version,
 				"version",
@@ -97,7 +97,7 @@ func makeRollback(name string) alf.Directive {
 				fmt.Sprintf("timestamp of migration, format: %s", internal.TimeFormat),
 			)
 			flags.Usage = func() {
-				fmt.Printf(`Usage: %s [godfish-flags] %s [%s-flags]
+				fmt.Fprintf(flags.Output(), `Usage: %s [godfish-flags] %s [%s-flags]
 
 	Execute migration(s) in the reverse direction. If the "version" is left
 	unspecified, then only the first available migration is executed. Otherwise,

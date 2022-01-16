@@ -118,18 +118,18 @@ func (m *MigrationParams) GenerateFiles() (err error) {
 	if forwardFile, err = newMigrationFile(m.Forward, m.Dirpath); err != nil {
 		return
 	}
-	fmt.Println("created forward file:", forwardFile.Name())
+	fmt.Fprintln(os.Stderr, "created forward file:", forwardFile.Name())
 	defer forwardFile.Close()
 
 	if !m.Reversible {
-		fmt.Println("migration marked irreversible, did not create reverse file")
+		fmt.Fprintln(os.Stderr, "migration marked irreversible, did not create reverse file")
 		return
 	}
 
 	if reverseFile, err = newMigrationFile(m.Reverse, m.Dirpath); err != nil {
 		return
 	}
-	fmt.Println("created reverse file:", reverseFile.Name())
+	fmt.Fprintln(os.Stderr, "created reverse file:", reverseFile.Name())
 	defer reverseFile.Close()
 	return
 }

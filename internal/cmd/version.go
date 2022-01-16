@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"os"
 
 	"github.com/rafaelespinoza/alf"
 )
@@ -26,10 +27,10 @@ func makeVersion(name string) alf.Directive {
 	return &alf.Command{
 		Description: "show metadata about the build",
 		Setup: func(p flag.FlagSet) *flag.FlagSet {
-			flags := flag.NewFlagSet(name, flag.ExitOnError)
+			flags := newFlagSet(name)
 			flags.BoolVar(&formatJSON, "json", false, "format output as JSON")
 			flags.Usage = func() {
-				fmt.Printf(`Usage: %s [flags]
+				fmt.Fprintf(flags.Output(), `Usage: %s [flags]
 
 	Prints some versioning info to stdout. Pass the -json flag to get JSON.
 `,
@@ -40,13 +41,16 @@ func makeVersion(name string) alf.Directive {
 			return flags
 		},
 		Run: func(_ context.Context) error {
+			// Calling fmt.Print* also writes to stdout, but want to be explicit
+			// about where this subcommand output goes.
+			w := os.Stdout
 			if !formatJSON {
-				fmt.Printf("BranchName:	%s\n", versionBranchName)
-				fmt.Printf("BuildTime: 	%s\n", versionBuildTime)
-				fmt.Printf("Driver: 	%s\n", versionDriver)
-				fmt.Printf("CommitHash:	%s\n", versionCommitHash)
-				fmt.Printf("GoVersion: 	%s\n", versionGoVersion)
-				fmt.Printf("Tag:		%s\n", versionTag)
+				fmt.Fprintf(w, "BranchName:	%s\n", versionBranchName)
+				fmt.Fprintf(w, "BuildTime: 	%s\n", versionBuildTime)
+				fmt.Fprintf(w, "Driver: 	%s\n", versionDriver)
+				fmt.Fprintf(w, "CommitHash:	%s\n", versionCommitHash)
+				fmt.Fprintf(w, "GoVersion: 	%s\n", versionGoVersion)
+				fmt.Fprintf(w, "Tag:		%s\n", versionTag)
 				return nil
 			}
 			out, err := json.Marshal(
@@ -62,7 +66,7 @@ func makeVersion(name string) alf.Directive {
 			if err != nil {
 				return err
 			}
-			fmt.Printf("%s\n", out)
+			fmt.Fprintf(w, "%s\n", out)
 			return nil
 		},
 	}

@@ -18,7 +18,7 @@ func makeInfo(name string) alf.Directive {
 	return &alf.Command{
 		Description: "output applied migrations, migrations to apply",
 		Setup: func(p flag.FlagSet) *flag.FlagSet {
-			flags := flag.NewFlagSet(name, flag.ExitOnError)
+			flags := newFlagSet(name)
 			flags.StringVar(
 				&direction,
 				"direction",
@@ -38,7 +38,7 @@ func makeInfo(name string) alf.Directive {
 				fmt.Sprintf("timestamp of migration, format: %s", internal.TimeFormat),
 			)
 			flags.Usage = func() {
-				fmt.Printf(`Usage: %s [godfish-flags] %s [%s-flags]
+				fmt.Fprintf(flags.Output(), `Usage: %s [godfish-flags] %s [%s-flags]
 
 	List applied migrations, preview migrations to apply.
 

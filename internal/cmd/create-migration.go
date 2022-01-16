@@ -18,7 +18,7 @@ func makeCreateMigration(subcmdName string) alf.Directive {
 
 	// Other subcommands scope the flagset within the Setup func. However, this
 	// one is scoped up here to check if some flags were specified at runtime.
-	flags := flag.NewFlagSet(subcmdName, flag.ExitOnError)
+	flags := newFlagSet(subcmdName)
 
 	return &alf.Command{
 		Description: "generate migration files",
@@ -48,7 +48,7 @@ func makeCreateMigration(subcmdName string) alf.Directive {
 				"customize the directional part of the filename for reverse migration",
 			)
 			flags.Usage = func() {
-				fmt.Printf(`Usage: %s [godfish-flags] %s [%s-flags]
+				fmt.Fprintf(flags.Output(), `Usage: %s [godfish-flags] %s [%s-flags]
 
 	Generate migration files: one meant for the "forward" direction,
 	another meant for "reverse". Optionally create a migration in the forward

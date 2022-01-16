@@ -50,7 +50,7 @@ func New(driver godfish.Driver) Root {
 		},
 	}
 
-	rootFlags := flag.NewFlagSet("godfish", flag.ExitOnError)
+	rootFlags := newFlagSet("godfish")
 	rootFlags.Usage = func() {
 		fmt.Fprintf(rootFlags.Output(), `Usage:
 
@@ -124,9 +124,15 @@ Examples:
 	}
 }
 
+func newFlagSet(name string) (out *flag.FlagSet) {
+	out = flag.NewFlagSet(name, flag.ExitOnError)
+	out.SetOutput(os.Stdout)
+	return
+}
+
 // printFlagDefaults calls PrintDefaults on f. It helps make help message
 // formatting more consistent.
 func printFlagDefaults(f *flag.FlagSet) {
-	fmt.Printf("\n%s flags:\n\n", f.Name())
+	fmt.Fprintf(f.Output(), "\n%s flags:\n\n", f.Name())
 	f.PrintDefaults()
 }
