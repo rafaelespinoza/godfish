@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/rafaelespinoza/godfish"
+	"github.com/rafaelespinoza/godfish/internal"
 )
 
 func testApplyMigration(t *testing.T, driver godfish.Driver, queries Queries) {
@@ -19,7 +20,7 @@ func testApplyMigration(t *testing.T, driver godfish.Driver, queries Queries) {
 	// testInput is passed to ApplyMigration.
 	type testInput struct {
 		// direction is the direction to migrate.
-		direction godfish.Direction
+		direction internal.Direction
 		// version is where to go when calling ApplyMigration.
 		version string
 	}
@@ -42,7 +43,7 @@ func testApplyMigration(t *testing.T, driver godfish.Driver, queries Queries) {
 		}
 		defer teardown(driver, pathToFiles, "foos", "bars")
 
-		err = godfish.ApplyMigration(driver, pathToFiles, input.direction, input.version)
+		err = godfish.ApplyMigration(driver, pathToFiles, input.direction == internal.DirForward, input.version)
 		if err != nil && !expected.err {
 			t.Errorf("could not apply migration; %v", err)
 			return
@@ -84,7 +85,7 @@ func testApplyMigration(t *testing.T, driver godfish.Driver, queries Queries) {
 				stubs: []testDriverStub{},
 			},
 			testInput{
-				direction: godfish.DirForward,
+				direction: internal.DirForward,
 				version:   "",
 			},
 			expectedOutput{
@@ -99,7 +100,7 @@ func testApplyMigration(t *testing.T, driver godfish.Driver, queries Queries) {
 				stubs: []testDriverStub{},
 			},
 			testInput{
-				direction: godfish.DirReverse,
+				direction: internal.DirReverse,
 				version:   "",
 			},
 			expectedOutput{
@@ -117,7 +118,7 @@ func testApplyMigration(t *testing.T, driver godfish.Driver, queries Queries) {
 				stubs:     defaultStubs,
 			},
 			testInput{
-				direction: godfish.DirForward,
+				direction: internal.DirForward,
 				version:   "",
 			},
 			expectedOutput{
@@ -132,7 +133,7 @@ func testApplyMigration(t *testing.T, driver godfish.Driver, queries Queries) {
 				stubs:     defaultStubs,
 			},
 			testInput{
-				direction: godfish.DirReverse,
+				direction: internal.DirReverse,
 				version:   "",
 			},
 			expectedOutput{
@@ -151,7 +152,7 @@ func testApplyMigration(t *testing.T, driver godfish.Driver, queries Queries) {
 					stubs:     defaultStubs,
 				},
 				testInput{
-					direction: godfish.DirForward,
+					direction: internal.DirForward,
 					version:   "",
 				},
 				expectedOutput{
@@ -166,7 +167,7 @@ func testApplyMigration(t *testing.T, driver godfish.Driver, queries Queries) {
 					stubs:     defaultStubs,
 				},
 				testInput{
-					direction: godfish.DirForward,
+					direction: internal.DirForward,
 					version:   "",
 				},
 				expectedOutput{
@@ -181,7 +182,7 @@ func testApplyMigration(t *testing.T, driver godfish.Driver, queries Queries) {
 					stubs:     defaultStubs,
 				},
 				testInput{
-					direction: godfish.DirForward,
+					direction: internal.DirForward,
 					version:   "",
 				},
 				expectedOutput{
@@ -199,7 +200,7 @@ func testApplyMigration(t *testing.T, driver godfish.Driver, queries Queries) {
 					stubs:     defaultStubs,
 				},
 				testInput{
-					direction: godfish.DirReverse,
+					direction: internal.DirReverse,
 					version:   "23450102030405",
 				},
 				expectedOutput{
@@ -214,7 +215,7 @@ func testApplyMigration(t *testing.T, driver godfish.Driver, queries Queries) {
 					stubs:     defaultStubs,
 				},
 				testInput{
-					direction: godfish.DirReverse,
+					direction: internal.DirReverse,
 					version:   "",
 				},
 				expectedOutput{
@@ -245,7 +246,7 @@ func testApplyMigration(t *testing.T, driver godfish.Driver, queries Queries) {
 					},
 				},
 				testInput{
-					direction: godfish.DirReverse,
+					direction: internal.DirReverse,
 					version:   "",
 				},
 				expectedOutput{
@@ -278,7 +279,7 @@ func testApplyMigration(t *testing.T, driver godfish.Driver, queries Queries) {
 				},
 			},
 			testInput{
-				direction: godfish.DirReverse,
+				direction: internal.DirReverse,
 				version:   "34560102030405",
 			},
 			expectedOutput{
@@ -313,7 +314,7 @@ func testApplyMigration(t *testing.T, driver godfish.Driver, queries Queries) {
 				stubs:     stubs,
 			},
 			testInput{
-				direction: godfish.DirForward,
+				direction: internal.DirForward,
 				version:   "43210102030405",
 			},
 			expectedOutput{
@@ -329,7 +330,7 @@ func testApplyMigration(t *testing.T, driver godfish.Driver, queries Queries) {
 				stubs:     stubs,
 			},
 			testInput{
-				direction: godfish.DirReverse,
+				direction: internal.DirReverse,
 				version:   "43210102030405",
 			},
 			expectedOutput{
@@ -347,7 +348,7 @@ func testApplyMigration(t *testing.T, driver godfish.Driver, queries Queries) {
 				stubs:     stubs,
 			},
 			testInput{
-				direction: godfish.DirReverse,
+				direction: internal.DirReverse,
 				version:   "34560102030405",
 			},
 			expectedOutput{
@@ -365,7 +366,7 @@ func testApplyMigration(t *testing.T, driver godfish.Driver, queries Queries) {
 				stubs:     stubs,
 			},
 			testInput{
-				direction: godfish.DirReverse,
+				direction: internal.DirReverse,
 				version:   "12340102030405",
 			},
 			expectedOutput{
@@ -391,7 +392,7 @@ func testApplyMigration(t *testing.T, driver godfish.Driver, queries Queries) {
 				}),
 			},
 			testInput{
-				direction: godfish.DirForward,
+				direction: internal.DirForward,
 				version:   "45670102030405",
 			},
 			expectedOutput{
@@ -422,7 +423,7 @@ func testApplyMigration(t *testing.T, driver godfish.Driver, queries Queries) {
 				},
 			},
 			testInput{
-				direction: godfish.DirForward,
+				direction: internal.DirForward,
 				version:   "3456",
 			},
 			expectedOutput{
@@ -454,7 +455,7 @@ func testApplyMigration(t *testing.T, driver godfish.Driver, queries Queries) {
 				},
 			},
 			testInput{
-				direction: godfish.DirForward,
+				direction: internal.DirForward,
 				version:   "12340102030405",
 			},
 			expectedOutput{
@@ -481,7 +482,7 @@ func testApplyMigration(t *testing.T, driver godfish.Driver, queries Queries) {
 				},
 			},
 			testInput{
-				direction: godfish.DirForward,
+				direction: internal.DirForward,
 				version:   "12340102030405",
 			},
 			expectedOutput{
@@ -496,9 +497,9 @@ func testApplyMigration(t *testing.T, driver godfish.Driver, queries Queries) {
 			var stubs = []testDriverStub{
 				{
 					content: queries.CreateFoos,
-					indirectives: struct{ forward, reverse godfish.Indirection }{
-						forward: godfish.Indirection{Label: "migrate"},
-						reverse: godfish.Indirection{Label: "rollback"},
+					indirectives: struct{ forward, reverse internal.Indirection }{
+						forward: internal.Indirection{Label: "migrate"},
+						reverse: internal.Indirection{Label: "rollback"},
 					},
 					version: formattedTime("12340102030405"),
 				},
@@ -511,7 +512,7 @@ func testApplyMigration(t *testing.T, driver godfish.Driver, queries Queries) {
 					stubs:     stubs,
 				},
 				testInput{
-					direction: godfish.DirForward,
+					direction: internal.DirForward,
 					version:   "12340102030405",
 				},
 				expectedOutput{
@@ -526,7 +527,7 @@ func testApplyMigration(t *testing.T, driver godfish.Driver, queries Queries) {
 					stubs:     stubs,
 				},
 				testInput{
-					direction: godfish.DirReverse,
+					direction: internal.DirReverse,
 					version:   "12340102030405",
 				},
 				expectedOutput{
@@ -539,9 +540,9 @@ func testApplyMigration(t *testing.T, driver godfish.Driver, queries Queries) {
 			var stubs = []testDriverStub{
 				{
 					content: queries.CreateFoos,
-					indirectives: struct{ forward, reverse godfish.Indirection }{
-						forward: godfish.Indirection{Label: "up"},
-						reverse: godfish.Indirection{Label: "down"},
+					indirectives: struct{ forward, reverse internal.Indirection }{
+						forward: internal.Indirection{Label: "up"},
+						reverse: internal.Indirection{Label: "down"},
 					},
 					version: formattedTime("12340102030405"),
 				},
@@ -554,7 +555,7 @@ func testApplyMigration(t *testing.T, driver godfish.Driver, queries Queries) {
 					stubs:     stubs,
 				},
 				testInput{
-					direction: godfish.DirForward,
+					direction: internal.DirForward,
 					version:   "12340102030405",
 				},
 				expectedOutput{
@@ -569,7 +570,7 @@ func testApplyMigration(t *testing.T, driver godfish.Driver, queries Queries) {
 					stubs:     stubs,
 				},
 				testInput{
-					direction: godfish.DirReverse,
+					direction: internal.DirReverse,
 					version:   "12340102030405",
 				},
 				expectedOutput{

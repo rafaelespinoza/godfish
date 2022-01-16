@@ -8,6 +8,7 @@ import (
 
 	"github.com/rafaelespinoza/alf"
 	"github.com/rafaelespinoza/godfish"
+	"github.com/rafaelespinoza/godfish/internal"
 )
 
 func makeCreateMigration(subcmdName string) alf.Directive {
@@ -37,13 +38,13 @@ func makeCreateMigration(subcmdName string) alf.Directive {
 			flags.StringVar(
 				&fwdlabelValue,
 				fwdlabelFlagname,
-				godfish.ForwardDirections[0],
+				internal.ForwardDirections[0],
 				"customize the directional part of the filename for forward migration",
 			)
 			flags.StringVar(
 				&revlabelValue,
 				revlabelFlagname,
-				godfish.ReverseDirections[0],
+				internal.ReverseDirections[0],
 				"customize the directional part of the filename for reverse migration",
 			)
 			flags.Usage = func() {
@@ -59,9 +60,9 @@ func makeCreateMigration(subcmdName string) alf.Directive {
 	- %s
 	- %s
 `,
-					bin, subcmdName, subcmdName, godfish.TimeFormat,
+					bin, subcmdName, subcmdName, internal.TimeFormat,
 					fwdlabelFlagname, revlabelFlagname,
-					strings.Join(godfish.ForwardDirections, ", "), strings.Join(godfish.ReverseDirections, ", "),
+					strings.Join(internal.ForwardDirections, ", "), strings.Join(internal.ReverseDirections, ", "),
 				)
 				printFlagDefaults(&p)
 				printFlagDefaults(flags)
@@ -90,37 +91,7 @@ func makeCreateMigration(subcmdName string) alf.Directive {
 				revlabelValue = commonArgs.DefaultRevLabel
 			}
 
-			// Should also consider values from the config file, so validate
-			// after allowing it the opportunity to set variable values.
-			if err := validateDirectionLabel(godfish.ForwardDirections, fwdlabelFlagname, fwdlabelValue); err != nil {
-				return err
-			}
-			if err := validateDirectionLabel(godfish.ReverseDirections, revlabelFlagname, revlabelValue); err != nil {
-				return err
-			}
-
-			migration, err := godfish.NewMigrationParams(migrationName, reversible, commonArgs.Files, fwdlabelValue, revlabelValue)
-			if err != nil {
-				return err
-			}
-			return migration.GenerateFiles()
+			return godfish.CreateMigrationFiles(migrationName, reversible, commonArgs.Files, fwdlabelValue, revlabelValue)
 		},
 	}
-}
-
-func validateDirectionLabel(okVals []string, flagName, flagVal string) (err error) {
-	var ok bool
-	for _, okVal := range okVals {
-		if flagVal == okVal {
-			ok = true
-			break
-		}
-	}
-	if !ok {
-		err = fmt.Errorf(
-			"invalid value (%q) for flag %q; should be one of: %s",
-			flagVal, flagName, strings.Join(okVals, ", "),
-		)
-	}
-	return
 }

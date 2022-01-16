@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/rafaelespinoza/godfish"
+	"github.com/rafaelespinoza/godfish/internal"
 	"github.com/rafaelespinoza/godfish/internal/stub"
 )
 
@@ -76,7 +77,7 @@ func setup(driver godfish.Driver, testName string, stubs []testDriverStub, migra
 		return
 	}
 	if migrateTo != skipMigration {
-		err = godfish.Migrate(driver, path, godfish.DirForward, migrateTo)
+		err = godfish.Migrate(driver, path, true, migrateTo)
 	}
 	return
 }
@@ -111,21 +112,18 @@ func teardown(driver godfish.Driver, path string, tablesToDrop ...string) {
 	driver.Close()
 }
 
-func formattedTime(v string) godfish.Version { return stub.NewVersion(v) }
+func formattedTime(v string) internal.Version { return stub.NewVersion(v) }
 
 // testDriverStub encompasses some data to use with interface tests.
 type testDriverStub struct {
-	migration    godfish.Migration
+	migration    internal.Migration
 	content      MigrationContent
-	indirectives struct{ forward, reverse godfish.Indirection }
-	version      godfish.Version
+	indirectives struct{ forward, reverse internal.Indirection }
+	version      internal.Version
 }
 
 func generateMigrationFiles(pathToTestDir string, stubs []testDriverStub) error {
 	for i, stub := range stubs {
-		var err error
-		var params *godfish.MigrationParams
-
 		var reversible bool
 		if stub.content.Forward != "" && stub.content.Reverse != "" {
 			reversible = true
@@ -133,21 +131,23 @@ func generateMigrationFiles(pathToTestDir string, stubs []testDriverStub) error 
 			panic(fmt.Errorf("test setup should have content in forward direction"))
 		}
 
-		if params, err = godfish.NewMigrationParams(strconv.Itoa(i), reversible, pathToTestDir, "", ""); err != nil {
+		fwd, rev := stub.indirectives.forward, stub.indirectives.reverse
+		params, err := internal.NewMigrationParams(strconv.Itoa(i), reversible, pathToTestDir, fwd.Label, rev.Label)
+		if err != nil {
 			return err
 		}
 
-		// replace migrations before generating files, to maintain control of
+		// replace migrations before generating files to maintain control of
 		// the timestamps, filenames, and migration content.
-		params.Forward = newMigrationStub(params.Forward, stub.version, stub.indirectives.forward)
+		params.Forward = newMigrationStub(params.Forward, stub.version, fwd)
 		if params.Reversible {
-			params.Reverse = newMigrationStub(params.Reverse, stub.version, stub.indirectives.reverse)
+			params.Reverse = newMigrationStub(params.Reverse, stub.version, rev)
 		}
 		if err = params.GenerateFiles(); err != nil {
 			return err
 		}
 
-		for j, mig := range []godfish.Migration{params.Forward, params.Reverse} {
+		for j, mig := range []internal.Migration{params.Forward, params.Reverse} {
 			if j > 0 && !params.Reversible {
 				continue
 			}
@@ -180,7 +180,7 @@ func generateMigrationFiles(pathToTestDir string, stubs []testDriverStub) error 
 	return nil
 }
 
-func newMigrationStub(mig godfish.Migration, version godfish.Version, ind godfish.Indirection) godfish.Migration {
+func newMigrationStub(mig internal.Migration, version internal.Version, ind internal.Indirection) internal.Migration {
 	return stub.NewMigration(mig, version, ind)
 }
 

@@ -3,15 +3,15 @@ package stub
 import (
 	"strconv"
 
-	"github.com/rafaelespinoza/godfish"
+	"github.com/rafaelespinoza/godfish/internal"
 )
 
 type version string
 
 // NewVersion converts the input to a Version for testing purposes.
-func NewVersion(v string) godfish.Version { return version(v) }
+func NewVersion(v string) internal.Version { return version(v) }
 
-func (v version) Before(u godfish.Version) bool {
+func (v version) Before(u internal.Version) bool {
 	w := u.(version) // potential panic intended, keep tests simple
 	return string(v) < string(w)
 }

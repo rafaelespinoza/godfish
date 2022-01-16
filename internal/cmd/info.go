@@ -4,13 +4,12 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"io"
 	"os"
 	"strings"
 
 	"github.com/rafaelespinoza/alf"
 	"github.com/rafaelespinoza/godfish"
-	"github.com/rafaelespinoza/godfish/internal/info"
+	"github.com/rafaelespinoza/godfish/internal"
 )
 
 func makeInfo(name string) alf.Directive {
@@ -36,7 +35,7 @@ func makeInfo(name string) alf.Directive {
 				&version,
 				"version",
 				"",
-				fmt.Sprintf("timestamp of migration, format: %s", godfish.TimeFormat),
+				fmt.Sprintf("timestamp of migration, format: %s", internal.TimeFormat),
 			)
 			flags.Usage = func() {
 				fmt.Printf(`Usage: %s [godfish-flags] %s [%s-flags]
@@ -63,31 +62,17 @@ func makeInfo(name string) alf.Directive {
 			return flags
 		},
 		Run: func(_ context.Context) error {
-			direction := whichDirection(direction)
-			printer := choosePrinter(format, os.Stdout)
-			return godfish.Info(theDriver, commonArgs.Files, direction, version, printer)
+			return godfish.Info(theDriver, commonArgs.Files, forward(direction), version, os.Stdout, format)
 		},
 	}
 }
 
-func whichDirection(input string) (direction godfish.Direction) {
-	direction = godfish.DirForward
+func forward(input string) bool {
 	d := strings.ToLower(input)
-	if strings.HasPrefix(d, "rev") || strings.HasPrefix(d, "back") {
-		direction = godfish.DirReverse
+	for _, prefix := range []string{"rev", "roll", "back", "down"} {
+		if strings.HasPrefix(d, prefix) {
+			return false
+		}
 	}
-	return
-}
-
-func choosePrinter(format string, w io.Writer) (printer godfish.InfoPrinter) {
-	if format == "json" {
-		printer = info.NewJSON(w)
-		return
-	}
-
-	if format != "tsv" && format != "" {
-		fmt.Fprintf(os.Stderr, "unknown format %q, defaulting to tsv\n", format)
-	}
-	printer = info.NewTSV(w)
-	return
+	return true
 }

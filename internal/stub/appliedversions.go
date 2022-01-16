@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/rafaelespinoza/godfish"
+	"github.com/rafaelespinoza/godfish/internal"
 )
 
 type appliedVersions struct {
@@ -13,7 +14,7 @@ type appliedVersions struct {
 
 // NewAppliedVersions constructs an in-memory AppliedVersions implementation for
 // testing purposes.
-func NewAppliedVersions(migrations ...godfish.Migration) godfish.AppliedVersions {
+func NewAppliedVersions(migrations ...internal.Migration) godfish.AppliedVersions {
 	out := appliedVersions{
 		versions: make([]string, len(migrations)),
 	}

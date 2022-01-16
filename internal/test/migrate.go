@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/rafaelespinoza/godfish"
+	"github.com/rafaelespinoza/godfish/internal"
 )
 
 func testMigrate(t *testing.T, driver godfish.Driver, queries Queries) {
@@ -31,9 +32,9 @@ func testMigrate(t *testing.T, driver godfish.Driver, queries Queries) {
 	// affect other tests.
 	defer teardown(driver, path, "foos", "bars")
 
-	err = godfish.Migrate(driver, path, godfish.DirForward, "")
+	err = godfish.Migrate(driver, path, true, "")
 	if err != nil {
-		t.Errorf("could not Migrate in %s Direction; %v", godfish.DirForward, err)
+		t.Errorf("could not Migrate in %s Direction; %v", internal.DirForward, err)
 	}
 
 	appliedVersions, err := collectAppliedVersions(driver)
@@ -46,9 +47,9 @@ func testMigrate(t *testing.T, driver godfish.Driver, queries Queries) {
 		t.Error(err)
 	}
 
-	err = godfish.Migrate(driver, path, godfish.DirReverse, "12340102030405")
+	err = godfish.Migrate(driver, path, false, "12340102030405")
 	if err != nil {
-		t.Errorf("could not Migrate in %s Direction; %v", godfish.DirReverse, err)
+		t.Errorf("could not Migrate in %s Direction; %v", internal.DirReverse, err)
 	}
 
 	appliedVersions, err = collectAppliedVersions(driver)

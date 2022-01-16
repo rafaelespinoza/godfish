@@ -1,16 +1,16 @@
-package godfish
+package internal
 
 import "strings"
 
 const filenameDelimeter = "-"
 
-// filename is just a string with a specific format to migration files. One part
+// Filename is just a string with a specific format to migration files. One part
 // has a generated timestamp, one part has a direction, another has a label.
-type filename string
+type Filename string
 
-// makeFilename creates a filename based on the independent parts. Format:
+// MakeFilename creates a filename based on the independent parts. Format:
 // "${direction}-${version}-${label}.sql"
-func makeFilename(version string, indirection Indirection, label string) string {
+func MakeFilename(version string, indirection Indirection, label string) string {
 	var dir string
 	if indirection.Value == DirUnknown {
 		dir = "*" + filenameDelimeter

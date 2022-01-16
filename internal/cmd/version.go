@@ -7,7 +7,17 @@ import (
 	"fmt"
 
 	"github.com/rafaelespinoza/alf"
-	"github.com/rafaelespinoza/godfish/internal/version"
+)
+
+// Pieces of version metadata that can be set through -ldflags at build time.
+// TODO: Look into embedding this info when building with golang >= v1.18.
+var (
+	versionBranchName string
+	versionBuildTime  string
+	versionDriver     string
+	versionCommitHash string
+	versionGoVersion  string
+	versionTag        string
 )
 
 func makeVersion(name string) alf.Directive {
@@ -31,22 +41,22 @@ func makeVersion(name string) alf.Directive {
 		},
 		Run: func(_ context.Context) error {
 			if !formatJSON {
-				fmt.Printf("BranchName:	%s\n", version.BranchName)
-				fmt.Printf("BuildTime: 	%s\n", version.BuildTime)
-				fmt.Printf("Driver: 	%s\n", version.Driver)
-				fmt.Printf("CommitHash:	%s\n", version.CommitHash)
-				fmt.Printf("GoVersion: 	%s\n", version.GoVersion)
-				fmt.Printf("Tag:		%s\n", version.Tag)
+				fmt.Printf("BranchName:	%s\n", versionBranchName)
+				fmt.Printf("BuildTime: 	%s\n", versionBuildTime)
+				fmt.Printf("Driver: 	%s\n", versionDriver)
+				fmt.Printf("CommitHash:	%s\n", versionCommitHash)
+				fmt.Printf("GoVersion: 	%s\n", versionGoVersion)
+				fmt.Printf("Tag:		%s\n", versionTag)
 				return nil
 			}
 			out, err := json.Marshal(
 				map[string]string{
-					"BranchName": version.BranchName,
-					"BuildTime":  version.BuildTime,
-					"Driver":     version.Driver,
-					"CommitHash": version.CommitHash,
-					"GoVersion":  version.GoVersion,
-					"Tag":        version.Tag,
+					"BranchName": versionBranchName,
+					"BuildTime":  versionBuildTime,
+					"Driver":     versionDriver,
+					"CommitHash": versionCommitHash,
+					"GoVersion":  versionGoVersion,
+					"Tag":        versionTag,
 				},
 			)
 			if err != nil {

@@ -1,4 +1,4 @@
-package godfish
+package internal
 
 import (
 	"regexp"
@@ -17,8 +17,6 @@ type timestamp struct {
 	value int64
 	label string
 }
-
-var _ Version = (*timestamp)(nil)
 
 func (v *timestamp) Before(u Version) bool {
 	// Until there's more than 1 interface implementation, this is fine. So,
@@ -43,14 +41,16 @@ const (
 	unixTimestampSecLen = len("1574079194")
 )
 
+// Some reasonable lower, upper limits for migration versions.
 var (
-	minVersion = time.Date(0, 1, 1, 0, 0, 0, 0, time.UTC).Format(TimeFormat)
-	maxVersion = time.Date(9999, 12, 31, 23, 59, 59, 0, time.UTC).Format(TimeFormat)
+	MinVersion = time.Date(0, 1, 1, 0, 0, 0, 0, time.UTC).Format(TimeFormat)
+	MaxVersion = time.Date(9999, 12, 31, 23, 59, 59, 0, time.UTC).Format(TimeFormat)
 )
 
 var timeformatMatcher = regexp.MustCompile(`\d{4,14}`)
 
-func parseVersion(basename string) (version Version, err error) {
+// ParseVersion extracts Version info from a file's basename.
+func ParseVersion(basename string) (version Version, err error) {
 	written := timeformatMatcher.FindString(basename)
 	if ts, perr := time.Parse(TimeFormat, written); perr != nil {
 		err = perr // keep going

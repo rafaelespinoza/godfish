@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/rafaelespinoza/godfish"
-	"github.com/rafaelespinoza/godfish/internal/info"
+	"github.com/rafaelespinoza/godfish/internal"
 )
 
 func testInfo(t *testing.T, driver godfish.Driver, queries Queries) {
@@ -31,21 +31,21 @@ func testInfo(t *testing.T, driver godfish.Driver, queries Queries) {
 	defer teardown(driver, path, "foos", "bars")
 
 	t.Run("forward", func(t *testing.T) {
-		err := godfish.Info(driver, path, godfish.DirForward, "", info.NewTSV(os.Stderr))
+		err := godfish.Info(driver, path, true, "", os.Stderr, "tsv")
 		if err != nil {
 			t.Errorf(
 				"could not output info in %s Direction; %v",
-				godfish.DirForward, err,
+				internal.DirForward, err,
 			)
 		}
 	})
 
 	t.Run("reverse", func(t *testing.T) {
-		err := godfish.Info(driver, path, godfish.DirReverse, "", info.NewJSON(os.Stderr))
+		err := godfish.Info(driver, path, false, "", os.Stderr, "json")
 		if err != nil {
 			t.Errorf(
 				"could not output info in %s Direction; %v",
-				godfish.DirReverse, err,
+				internal.DirReverse, err,
 			)
 		}
 	})

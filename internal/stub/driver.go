@@ -34,7 +34,7 @@ func (d *driver) Execute(q string, a ...interface{}) error {
 	return d.errorOnExecute
 }
 
-func (d *driver) UpdateSchemaMigrations(direction godfish.Direction, version string) error {
+func (d *driver) UpdateSchemaMigrations(forward bool, version string) error {
 	var stubbedAV *appliedVersions
 	av, err := d.AppliedVersions()
 	if err != nil {
@@ -50,7 +50,7 @@ func (d *driver) UpdateSchemaMigrations(direction godfish.Direction, version str
 			"if you assign anything to this field, make it a %T", stubbedAV,
 		)
 	}
-	if direction == godfish.DirForward {
+	if forward {
 		stubbedAV.versions = append(stubbedAV.versions, version)
 	} else {
 		for i, v := range stubbedAV.versions {

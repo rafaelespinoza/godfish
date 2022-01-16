@@ -92,9 +92,9 @@ func (d *driver) AppliedVersions() (out godfish.AppliedVersions, err error) {
 	return
 }
 
-func (d *driver) UpdateSchemaMigrations(dir godfish.Direction, version string) (err error) {
+func (d *driver) UpdateSchemaMigrations(forward bool, version string) (err error) {
 	conn := d.connection
-	if dir == godfish.DirForward {
+	if forward {
 		_, err = conn.Exec(`
 			INSERT INTO schema_migrations (migration_id)
 			VALUES (?)`,

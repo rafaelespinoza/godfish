@@ -1,4 +1,4 @@
-package info_test
+package internal_test
 
 import (
 	"bytes"
@@ -10,8 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/rafaelespinoza/godfish"
-	"github.com/rafaelespinoza/godfish/internal/info"
+	"github.com/rafaelespinoza/godfish/internal"
 	"github.com/rafaelespinoza/godfish/internal/stub"
 )
 
@@ -19,7 +18,7 @@ func TestTSV(t *testing.T) {
 	var buf bytes.Buffer
 	names := []string{"alfa", "bravo", "charlie", "delta"}
 
-	if err := printMigrations(info.NewTSV(&buf), "up", mustMakeMigrations(names...)); err != nil {
+	if err := printMigrations(internal.NewTSV(&buf), "up", mustMakeMigrations(names...)); err != nil {
 		t.Fatal(err)
 	}
 
@@ -63,7 +62,7 @@ func TestJSON(t *testing.T) {
 	var buf bytes.Buffer
 	names := []string{"alfa", "bravo", "charlie", "delta"}
 
-	if err := printMigrations(info.NewJSON(&buf), "up", mustMakeMigrations(names...)); err != nil {
+	if err := printMigrations(internal.NewJSON(&buf), "up", mustMakeMigrations(names...)); err != nil {
 		t.Fatal(err)
 	}
 
@@ -106,26 +105,26 @@ func TestJSON(t *testing.T) {
 	}
 }
 
-func mustMakeMigrations(names ...string) []godfish.Migration {
+func mustMakeMigrations(names ...string) []internal.Migration {
 	dir, err := os.MkdirTemp(os.TempDir(), "godfish_test_*")
 	if err != nil {
 		panic(err)
 	}
 
-	out := make([]godfish.Migration, len(names))
+	out := make([]internal.Migration, len(names))
 
 	for i := 0; i < len(names); i++ {
-		params, err := godfish.NewMigrationParams(names[i], false, dir, "", "")
+		params, err := internal.NewMigrationParams(names[i], false, dir, "forward", "reverse")
 		if err != nil {
 			panic(err)
 		}
 		version := stub.NewVersion(strconv.Itoa((i + 1) * 1000))
-		out[i] = stub.NewMigration(params.Forward, version, godfish.Indirection{})
+		out[i] = stub.NewMigration(params.Forward, version, internal.Indirection{})
 	}
 	return out
 }
 
-func printMigrations(p godfish.InfoPrinter, state string, migrations []godfish.Migration) (err error) {
+func printMigrations(p internal.InfoPrinter, state string, migrations []internal.Migration) (err error) {
 	for i, mig := range migrations {
 		if err = p.PrintInfo(state, mig); err != nil {
 			err = fmt.Errorf("%w; item %d", err, i)

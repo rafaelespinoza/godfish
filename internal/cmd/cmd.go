@@ -11,6 +11,7 @@ import (
 
 	"github.com/rafaelespinoza/alf"
 	"github.com/rafaelespinoza/godfish"
+	"github.com/rafaelespinoza/godfish/internal"
 )
 
 var (
@@ -104,7 +105,7 @@ Examples:
 		PrePerform: func(_ context.Context) error {
 			// Look for config file and if present, merge those values with
 			// input flag values.
-			var conf godfish.Config
+			var conf internal.Config
 			if data, ierr := os.ReadFile(pathToConfig); ierr != nil {
 				// probably no config file present, rely on arguments instead.
 			} else if ierr = json.Unmarshal(data, &conf); ierr != nil {

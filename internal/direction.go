@@ -1,6 +1,9 @@
-package godfish
+package internal
 
-import "strings"
+import (
+	"fmt"
+	"strings"
+)
 
 // Direction describes which way the change goes.
 type Direction uint8
@@ -33,6 +36,23 @@ var (
 		"down",
 	}
 )
+
+func validateDirectionLabel(okVals []string, val string) (err error) {
+	var ok bool
+	for _, okVal := range okVals {
+		if val == okVal {
+			ok = true
+			break
+		}
+	}
+	if !ok {
+		err = fmt.Errorf(
+			"invalid value (%q); should be one of: %s",
+			val, strings.Join(okVals, ", "),
+		)
+	}
+	return
+}
 
 // Indirection is some glue to help determine the direction of a migration,
 // usually from a filename with an alias for a direction.

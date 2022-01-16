@@ -7,6 +7,7 @@ import (
 
 	"github.com/rafaelespinoza/alf"
 	"github.com/rafaelespinoza/godfish"
+	"github.com/rafaelespinoza/godfish/internal"
 )
 
 func makeMigrate(name string) alf.Directive {
@@ -20,7 +21,7 @@ func makeMigrate(name string) alf.Directive {
 				&version,
 				"version",
 				"",
-				fmt.Sprintf("timestamp of migration, format: %s", godfish.TimeFormat),
+				fmt.Sprintf("timestamp of migration, format: %s", internal.TimeFormat),
 			)
 			flags.Usage = func() {
 				fmt.Printf(`Usage: %s [godfish-flags] %s [%s-flags]
@@ -32,7 +33,7 @@ func makeMigrate(name string) alf.Directive {
 
 	The "files" flag can specify the path to a directory with migration files.
 `,
-					bin, name, name, godfish.TimeFormat,
+					bin, name, name, internal.TimeFormat,
 				)
 				printFlagDefaults(&p)
 				printFlagDefaults(flags)
@@ -44,7 +45,7 @@ func makeMigrate(name string) alf.Directive {
 			err := godfish.Migrate(
 				theDriver,
 				commonArgs.Files,
-				godfish.DirForward,
+				true,
 				version,
 			)
 			return err
@@ -73,11 +74,11 @@ func makeRemigrate(name string) alf.Directive {
 			return flags
 		},
 		Run: func(_ context.Context) error {
-			err := godfish.ApplyMigration(theDriver, commonArgs.Files, godfish.DirReverse, "")
+			err := godfish.ApplyMigration(theDriver, commonArgs.Files, false, "")
 			if err != nil {
 				return err
 			}
-			return godfish.ApplyMigration(theDriver, commonArgs.Files, godfish.DirForward, "")
+			return godfish.ApplyMigration(theDriver, commonArgs.Files, true, "")
 		},
 	}
 }
@@ -93,7 +94,7 @@ func makeRollback(name string) alf.Directive {
 				&version,
 				"version",
 				"",
-				fmt.Sprintf("timestamp of migration, format: %s", godfish.TimeFormat),
+				fmt.Sprintf("timestamp of migration, format: %s", internal.TimeFormat),
 			)
 			flags.Usage = func() {
 				fmt.Printf(`Usage: %s [godfish-flags] %s [%s-flags]
@@ -105,7 +106,7 @@ func makeRollback(name string) alf.Directive {
 
 	The "files" flag can specify the path to a directory with migration files.
 `,
-					bin, name, name, godfish.TimeFormat,
+					bin, name, name, internal.TimeFormat,
 				)
 				printFlagDefaults(&p)
 				printFlagDefaults(flags)
@@ -118,14 +119,14 @@ func makeRollback(name string) alf.Directive {
 				err = godfish.ApplyMigration(
 					theDriver,
 					commonArgs.Files,
-					godfish.DirReverse,
+					false,
 					version,
 				)
 			} else {
 				err = godfish.Migrate(
 					theDriver,
 					commonArgs.Files,
-					godfish.DirReverse,
+					false,
 					version,
 				)
 			}
