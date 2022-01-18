@@ -11,11 +11,12 @@ POSTGRES_PATH=$(PKG_IMPORT_PATH)/drivers/postgres
 SQLITE3_PATH=$(PKG_IMPORT_PATH)/drivers/sqlite3
 
 # inject this metadata when building a binary.
+GO_VERSION := $(shell $(GO) version | awk '{ print $$3 }')
 define LDFLAGS
 -X $(PKG_IMPORT_PATH)/internal/cmd.versionBranchName=$(shell git rev-parse --abbrev-ref HEAD) \
 -X $(PKG_IMPORT_PATH)/internal/cmd.versionBuildTime=$(shell date --utc +%FT%T%z) \
 -X $(PKG_IMPORT_PATH)/internal/cmd.versionCommitHash=$(shell git rev-parse --short=7 HEAD) \
--X $(PKG_IMPORT_PATH)/internal/cmd.versionGoVersion=$(shell $(GO) version | awk '{ print $$3 }') \
+-X $(PKG_IMPORT_PATH)/internal/cmd.versionGoVersion=$(GO_VERSION) \
 -X $(PKG_IMPORT_PATH)/internal/cmd.versionTag=$(shell git describe --tag)
 endef
 
@@ -41,6 +42,13 @@ _mkdir:
 # be a "relative" package path. That is, starting with a dot.
 gosec:
 	$(GOSEC) $(ARGS) . ./internal/... ./drivers/...
+
+# Automates binary building on many platforms. This Makefile won't install the
+# tool for you. Read more at https://goreleaser.com.
+GORELEASER ?= goreleaser
+release:
+	GOVERSION=$(GO_VERSION) PKG_IMPORT_PATH=$(PKG_IMPORT_PATH) LDFLAGS='$(LDFLAGS)' \
+		$(GORELEASER) release --clean $(ARGS)
 
 #
 # Cassandra

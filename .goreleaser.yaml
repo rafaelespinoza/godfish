@@ -1,0 +1,77 @@
+---
+project_name: godfish
+
+# env vars are put together with the Makefile.
+env:
+
+builds:
+  -
+    id: cassandra
+    dir: ./drivers/cassandra/godfish
+    binary: ./godfish_cassandra
+    goarch:
+      - amd64
+      - arm64
+    goos:
+      - darwin
+      - linux
+      - windows
+    ldflags:
+      - >
+        {{ .Env.LDFLAGS }} -X {{ .Env.PKG_IMPORT_PATH }}/internal/cmd.versionDriver=cassandra
+  -
+    id: mysql
+    dir: ./drivers/mysql/godfish
+    binary: ./godfish_mysql
+    goarch:
+      - amd64
+      - arm64
+    goos:
+      - darwin
+      - linux
+      - windows
+    ldflags:
+      - >
+        {{ .Env.LDFLAGS }} -X {{ .Env.PKG_IMPORT_PATH }}/internal/cmd.versionDriver=mysql
+  -
+    id: postgres
+    dir: ./drivers/postgres/godfish
+    binary: ./godfish_postgres
+    goarch:
+      - amd64
+      - arm64
+    goos:
+      - darwin
+      - linux
+      - windows
+    ldflags:
+      - >
+        {{ .Env.LDFLAGS }} -X {{ .Env.PKG_IMPORT_PATH }}/internal/cmd.versionDriver=postgres
+  -
+    id: sqlite3
+    dir: ./drivers/sqlite3/godfish
+    binary: ./godfish_sqlite3
+    goarch:
+      - amd64
+      - arm64
+    goos:
+      - darwin
+      - linux
+      - windows
+    ldflags:
+      - >
+        {{ .Env.LDFLAGS }} -X {{ .Env.PKG_IMPORT_PATH }}/internal/cmd.versionDriver=sqlite3
+  -
+    id: sqlserver
+    dir: ./drivers/sqlserver/godfish
+    binary: ./godfish_sqlserver
+    goarch:
+      - amd64
+      - arm64
+    goos:
+      - darwin
+      - linux
+      - windows
+    ldflags:
+      - >
+        {{ .Env.LDFLAGS }} -X {{ .Env.PKG_IMPORT_PATH }}/internal/cmd.versionDriver=sqlserver
