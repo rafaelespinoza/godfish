@@ -5,16 +5,20 @@ CI_DIR=./.ci
 # Build CI environment, run test suite against a live DB.
 # NOTE: The client entrypoints require the other Makefile.
 #
-ci-cassandra-up: build-cassandra
-	docker-compose -f $(CI_DIR)/cassandra/docker-compose.yml -- up --exit-code-from client
+ci-cassandra3-up: build-cassandra3
+	docker-compose -f $(CI_DIR)/cassandra/v3.yml -- up --exit-code-from client
+ci-cassandra4-up: build-cassandra4
+	docker-compose -f $(CI_DIR)/cassandra/v4.yml -- up --exit-code-from client
 ci-mysql-up: build-mysql
 	docker-compose -f $(CI_DIR)/mysql/docker-compose.yml -- up --exit-code-from client
 ci-postgres-up: build-postgres
 	docker-compose -f $(CI_DIR)/postgres/docker-compose.yml -- up --exit-code-from client
 ci-sqlite3-up: build-sqlite3
 	docker container run --name=$(BASENAME)_sqlite3 -- $(BASENAME)/sqlite3
-ci-cassandra-down:
-	docker-compose -f $(CI_DIR)/cassandra/docker-compose.yml -- down --rmi all --volumes
+ci-cassandra3-down:
+	docker-compose -f $(CI_DIR)/cassandra/v3.yml -- down --rmi all --volumes
+ci-cassandra4-down:
+	docker-compose -f $(CI_DIR)/cassandra/v4.yml -- down --rmi all --volumes
 ci-mysql-down:
 	docker-compose -f $(CI_DIR)/mysql/docker-compose.yml -- down --rmi all --volumes
 ci-postgres-down:
@@ -29,9 +33,13 @@ build-base: $(eval BUILD_DIR=$(shell mktemp -d -p /tmp $(BASENAME)_XXXXXX))
 build-base:
 	git clone --depth=1 file://$(PWD) $(BUILD_DIR)
 	docker image build -f $(CI_DIR)/client_base.Dockerfile -t $(BASENAME)/client_base $(BUILD_DIR)
-build-cassandra: build-base
+build-cassandra3: build-base
 	docker image build -f $(CI_DIR)/cassandra/client.Dockerfile -t $(BASENAME)/cassandra/client $(BUILD_DIR)
-	docker image build -f $(CI_DIR)/cassandra/server.Dockerfile -t $(BASENAME)/cassandra/server $(BUILD_DIR)
+	docker image build -f $(CI_DIR)/cassandra/server_v3.Dockerfile -t $(BASENAME)/cassandra/server_v3 $(BUILD_DIR)
+	rm -rf $(BUILD_DIR)
+build-cassandra4: build-base
+	docker image build -f $(CI_DIR)/cassandra/client.Dockerfile -t $(BASENAME)/cassandra/client $(BUILD_DIR)
+	docker image build -f $(CI_DIR)/cassandra/server_v4.Dockerfile -t $(BASENAME)/cassandra/server_v4 $(BUILD_DIR)
 	rm -rf $(BUILD_DIR)
 build-mysql: build-base
 	docker image build -f $(CI_DIR)/mysql/client.Dockerfile -t $(BASENAME)/mysql/client $(BUILD_DIR)
@@ -50,7 +58,8 @@ build-sqlite3: build-base
 #
 rm-cassandra:
 	docker container rm $(shell docker container ls -aq --filter ancestor=$(BASENAME)/cassandra/client)
-	docker container rm $(shell docker container ls -aq --filter ancestor=$(BASENAME)/cassandra/server)
+	docker container rm $(shell docker container ls -aq --filter ancestor=$(BASENAME)/cassandra/server_v3)
+	docker container rm $(shell docker container ls -aq --filter ancestor=$(BASENAME)/cassandra/server_v4)
 rm-mysql:
 	docker container rm $(shell docker container ls -aq --filter ancestor=$(BASENAME)/mysql/client)
 	docker container rm $(shell docker container ls -aq --filter ancestor=$(BASENAME)/mysql/server)
@@ -62,7 +71,8 @@ rm-sqlite3:
 
 rmi-cassandra:
 	docker image rmi $(shell docker image ls -aq $(BASENAME)/cassandra/client)
-	docker image rmi $(shell docker image ls -aq $(BASENAME)/cassandra/server)
+	docker image rmi $(shell docker image ls -aq $(BASENAME)/cassandra/server_v3)
+	docker image rmi $(shell docker image ls -aq $(BASENAME)/cassandra/server_v4)
 rmi-mysql:
 	docker image rmi $(shell docker image ls -aq $(BASENAME)/mysql/client)
 	docker image rmi $(shell docker image ls -aq $(BASENAME)/mysql/server)

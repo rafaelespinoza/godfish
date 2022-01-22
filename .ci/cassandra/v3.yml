@@ -12,8 +12,8 @@ services:
             DB_DSN: "cassandra://server:9042/godfish_test?timeout_ms=2000&connect_timeout_ms=2000"
         tty: true
     server:
-        image: godfish_test/cassandra/server:latest
-        container_name: godfish_ci_cassandra_server
+        image: godfish_test/cassandra/server_v3:latest
+        container_name: godfish_ci_cassandra_server_v3
         expose:
             - "9042"
         volumes:

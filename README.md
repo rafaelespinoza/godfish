@@ -149,13 +149,15 @@ lives in `Makefile.docker` and the `.ci/` directory.
 
 ```sh
 # Build environments and run tests
-make -f Makefile.docker ci-cassandra-up
+make -f Makefile.docker ci-cassandra3-up
+make -f Makefile.docker ci-cassandra4-up
 make -f Makefile.docker ci-mysql-up
 make -f Makefile.docker ci-postgres-up
 make -f Makefile.docker ci-sqlite3-up
 
 # Teardown
-make -f Makefile.docker ci-cassandra-down
+make -f Makefile.docker ci-cassandra3-down
+make -f Makefile.docker ci-cassandra4-down
 make -f Makefile.docker ci-mysql-down
 make -f Makefile.docker ci-postgres-down
 make -f Makefile.docker ci-sqlite3-down

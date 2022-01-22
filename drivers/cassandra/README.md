@@ -1,8 +1,9 @@
 # cassandra
 
-This `godfish.Driver` implementation has been tested against:
+This `godfish.Driver` implementation has been tested against cassandra versions:
 
-- cassandra version 3.11.11
+- 3.11.11
+- 4.0.1
 
 ## Connecting
 

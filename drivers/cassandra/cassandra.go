@@ -77,20 +77,27 @@ func (d *driver) AppliedVersions() (out godfish.AppliedVersions, err error) {
 
 	av := execAllAscending(query)
 
-	ierr := av.err
-	if ierr == nil {
+	if av.err == nil {
 		out = av
 		return
 	}
 
-	// A cleaner approach may be to look for a specific error code. The most
-	// specific error code from the gocql library I've encountered is 8704 (or
-	// 0x2200 if using cqlsh). As far as I know, it just means "invalid".
-	if strings.Contains(ierr.Error(), "unconfigured table") {
-		err = godfish.ErrSchemaMigrationsDoesNotExist
+	ierr, ok := av.err.(gocql.RequestError)
+	if !ok {
+		err = av.err
 		return
 	}
-	err = ierr
+
+	// In cassandra v3, the error message might be "unconfigured table".
+	// In cassandra v4, the error message might be "table does not exist".
+	// Either version would return this error code (0x2200). At this time, the
+	// gocql library does not seem to have a more specific error code.
+	if ierr.Code() == gocql.ErrCodeInvalid && strings.Contains(ierr.Message(), "table") {
+		err = godfish.ErrSchemaMigrationsDoesNotExist
+	} else {
+		err = av.err
+	}
+
 	return
 }
 
