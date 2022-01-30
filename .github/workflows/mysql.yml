@@ -1,12 +1,33 @@
 name: mysql
 on: [push, pull_request]
 jobs:
-  all:
+  mariadb:
+    name: mariadb v10.6
     runs-on: ubuntu-20.04
     steps:
     - name: Checkout repo
-      uses: actions/checkout@v1
+      uses: actions/checkout@v2
     - name: Build environment and run tests
-      run: make -f Makefile.docker ci-mysql-up
+      run: make -f ci.Makefile ci-mariadb-up
     - name: Teardown
-      run: make -f Makefile.docker ci-mysql-down
+      run: make -f ci.Makefile ci-mariadb-down
+  mysql_v57:
+    name: mysql v5.7
+    runs-on: ubuntu-20.04
+    steps:
+    - name: Checkout repo
+      uses: actions/checkout@v2
+    - name: Build environment and run tests
+      run: make -f ci.Makefile ci-mysql57-up
+    - name: Teardown
+      run: make -f ci.Makefile ci-mysql57-down
+  mysql_v8:
+    name: mysql v8.0
+    runs-on: ubuntu-20.04
+    steps:
+    - name: Checkout repo
+      uses: actions/checkout@v2
+    - name: Build environment and run tests
+      run: make -f ci.Makefile ci-mysql8-up
+    - name: Teardown
+      run: make -f ci.Makefile ci-mysql8-down

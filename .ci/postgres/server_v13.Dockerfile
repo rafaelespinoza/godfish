@@ -1,4 +1,4 @@
-FROM postgres:12.6-alpine
+FROM postgres:13-alpine
 LABEL driver=postgres role=server
 WORKDIR /var/lib/postgresql
 COPY .ci/postgres/server.sh scripts/

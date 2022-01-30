@@ -1,3 +1,3 @@
-FROM mariadb:10.4
+FROM mysql:5.7
 LABEL driver=mysql role=server
 EXPOSE 3306

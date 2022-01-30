@@ -1,8 +1,5 @@
 GO ?= go
-BIN=godfish
-DB_USER ?= godfish
-DB_HOST ?= localhost
-TEST_DB_NAME=godfish_test
+BIN_DIR=bin
 PKG_IMPORT_PATH=github.com/rafaelespinoza/godfish
 
 # inject this metadata when building a binary.
@@ -18,36 +15,47 @@ test:
 	$(GO) test $(ARGS) . ./internal/...
 
 clean:
-	rm $(BIN)
+	rm -rf $(BIN_DIR)
 
-cassandra:
+_mkdir:
+	mkdir -pv $(BIN_DIR)
+
+build-cassandra: BIN=$(BIN_DIR)/godfish_cassandra
+build-cassandra: _mkdir
 	$(GO) build -o $(BIN) -v \
 		-ldflags "$(LDFLAGS) \
 		-X $(PKG_IMPORT_PATH)/internal/cmd.versionDriver=cassandra" \
 		./drivers/cassandra/godfish
-cassandra-test:
-	$(GO) test $(ARGS) ./drivers/cassandra
+	@echo "built cassandra to $(BIN)"
+test-cassandra:
+	$(GO) test $(ARGS) ./drivers/cassandra/...
 
-postgres:
+build-postgres: BIN=$(BIN_DIR)/godfish_postgres
+build-postgres: _mkdir
 	$(GO) build -o $(BIN) -v \
 		-ldflags "$(LDFLAGS) \
 		-X $(PKG_IMPORT_PATH)/internal/cmd.versionDriver=postgres" \
 		./drivers/postgres/godfish
-postgres-test:
-	$(GO) test $(ARGS) ./drivers/postgres
+	@echo "built postgres to $(BIN)"
+test-postgres:
+	$(GO) test $(ARGS) ./drivers/postgres/...
 
-mysql:
+build-mysql: BIN=$(BIN_DIR)/godfish_mysql
+build-mysql: _mkdir
 	$(GO) build -o $(BIN) -v \
 		-ldflags "$(LDFLAGS) \
 		-X $(PKG_IMPORT_PATH)/internal/cmd.versionDriver=mysql" \
 		./drivers/mysql/godfish
-mysql-test:
-	$(GO) test $(ARGS) ./drivers/mysql
+	@echo "built mysql to $(BIN)"
+test-mysql:
+	$(GO) test $(ARGS) ./drivers/mysql/...
 
-sqlite3:
+build-sqlite3: BIN=$(BIN_DIR)/godfish_sqlite3
+build-sqlite3: _mkdir
 	CGO_ENABLED=1 $(GO) build -o $(BIN) -v \
 		-ldflags "$(LDFLAGS) \
 		-X $(PKG_IMPORT_PATH)/internal/cmd.versionDriver=sqlite3" \
 		./drivers/sqlite3/godfish
-sqlite3-test:
-	$(GO) test $(ARGS) ./drivers/sqlite3
+	@echo "built sqlite3 to $(BIN)"
+test-sqlite3:
+	$(GO) test $(ARGS) ./drivers/sqlite3/...

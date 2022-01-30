@@ -11,5 +11,5 @@ RUN apk update && \
   go test -c . && \
   go test -c ./drivers/sqlite3
 
-COPY .ci/sqlite3/run.sh /
-ENTRYPOINT /run.sh
+COPY .ci/sqlite3/client.sh /
+ENTRYPOINT /client.sh

@@ -7,7 +7,7 @@ dbname='godfish_test'
 dbuser='godfish'
 
 echo "building binary"
-make postgres
+make build-postgres
 echo "testing godfish"
 make test ARGS='-v -count=1'
 
@@ -27,4 +27,4 @@ done
 >&2 echo "db is up"
 
 echo "testing godfish against live db"
-make postgres-test ARGS='-v -count=1'
+make test-postgres ARGS='-v -count=1'

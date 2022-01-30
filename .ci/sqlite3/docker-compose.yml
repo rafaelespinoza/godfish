@@ -1,0 +1,10 @@
+version: "3.9"
+
+services:
+    clientserver:
+        build:
+            context: "${BUILD_DIR}"
+            dockerfile: "${BUILD_DIR}/.ci/sqlite3/Dockerfile"
+        image: godfish_test/sqlite3:latest
+        container_name: godfish_ci_sqlite3
+        tty: true

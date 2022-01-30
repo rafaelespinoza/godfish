@@ -5,7 +5,7 @@ set -eu
 dbhost="${1:?missing dbhost}"
 
 echo "building binary"
-make cassandra
+make build-cassandra
 echo "testing godfish"
 make test ARGS='-v -count=1'
 
@@ -25,4 +25,4 @@ done
 >&2 echo "db is up"
 
 echo "testing godfish against live db"
-make cassandra-test ARGS='-v -count=1'
+make test-cassandra ARGS='-v -count=1'

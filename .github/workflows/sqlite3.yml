@@ -5,8 +5,8 @@ jobs:
     runs-on: ubuntu-20.04
     steps:
     - name: Checkout repo
-      uses: actions/checkout@v1
+      uses: actions/checkout@v2
     - name: Build environment and run tests
-      run: make -f Makefile.docker ci-sqlite3-up
+      run: make -f ci.Makefile ci-sqlite3-up
     - name: Teardown
-      run: make -f Makefile.docker ci-sqlite3-down
+      run: make -f ci.Makefile ci-sqlite3-down

@@ -1,0 +1,36 @@
+version: "3.9"
+
+services:
+    client:
+        build:
+            context: "${BUILD_DIR}"
+            dockerfile: "${BUILD_DIR}/.ci/postgres/client.Dockerfile"
+        image: godfish_test/postgres/client:latest
+        container_name: godfish_ci_postgres_client
+        depends_on:
+          - server
+        entrypoint: /client.sh server
+        env_file:
+            - env
+        environment:
+            CGO_ENABLED: 0
+            DB_DSN: "postgresql://godfish:password@server:5432/godfish_test?sslmode=disable"
+        tty: true
+    server:
+        build:
+            context: "${BUILD_DIR}"
+            dockerfile: "${BUILD_DIR}/.ci/postgres/server_v12.Dockerfile"
+        image: godfish_test/postgres/server_v12:latest
+        container_name: godfish_ci_postgres_server_v12
+        env_file:
+            - env
+        expose:
+            - 5432
+        volumes:
+            -
+              type: volume
+              source: server
+              target: /var/lib/postgresql/data
+
+volumes:
+    server:

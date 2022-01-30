@@ -2,6 +2,9 @@ version: "3.9"
 
 services:
     client:
+        build:
+            context: "${BUILD_DIR}"
+            dockerfile: "${BUILD_DIR}/.ci/postgres/client.Dockerfile"
         image: godfish_test/postgres/client:latest
         container_name: godfish_ci_postgres_client
         depends_on:
@@ -14,8 +17,11 @@ services:
             DB_DSN: "postgresql://godfish:password@server:5432/godfish_test?sslmode=disable"
         tty: true
     server:
-        image: godfish_test/postgres/server:latest
-        container_name: godfish_ci_postgres_server
+        build:
+            context: "${BUILD_DIR}"
+            dockerfile: "${BUILD_DIR}/.ci/postgres/server_v13.Dockerfile"
+        image: godfish_test/postgres/server_v13:latest
+        container_name: godfish_ci_postgres_server_v13
         env_file:
             - env
         expose:

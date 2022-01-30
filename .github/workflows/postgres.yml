@@ -1,12 +1,23 @@
 name: postgres
 on: [push, pull_request]
 jobs:
-  all:
+  v12:
+    name: postgres v12
     runs-on: ubuntu-20.04
     steps:
     - name: Checkout repo
-      uses: actions/checkout@v1
+      uses: actions/checkout@v2
     - name: Build environment and run tests
-      run: make -f Makefile.docker ci-postgres-up
+      run: make -f ci.Makefile ci-postgres12-up
     - name: Teardown
-      run: make -f Makefile.docker ci-postgres-down
+      run: make -f ci.Makefile ci-postgres12-down
+  v13:
+    name: postgres v13
+    runs-on: ubuntu-20.04
+    steps:
+    - name: Checkout repo
+      uses: actions/checkout@v2
+    - name: Build environment and run tests
+      run: make -f ci.Makefile ci-postgres13-up
+    - name: Teardown
+      run: make -f ci.Makefile ci-postgres13-down

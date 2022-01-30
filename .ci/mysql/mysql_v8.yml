@@ -2,6 +2,9 @@ version: "3.9"
 
 services:
     client:
+        build:
+            context: "${BUILD_DIR}"
+            dockerfile: "${BUILD_DIR}/.ci/mysql/client.Dockerfile"
         image: godfish_test/mysql/client:latest
         container_name: godfish_ci_mysql_client
         depends_on:
@@ -16,8 +19,11 @@ services:
             DB_DSN: "godfish:password@tcp(server)/godfish_test"
         tty: true
     server:
-        image: godfish_test/mysql/server:latest
-        container_name: godfish_ci_mysql_server
+        build:
+            context: "${BUILD_DIR}"
+            dockerfile: "${BUILD_DIR}/.ci/mysql/mysql_server_v8.Dockerfile"
+        image: godfish_test/mysql/server_v8:latest
+        container_name: godfish_ci_mysql_server_v8
         env_file: env
         expose:
             - 3306

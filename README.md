@@ -23,10 +23,10 @@ Make a CLI binary for the DB you want to use. This tool comes with some driver
 implementations. Build one like so:
 
 ```
-make cassandra
-make postgres
-make mysql
-make sqlite3
+make build-cassandra
+make build-mysql
+make build-postgres
+make build-sqlite3
 ```
 
 From there you could move it to `$GOPATH/bin`, move it to your project or
@@ -145,20 +145,26 @@ generated godoc looks weird. There are also tests, those should pass.
 
 Docker and docker-compose are used to create environments and run the tests
 against a live database. Each database has a separate configuration. All of this
-lives in `Makefile.docker` and the `.ci/` directory.
+lives in `ci.Makefile` and the `.ci/` directory.
 
 ```sh
 # Build environments and run tests
-make -f Makefile.docker ci-cassandra3-up
-make -f Makefile.docker ci-cassandra4-up
-make -f Makefile.docker ci-mysql-up
-make -f Makefile.docker ci-postgres-up
-make -f Makefile.docker ci-sqlite3-up
+make -f ci.Makefile ci-cassandra3-up
+make -f ci.Makefile ci-cassandra4-up
+make -f ci.Makefile ci-mariadb-up
+make -f ci.Makefile ci-mysql57-up
+make -f ci.Makefile ci-mysql8-up
+make -f ci.Makefile ci-postgres12-up
+make -f ci.Makefile ci-postgres13-up
+make -f ci.Makefile ci-sqlite3-up
 
 # Teardown
-make -f Makefile.docker ci-cassandra3-down
-make -f Makefile.docker ci-cassandra4-down
-make -f Makefile.docker ci-mysql-down
-make -f Makefile.docker ci-postgres-down
-make -f Makefile.docker ci-sqlite3-down
+make -f ci.Makefile ci-cassandra3-down
+make -f ci.Makefile ci-cassandra4-down
+make -f ci.Makefile ci-mariadb-down
+make -f ci.Makefile ci-mysql57-down
+make -f ci.Makefile ci-mysql8-down
+make -f ci.Makefile ci-postgres12-down
+make -f ci.Makefile ci-postgres13-down
+make -f ci.Makefile ci-sqlite3-down
 ```
