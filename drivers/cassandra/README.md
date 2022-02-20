@@ -2,8 +2,8 @@
 
 This `godfish.Driver` implementation has been tested against cassandra versions:
 
-- 3.11.11
-- 4.0.1
+- 3.11.12
+- 4.0.3
 
 ## Connecting
 

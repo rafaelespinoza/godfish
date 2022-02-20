@@ -6,40 +6,40 @@ CI_DIR=./.ci
 # NOTE: The client entrypoints require the other Makefile.
 #
 ci-cassandra3-up: build-base
-	BUILD_DIR=$(BUILD_DIR) docker-compose -f $(CI_DIR)/cassandra/v3.yml -- up --build --exit-code-from client
+	BUILD_DIR=$(BUILD_DIR) docker-compose -f $(CI_DIR)/cassandra/v3.yml up --build --exit-code-from client
 ci-cassandra3-down:
-	docker-compose -f $(CI_DIR)/cassandra/v3.yml -- down --rmi all --volumes
+	docker-compose -f $(CI_DIR)/cassandra/v3.yml down --rmi all --volumes
 ci-cassandra4-up: build-base
-	BUILD_DIR=$(BUILD_DIR) docker-compose -f $(CI_DIR)/cassandra/v4.yml -- up --build --exit-code-from client
+	BUILD_DIR=$(BUILD_DIR) docker-compose -f $(CI_DIR)/cassandra/v4.yml up --build --exit-code-from client
 ci-cassandra4-down:
-	docker-compose -f $(CI_DIR)/cassandra/v4.yml -- down --rmi all --volumes
+	docker-compose -f $(CI_DIR)/cassandra/v4.yml down --rmi all --volumes
 
 ci-postgres12-up: build-base
-	BUILD_DIR=$(BUILD_DIR) docker-compose -f $(CI_DIR)/postgres/v12.yml -- up --build --exit-code-from client
+	BUILD_DIR=$(BUILD_DIR) docker-compose -f $(CI_DIR)/postgres/v12.yml up --build --exit-code-from client
 ci-postgres12-down:
-	docker-compose -f $(CI_DIR)/postgres/v12.yml -- down --rmi all --volumes
+	docker-compose -f $(CI_DIR)/postgres/v12.yml down --rmi all --volumes
 ci-postgres13-up: build-base
-	BUILD_DIR=$(BUILD_DIR) docker-compose -f $(CI_DIR)/postgres/v13.yml -- up --build --exit-code-from client
+	BUILD_DIR=$(BUILD_DIR) docker-compose -f $(CI_DIR)/postgres/v13.yml up --build --exit-code-from client
 ci-postgres13-down:
-	docker-compose -f $(CI_DIR)/postgres/v13.yml -- down --rmi all --volumes
+	docker-compose -f $(CI_DIR)/postgres/v13.yml down --rmi all --volumes
 
 ci-mariadb-up: build-base
-	BUILD_DIR=$(BUILD_DIR) docker-compose -f $(CI_DIR)/mysql/mariadb_v10.yml -- up --build --exit-code-from client
+	BUILD_DIR=$(BUILD_DIR) docker-compose -f $(CI_DIR)/mysql/mariadb_v10.yml up --build --exit-code-from client
 ci-mariadb-down:
-	docker-compose -f $(CI_DIR)/mysql/mariadb_v10.yml -- down --rmi all --volumes
+	docker-compose -f $(CI_DIR)/mysql/mariadb_v10.yml down --rmi all --volumes
 ci-mysql57-up: build-base
-	BUILD_DIR=$(BUILD_DIR) docker-compose -f $(CI_DIR)/mysql/mysql_v57.yml -- up --build --exit-code-from client
+	BUILD_DIR=$(BUILD_DIR) docker-compose -f $(CI_DIR)/mysql/mysql_v57.yml up --build --exit-code-from client
 ci-mysql57-down:
-	docker-compose -f $(CI_DIR)/mysql/mysql_v57.yml -- down --rmi all --volumes
+	docker-compose -f $(CI_DIR)/mysql/mysql_v57.yml down --rmi all --volumes
 ci-mysql8-up: build-base
-	BUILD_DIR=$(BUILD_DIR) docker-compose -f $(CI_DIR)/mysql/mysql_v8.yml -- up --build --exit-code-from client
+	BUILD_DIR=$(BUILD_DIR) docker-compose -f $(CI_DIR)/mysql/mysql_v8.yml up --build --exit-code-from client
 ci-mysql8-down:
-	docker-compose -f $(CI_DIR)/mysql/mysql_v8.yml -- down --rmi all --volumes
+	docker-compose -f $(CI_DIR)/mysql/mysql_v8.yml down --rmi all --volumes
 
 ci-sqlite3-up: build-base
-	BUILD_DIR=$(BUILD_DIR) docker-compose -f $(CI_DIR)/sqlite3/docker-compose.yml -- up --build --exit-code-from clientserver
+	BUILD_DIR=$(BUILD_DIR) docker-compose -f $(CI_DIR)/sqlite3/docker-compose.yml up --build --exit-code-from clientserver
 ci-sqlite3-down:
-	docker-compose -f $(CI_DIR)/sqlite3/docker-compose.yml -- down --rmi all --volumes
+	docker-compose -f $(CI_DIR)/sqlite3/docker-compose.yml down --rmi all --volumes
 
 #
 # Build and tag base image.
