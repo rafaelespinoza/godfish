@@ -26,3 +26,6 @@ done
 
 echo "testing godfish against live db"
 make test-cassandra ARGS='-v -count=1'
+
+echo "vetting code"
+make vet-cassandra

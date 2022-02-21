@@ -28,3 +28,6 @@ done
 
 echo "testing godfish against live db"
 make test-postgres ARGS='-v -count=1'
+
+echo "vetting code"
+make vet-postgres
