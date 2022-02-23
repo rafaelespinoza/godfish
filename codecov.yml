@@ -1,0 +1,7 @@
+parsers:
+  go:
+    # Codecov has the concept of partial hits, which have a lower code coverage
+    # value than a full hit. This option deactivates partial hits so the
+    # coverage percentage is closer to what you may get with native golang
+    # tooling, like the -coverprofile flag.
+    partials_as_hits: true

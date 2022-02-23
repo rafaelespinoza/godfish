@@ -1,7 +1,17 @@
 version: "3.9"
 
 services:
-    clientserver:
+    # SQLite3 doesn't actually have a client-server model. Instead, it's linked
+    # to the application. The other databases in this project build test
+    # environments of separate docker-compose services for the database and the
+    # test client because setting up databases in general can be like wrestling
+    # a bear. Unlike the other databases, the test environment for the sqlite3
+    # driver can be built with just one docker-compose service.
+    #
+    # Q:  If there's no client-server, then why is this called "client"?
+    # A:  Some CI-related tooling assumes that tests are taking place in a
+    #     service called client, so it's just easier to set it up like this.
+    client:
         build:
             context: "${BUILD_DIR}"
             dockerfile: "${BUILD_DIR}/.ci/sqlite3/Dockerfile"

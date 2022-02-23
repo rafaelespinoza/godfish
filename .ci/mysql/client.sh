@@ -8,7 +8,7 @@ dbuser='godfish'
 echo "building binary"
 make build-mysql
 echo "testing godfish"
-make test ARGS='-v -count=1'
+make test ARGS='-v -count=1 -coverprofile=/tmp/cover.out'
 
 # Wait for db server to be ready, with some limits.
 
@@ -27,7 +27,7 @@ done
 >&2 echo "db is up"
 
 echo "testing godfish against live db"
-make test-mysql ARGS='-v -count=1'
+make test-mysql ARGS='-v -count=1 -coverprofile=/tmp/cover_driver.out'
 
 echo "vetting code"
 make vet-mysql
