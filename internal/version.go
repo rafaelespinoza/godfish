@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"errors"
 	"regexp"
 	"strconv"
 	"time"
@@ -52,6 +53,10 @@ var timeformatMatcher = regexp.MustCompile(`\d{4,14}`)
 // ParseVersion extracts Version info from a file's basename.
 func ParseVersion(basename string) (version Version, err error) {
 	written := timeformatMatcher.FindString(basename)
+	if len(written) < 1 {
+		err = errors.New("could not parse version from filename")
+		return
+	}
 	if ts, perr := time.Parse(TimeFormat, written); perr != nil {
 		err = perr // keep going
 	} else {

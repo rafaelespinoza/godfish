@@ -8,5 +8,6 @@ import (
 )
 
 func Test(t *testing.T) {
+	t.Setenv("DB_DSN", "stub_dsn")
 	test.RunDriverTests(t, stub.NewDriver(), test.DefaultQueries)
 }

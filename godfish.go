@@ -162,19 +162,6 @@ func figureOutBasename(directoryPath string, direction internal.Direction, versi
 	return
 }
 
-type runMigrationError struct {
-	driverName    string
-	originalError error
-	path          string
-}
-
-func (e *runMigrationError) Error() string {
-	return fmt.Sprintf(
-		"driver: %q, path: %q, error: %v",
-		e.driverName, e.path, e.originalError,
-	)
-}
-
 // runMigration executes a migration against the database. The input, pathToFile
 // should be relative to the current working directory.
 func runMigration(driver Driver, pathToFile string, mig internal.Migration) (err error) {
@@ -189,11 +176,7 @@ func runMigration(driver Driver, pathToFile string, mig internal.Migration) (err
 	fmt.Fprintf(os.Stderr, "%s version %q ... ", gerund, mig.Version().String())
 
 	if err = driver.Execute(string(data)); err != nil {
-		err = &runMigrationError{
-			driverName:    driver.Name(),
-			originalError: err,
-			path:          pathToFile,
-		}
+		err = fmt.Errorf("%w, path_to_file: %q", err, pathToFile)
 		return
 	}
 	if err = driver.CreateSchemaMigrationsTable(); err != nil {

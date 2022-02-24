@@ -118,7 +118,10 @@ func mustMakeMigrations(names ...string) []internal.Migration {
 		if err != nil {
 			panic(err)
 		}
-		version := stub.NewVersion(strconv.Itoa((i + 1) * 1000))
+		version, err := internal.ParseVersion(strconv.Itoa((i + 1) * 1000))
+		if err != nil {
+			panic(err)
+		}
 		out[i] = stub.NewMigration(params.Forward, version, internal.Indirection{})
 	}
 	return out

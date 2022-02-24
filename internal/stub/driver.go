@@ -10,28 +10,26 @@ import (
 
 type driver struct {
 	appliedVersions godfish.AppliedVersions
-	err             error
-	errorOnExecute  error
 }
 
 func NewDriver() godfish.Driver { return &driver{} }
 
 func (d *driver) Name() string             { return "stub" }
-func (d *driver) Connect(dsn string) error { return d.err }
-func (d *driver) Close() error             { return d.err }
+func (d *driver) Connect(dsn string) error { return nil }
+func (d *driver) Close() error             { return nil }
 
 func (d *driver) CreateSchemaMigrationsTable() error {
 	if d.appliedVersions == nil {
 		d.appliedVersions = NewAppliedVersions()
 	}
-	return d.err
+	return nil
 }
 
 func (d *driver) Execute(q string, a ...interface{}) error {
 	if strings.Contains(q, "invalid SQL") {
 		return fmt.Errorf(q)
 	}
-	return d.errorOnExecute
+	return nil
 }
 
 func (d *driver) UpdateSchemaMigrations(forward bool, version string) error {
@@ -70,7 +68,7 @@ func (d *driver) AppliedVersions() (godfish.AppliedVersions, error) {
 	if d.appliedVersions == nil {
 		return nil, godfish.ErrSchemaMigrationsDoesNotExist
 	}
-	return d.appliedVersions, d.err
+	return d.appliedVersions, nil
 }
 
 // Teardown resets the stub driver in tests. All other Driver implementations

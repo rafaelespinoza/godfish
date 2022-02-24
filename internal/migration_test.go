@@ -1,6 +1,7 @@
 package internal_test
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -11,6 +12,162 @@ import (
 )
 
 const baseTestOutputDir = "/tmp/godfish_test"
+
+func TestParseMigration(t *testing.T) {
+	type testCase struct {
+		filename       internal.Filename
+		expErr         bool
+		expIndirection internal.Indirection
+		expLabel       string
+		// expVersionInput should be an input to ParseVersion, the
+		// implementation used in the test assertions is not exported, so you
+		// cannot directly construct it.
+		expVersionInput string
+	}
+
+	runTest := func(t *testing.T, test testCase) {
+		actual, err := internal.ParseMigration(test.filename)
+		if !test.expErr && err != nil {
+			t.Fatal(err)
+		} else if test.expErr && err == nil {
+			t.Fatal("expected error but did not get one")
+		} else if test.expErr && err != nil {
+			// some unexported funcs in the godfish package have behavior that
+			// depend on this wrapped error.
+			if !errors.Is(err, internal.ErrDataInvalid) {
+				t.Fatalf("expected error %v to wrap %v", err, internal.ErrDataInvalid)
+			}
+			return // ok, nothing more to test.
+		}
+
+		if actual.Indirection().Value != test.expIndirection.Value {
+			t.Errorf(
+				"wrong Direction; got %s, expected %s",
+				actual.Indirection().Value, test.expIndirection.Value,
+			)
+		}
+
+		if actual.Label() != test.expLabel {
+			t.Errorf(
+				"wrong Name; got %s, expected %s",
+				actual.Label(), test.expLabel,
+			)
+		}
+
+		expVersion, err := internal.ParseVersion(test.expVersionInput)
+		if err != nil {
+			t.Fatal(err)
+		}
+		gotVersion := actual.Version()
+		if gotVersion.Before(expVersion) || expVersion.Before(gotVersion) {
+			t.Errorf(
+				"wrong Version timestamp; got %s, expected %s",
+				gotVersion.String(), expVersion.String(),
+			)
+		}
+	}
+
+	t.Run("ok", func(t *testing.T) {
+		runTest(t, testCase{
+			filename:        internal.Filename("forward-20191118121314-test.sql"),
+			expIndirection:  internal.Indirection{Value: internal.DirForward, Label: "forward"},
+			expLabel:        "test",
+			expVersionInput: "20191118121314",
+		})
+
+		runTest(t, testCase{
+			filename:        internal.Filename("reverse-20191118121314-test.sql"),
+			expIndirection:  internal.Indirection{Value: internal.DirReverse},
+			expLabel:        "test",
+			expVersionInput: "20191118121314",
+		})
+	})
+
+	t.Run("no extension", func(t *testing.T) {
+		runTest(t, testCase{
+			filename:        internal.Filename("forward-20191118121314-test"),
+			expIndirection:  internal.Indirection{Value: internal.DirForward},
+			expLabel:        "test",
+			expVersionInput: "20191118121314",
+		})
+	})
+
+	t.Run("timestamp is too long", func(t *testing.T) {
+		runTest(t, testCase{
+			filename:        internal.Filename("forward-201911181213141516-test.sql"),
+			expIndirection:  internal.Indirection{Value: internal.DirForward},
+			expLabel:        "516-test",
+			expVersionInput: "20191118121314",
+		})
+	})
+
+	t.Run("timestamp is short", func(t *testing.T) {
+		runTest(t, testCase{
+			filename:        internal.Filename("forward-1234-test.sql"),
+			expIndirection:  internal.Indirection{Value: internal.DirForward},
+			expLabel:        "test",
+			expVersionInput: "1234",
+		})
+
+		runTest(t, testCase{filename: internal.Filename("forward-123-test.sql"), expErr: true})
+	})
+
+	t.Run("unknown direction", func(t *testing.T) {
+		runTest(t, testCase{filename: internal.Filename("foo-20191118121314-bar.sql"), expErr: true})
+	})
+
+	t.Run("just bad", func(t *testing.T) {
+		runTest(t, testCase{filename: internal.Filename("foo-bar"), expErr: true})
+	})
+
+	t.Run("label has a delimiter", func(t *testing.T) {
+		runTest(t, testCase{
+			filename:        internal.Filename("forward-20191118121314-foo-bar.sql"),
+			expIndirection:  internal.Indirection{Value: internal.DirForward},
+			expLabel:        "foo-bar",
+			expVersionInput: "20191118121314",
+		})
+	})
+
+	t.Run("alternative names for directions", func(t *testing.T) {
+		runTest(t, testCase{
+			filename:        internal.Filename("migrate-20191118121314-test.sql"),
+			expIndirection:  internal.Indirection{Value: internal.DirForward, Label: "migration"},
+			expLabel:        "test",
+			expVersionInput: "20191118121314",
+		})
+
+		runTest(t, testCase{
+			filename:        internal.Filename("up-20191118121314-test.sql"),
+			expIndirection:  internal.Indirection{Value: internal.DirForward, Label: "up"},
+			expLabel:        "test",
+			expVersionInput: "20191118121314",
+		})
+
+		runTest(t, testCase{
+			filename:        internal.Filename("rollback-20191118121314-test.sql"),
+			expIndirection:  internal.Indirection{Value: internal.DirReverse, Label: "rollback"},
+			expLabel:        "test",
+			expVersionInput: "20191118121314",
+		})
+
+		runTest(t, testCase{
+			filename:        internal.Filename("down-20191118121314-test.sql"),
+			expIndirection:  internal.Indirection{Value: internal.DirReverse, Label: "down"},
+			expLabel:        "test",
+			expVersionInput: "20191118121314",
+		})
+	})
+
+	t.Run("unix timestamps as version", func(t *testing.T) {
+		runTest(t, testCase{
+			filename:        internal.Filename("forward-1574079194-test.sql"),
+			expIndirection:  internal.Indirection{Value: internal.DirForward, Label: "forward"},
+			expLabel:        "test",
+			expVersionInput: "20191118121314",
+		})
+	})
+}
 
 func TestMigrationParams(t *testing.T) {
 	testOutputDir := baseTestOutputDir + "/" + t.Name()

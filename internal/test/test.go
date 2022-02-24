@@ -112,7 +112,13 @@ func teardown(driver godfish.Driver, path string, tablesToDrop ...string) {
 	driver.Close()
 }
 
-func formattedTime(v string) internal.Version { return stub.NewVersion(v) }
+func formattedTime(v string) internal.Version {
+	out, err := internal.ParseVersion(v)
+	if err != nil {
+		panic(err)
+	}
+	return out
+}
 
 // testDriverStub encompasses some data to use with interface tests.
 type testDriverStub struct {
