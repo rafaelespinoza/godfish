@@ -190,7 +190,7 @@ func newMigrationStub(mig internal.Migration, version internal.Version, ind inte
 	return stub.NewMigration(mig, version, ind)
 }
 
-// collectAppliedVersions uses the Driver's AppliedVersions method to retreive
+// collectAppliedVersions uses the Driver's AppliedVersions method to retrieve
 // and scan migration version. It opens a new connection in case the connection
 // isn't already on the Driver, but it does close it afterwards.
 func collectAppliedVersions(driver godfish.Driver) (out []string, err error) {

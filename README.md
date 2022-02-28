@@ -1,6 +1,8 @@
 # godfish
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/rafaelespinoza/godfish.svg)](https://pkg.go.dev/github.com/rafaelespinoza/godfish)
+[![codecov](https://codecov.io/gh/rafaelespinoza/godfish/branch/main/graph/badge.svg?token=EoLelW4qiy)](https://codecov.io/gh/rafaelespinoza/godfish)
+[![Go Report Card](https://goreportcard.com/badge/github.com/rafaelespinoza/godfish)](https://goreportcard.com/report/github.com/rafaelespinoza/godfish)
 
 [![cassandra](https://github.com/rafaelespinoza/godfish/actions/workflows/cassandra.yml/badge.svg)](https://github.com/rafaelespinoza/godfish/actions/workflows/cassandra.yml)
 [![mysql](https://github.com/rafaelespinoza/godfish/actions/workflows/mysql.yml/badge.svg)](https://github.com/rafaelespinoza/godfish/actions/workflows/mysql.yml)
