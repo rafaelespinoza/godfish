@@ -119,7 +119,7 @@ func (m *MigrationParams) GenerateFiles() (err error) {
 		return
 	}
 	fmt.Fprintln(os.Stderr, "created forward file:", forwardFile.Name())
-	defer forwardFile.Close()
+	defer func() { _ = forwardFile.Close() }()
 
 	if !m.Reversible {
 		fmt.Fprintln(os.Stderr, "migration marked irreversible, did not create reverse file")
@@ -130,12 +130,13 @@ func (m *MigrationParams) GenerateFiles() (err error) {
 		return
 	}
 	fmt.Fprintln(os.Stderr, "created reverse file:", reverseFile.Name())
-	defer reverseFile.Close()
+	defer func() { _ = reverseFile.Close() }()
 	return
 }
 
 func newMigrationFile(m Migration, baseDir string) (*os.File, error) {
-	return os.Create(baseDir + "/" + MakeMigrationFilename(m))
+	name := filepath.Join(baseDir, MakeMigrationFilename(m))
+	return os.Create(filepath.Clean(name))
 }
 
 // MakeMigrationFilename converts a Migration m to a filename.

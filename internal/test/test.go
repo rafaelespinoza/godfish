@@ -3,6 +3,7 @@ package test
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
 	"testing"
 
@@ -69,8 +70,8 @@ const (
 
 // setup prepares state before running a test.
 func setup(driver godfish.Driver, testName string, stubs []testDriverStub, migrateTo string) (path string, err error) {
-	path = "/tmp/godfish_test/drivers/" + driver.Name() + "/" + testName
-	if err = os.MkdirAll(path, 0755); err != nil {
+	path = filepath.Join("/tmp/godfish_test/drivers/", driver.Name(), testName)
+	if err = os.MkdirAll(path, 0750); err != nil {
 		return
 	}
 	if err = generateMigrationFiles(path, stubs); err != nil {
@@ -108,8 +109,10 @@ func teardown(driver godfish.Driver, path string, tablesToDrop ...string) {
 	if err = driver.Execute(truncate); err != nil {
 		panic(err)
 	}
-	os.RemoveAll(path)
-	driver.Close()
+	_ = os.RemoveAll(path)
+	if err := driver.Close(); err != nil {
+		panic(err)
+	}
 }
 
 func formattedTime(v string) internal.Version {
@@ -162,11 +165,11 @@ func generateMigrationFiles(pathToTestDir string, stubs []testDriverStub) error 
 				"%s/%s-%s-%s.sql",
 				pathToTestDir, mig.Indirection().Label, mig.Version().String(), mig.Label(),
 			)
-			file, err := os.OpenFile(filename, os.O_RDWR|os.O_CREATE, 0755)
+			file, err := os.OpenFile(filepath.Clean(filename), os.O_RDWR|os.O_CREATE, 0600)
 			if err != nil {
 				return err
 			}
-			defer file.Close()
+			defer func() { _ = file.Close() }()
 
 			// this only works if the slice we're iterating through has
 			// migrations where each Direction is in the order:

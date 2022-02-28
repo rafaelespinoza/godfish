@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -131,7 +132,7 @@ func TestInit(t *testing.T) {
 	var err error
 	testOutputDir := makeTestDir(t, "")
 
-	pathToFile := testOutputDir + "/config.json"
+	pathToFile := filepath.Clean(filepath.Join(testOutputDir, "config.json"))
 
 	// setup: file should not exist at first
 	if _, err = os.Stat(pathToFile); !os.IsNotExist(err) {
@@ -154,11 +155,10 @@ func TestInit(t *testing.T) {
 	if data, err := json.MarshalIndent(conf, "", "\t"); err != nil {
 		t.Fatal(err)
 	} else {
-		os.WriteFile(
-			pathToFile,
-			append(data, byte('\n')),
-			os.FileMode(0644),
-		)
+		err = os.WriteFile(pathToFile, append(data, byte('\n')), os.FileMode(0640))
+		if err != nil {
+			t.Fatal(err)
+		}
 	}
 	if err := godfish.Init(pathToFile); err != nil {
 		t.Fatal(err)

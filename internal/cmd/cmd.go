@@ -7,6 +7,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/rafaelespinoza/alf"
@@ -106,7 +107,7 @@ Examples:
 			// Look for config file and if present, merge those values with
 			// input flag values.
 			var conf internal.Config
-			if data, ierr := os.ReadFile(pathToConfig); ierr != nil {
+			if data, ierr := os.ReadFile(filepath.Clean(pathToConfig)); ierr != nil {
 				// probably no config file present, rely on arguments instead.
 			} else if ierr = json.Unmarshal(data, &conf); ierr != nil {
 				return ierr

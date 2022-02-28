@@ -166,7 +166,7 @@ func figureOutBasename(directoryPath string, direction internal.Direction, versi
 // should be relative to the current working directory.
 func runMigration(driver Driver, pathToFile string, mig internal.Migration) (err error) {
 	var data []byte
-	if data, err = os.ReadFile(pathToFile); err != nil {
+	if data, err = os.ReadFile(filepath.Clean(pathToFile)); err != nil {
 		return
 	}
 	gerund := "migrating"
@@ -334,7 +334,11 @@ func (m *migrationFinder) available() (out []internal.Migration, err error) {
 		}
 		return
 	}
-	defer fileDir.Close()
+	defer func() {
+		if ierr := fileDir.Close(); ierr != nil {
+			fmt.Fprintln(os.Stderr, ierr)
+		}
+	}()
 	if filenames, err = fileDir.Readdirnames(0); err != nil {
 		return
 	}

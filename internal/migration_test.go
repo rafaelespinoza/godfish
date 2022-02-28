@@ -171,7 +171,7 @@ func TestParseMigration(t *testing.T) {
 
 func TestMigrationParams(t *testing.T) {
 	testOutputDir := baseTestOutputDir + "/" + t.Name()
-	if err := os.MkdirAll(testOutputDir, 0755); err != nil {
+	if err := os.MkdirAll(testOutputDir, 0750); err != nil {
 		t.Fatal(err)
 	}
 

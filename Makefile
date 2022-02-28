@@ -1,6 +1,7 @@
 GO ?= go
 BIN_DIR=bin
 PKG_IMPORT_PATH=github.com/rafaelespinoza/godfish
+GOSEC ?= gosec
 
 CORE_SRC_PKG_PATHS=$(PKG_IMPORT_PATH) $(PKG_IMPORT_PATH)/internal/...
 CASSANDRA_PATH=$(PKG_IMPORT_PATH)/drivers/cassandra
@@ -29,6 +30,20 @@ clean:
 _mkdir:
 	mkdir -pv $(BIN_DIR)
 
+# Run a security scanner over the source code. This Makefile won't install the
+# scanner binary for you, so check out the gosec README for instructions:
+# https://github.com/securego/gosec
+#
+# If necessary, specify the path to the built binary with the GOSEC env var.
+#
+# Also note, the package paths (last positional input to gosec command) should
+# be a "relative" package path. That is, starting with a dot.
+gosec:
+	$(GOSEC) $(ARGS) . ./internal/...
+
+#
+# Cassandra
+#
 build-cassandra: BIN=$(BIN_DIR)/godfish_cassandra
 build-cassandra: _mkdir
 	$(GO) build -o $(BIN) -v \
@@ -40,7 +55,12 @@ test-cassandra:
 	$(GO) test $(ARGS) $(CASSANDRA_PATH)/...
 vet-cassandra: vet
 	$(GO) vet $(ARGS) $(CASSANDRA_PATH)/...
+gosec-cassandra: gosec
+	$(GOSEC) $(ARGS) ./drivers/cassandra/...
 
+#
+# Postgres
+#
 build-postgres: BIN=$(BIN_DIR)/godfish_postgres
 build-postgres: _mkdir
 	$(GO) build -o $(BIN) -v \
@@ -52,7 +72,12 @@ test-postgres:
 	$(GO) test $(ARGS) $(POSTGRES_PATH)/...
 vet-postgres: vet
 	$(GO) vet $(ARGS) $(POSTGRES_PATH)/...
+gosec-postgres: gosec
+	$(GOSEC) $(ARGS) ./drivers/postgres/...
 
+#
+# MySQL
+#
 build-mysql: BIN=$(BIN_DIR)/godfish_mysql
 build-mysql: _mkdir
 	$(GO) build -o $(BIN) -v \
@@ -64,7 +89,12 @@ test-mysql:
 	$(GO) test $(ARGS) $(MYSQL_PATH)/...
 vet-mysql: vet
 	$(GO) vet $(ARGS) $(MYSQL_PATH)/...
+gosec-mysql: gosec
+	$(GOSEC) $(ARGS) ./drivers/mysql/...
 
+#
+# SQLite3
+#
 build-sqlite3: BIN=$(BIN_DIR)/godfish_sqlite3
 build-sqlite3: _mkdir
 	CGO_ENABLED=1 $(GO) build -o $(BIN) -v \
@@ -76,3 +106,5 @@ test-sqlite3:
 	$(GO) test $(ARGS) $(SQLITE3_PATH)/...
 vet-sqlite3: vet
 	$(GO) vet $(ARGS) $(SQLITE3_PATH)/...
+gosec-sqlite3: gosec
+	$(GOSEC) $(ARGS) ./drivers/sqlite3/...
