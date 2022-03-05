@@ -143,6 +143,11 @@ source code lines too long. More lines is fine with the exception of
 declarations of exported identifiers; they should be on one line, otherwise the
 generated godoc looks weird. There are also tests, those should pass.
 
+The GitHub Actions run a security scanner on all of the source code using
+[gosec](https://github.com/securego/gosec). There should be no rule violations
+here. The Makefile provides some convenience targets if you want to run `gosec`
+on your development machine.
+
 ## tests
 
 Docker and docker-compose are used to create environments and run the tests

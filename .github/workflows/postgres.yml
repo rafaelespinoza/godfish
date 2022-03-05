@@ -33,3 +33,12 @@ jobs:
         verbose: true
     - name: Teardown
       run: make -f ci.Makefile ci-postgres13-down
+  security_scan:
+    runs-on: ubuntu-20.04
+    steps:
+    - name: Checkout repo
+      uses: actions/checkout@v2
+    - name: Run gosec
+      uses: securego/gosec@master
+      with:
+        args: . ./internal/... ./drivers/postgres/...
