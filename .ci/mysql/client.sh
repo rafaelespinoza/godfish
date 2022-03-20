@@ -28,6 +28,3 @@ done
 
 echo "testing godfish against live db"
 make test-mysql ARGS='-v -count=1 -coverprofile=/tmp/cover_driver.out'
-
-echo "vetting code"
-make vet-mysql

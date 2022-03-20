@@ -1,14 +1,14 @@
-name: cassandra
+name: postgres
 on: [push, pull_request]
 jobs:
-  v3:
-    name: cassandra_v3
+  v12:
+    name: postgres v12
     runs-on: ubuntu-20.04
     steps:
     - name: Checkout repo
       uses: actions/checkout@v2
     - name: Build environment and run tests
-      run: make -f ci.Makefile ci-cassandra3-up
+      run: make -f ci.Makefile ci-postgres12-up
     - name: Upload code coverage
       uses: codecov/codecov-action@v2
       with:
@@ -16,15 +16,15 @@ jobs:
         files: /tmp/cover.out,/tmp/cover_driver.out
         verbose: true
     - name: Teardown
-      run: make -f ci.Makefile ci-cassandra3-down
-  v4:
-    name: cassandra_v4
+      run: make -f ci.Makefile ci-postgres12-down
+  v13:
+    name: postgres v13
     runs-on: ubuntu-20.04
     steps:
     - name: Checkout repo
       uses: actions/checkout@v2
     - name: Build environment and run tests
-      run: make -f ci.Makefile ci-cassandra4-up
+      run: make -f ci.Makefile ci-postgres13-up
     - name: Upload code coverage
       uses: codecov/codecov-action@v2
       with:
@@ -32,13 +32,4 @@ jobs:
         files: /tmp/cover.out,/tmp/cover_driver.out
         verbose: true
     - name: Teardown
-      run: make -f ci.Makefile ci-cassandra4-down
-  security_scan:
-    runs-on: ubuntu-20.04
-    steps:
-    - name: Checkout repo
-      uses: actions/checkout@v2
-    - name: Run gosec
-      uses: securego/gosec@master
-      with:
-        args: . ./internal/... ./drivers/cassandra/...
+      run: make -f ci.Makefile ci-postgres13-down

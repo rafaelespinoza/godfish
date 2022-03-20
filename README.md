@@ -4,10 +4,10 @@
 [![codecov](https://codecov.io/gh/rafaelespinoza/godfish/branch/main/graph/badge.svg?token=EoLelW4qiy)](https://codecov.io/gh/rafaelespinoza/godfish)
 [![Go Report Card](https://goreportcard.com/badge/github.com/rafaelespinoza/godfish)](https://goreportcard.com/report/github.com/rafaelespinoza/godfish)
 
-[![cassandra](https://github.com/rafaelespinoza/godfish/actions/workflows/cassandra.yml/badge.svg)](https://github.com/rafaelespinoza/godfish/actions/workflows/cassandra.yml)
-[![mysql](https://github.com/rafaelespinoza/godfish/actions/workflows/mysql.yml/badge.svg)](https://github.com/rafaelespinoza/godfish/actions/workflows/mysql.yml)
-[![postgres](https://github.com/rafaelespinoza/godfish/actions/workflows/postgres.yml/badge.svg)](https://github.com/rafaelespinoza/godfish/actions/workflows/postgres.yml)
-[![sqlite3](https://github.com/rafaelespinoza/godfish/actions/workflows/sqlite3.yml/badge.svg)](https://github.com/rafaelespinoza/godfish/actions/workflows/sqlite3.yml)
+[![cassandra](https://github.com/rafaelespinoza/godfish/actions/workflows/build-cassandra.yml/badge.svg)](https://github.com/rafaelespinoza/godfish/actions/workflows/build-cassandra.yml)
+[![mysql](https://github.com/rafaelespinoza/godfish/actions/workflows/build-mysql.yml/badge.svg)](https://github.com/rafaelespinoza/godfish/actions/workflows/build-mysql.yml)
+[![postgres](https://github.com/rafaelespinoza/godfish/actions/workflows/build-postgres.yml/badge.svg)](https://github.com/rafaelespinoza/godfish/actions/workflows/build-postgres.yml)
+[![sqlite3](https://github.com/rafaelespinoza/godfish/actions/workflows/build-sqlite3.yml/badge.svg)](https://github.com/rafaelespinoza/godfish/actions/workflows/build-sqlite3.yml)
 
 `godfish` is a database migration manager, similar to the very good
 [`dogfish`](https://github.com/dwb/dogfish), but written in golang.
@@ -145,8 +145,8 @@ generated godoc looks weird. There are also tests, those should pass.
 
 The GitHub Actions run a security scanner on all of the source code using
 [gosec](https://github.com/securego/gosec). There should be no rule violations
-here. The Makefile provides some convenience targets if you want to run `gosec`
-on your development machine.
+here. The Makefile provides a convenience target if you want to run `gosec` on
+your development machine.
 
 ## tests
 

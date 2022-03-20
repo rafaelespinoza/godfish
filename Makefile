@@ -22,7 +22,7 @@ test:
 	$(GO) test $(ARGS) $(CORE_SRC_PKG_PATHS)
 
 vet:
-	$(GO) vet $(ARGS) $(CORE_SRC_PKG_PATHS)
+	$(GO) vet $(ARGS) $(CORE_SRC_PKG_PATHS) $(PKG_IMPORT_PATH)/drivers/...
 
 clean:
 	rm -rf $(BIN_DIR)
@@ -39,7 +39,7 @@ _mkdir:
 # Also note, the package paths (last positional input to gosec command) should
 # be a "relative" package path. That is, starting with a dot.
 gosec:
-	$(GOSEC) $(ARGS) . ./internal/...
+	$(GOSEC) $(ARGS) . ./internal/... ./drivers/...
 
 #
 # Cassandra
@@ -53,10 +53,6 @@ build-cassandra: _mkdir
 	@echo "built cassandra to $(BIN)"
 test-cassandra:
 	$(GO) test $(ARGS) $(CASSANDRA_PATH)/...
-vet-cassandra: vet
-	$(GO) vet $(ARGS) $(CASSANDRA_PATH)/...
-gosec-cassandra: gosec
-	$(GOSEC) $(ARGS) ./drivers/cassandra/...
 
 #
 # Postgres
@@ -70,10 +66,6 @@ build-postgres: _mkdir
 	@echo "built postgres to $(BIN)"
 test-postgres:
 	$(GO) test $(ARGS) $(POSTGRES_PATH)/...
-vet-postgres: vet
-	$(GO) vet $(ARGS) $(POSTGRES_PATH)/...
-gosec-postgres: gosec
-	$(GOSEC) $(ARGS) ./drivers/postgres/...
 
 #
 # MySQL
@@ -87,10 +79,6 @@ build-mysql: _mkdir
 	@echo "built mysql to $(BIN)"
 test-mysql:
 	$(GO) test $(ARGS) $(MYSQL_PATH)/...
-vet-mysql: vet
-	$(GO) vet $(ARGS) $(MYSQL_PATH)/...
-gosec-mysql: gosec
-	$(GOSEC) $(ARGS) ./drivers/mysql/...
 
 #
 # SQLite3
@@ -104,7 +92,3 @@ build-sqlite3: _mkdir
 	@echo "built sqlite3 to $(BIN)"
 test-sqlite3:
 	$(GO) test $(ARGS) $(SQLITE3_PATH)/...
-vet-sqlite3: vet
-	$(GO) vet $(ARGS) $(SQLITE3_PATH)/...
-gosec-sqlite3: gosec
-	$(GOSEC) $(ARGS) ./drivers/sqlite3/...
