@@ -1,0 +1,2 @@
+SA_PASSWORD=1_complicated_password!
+DB_DSN="sqlserver://sa:${SA_PASSWORD}@server"

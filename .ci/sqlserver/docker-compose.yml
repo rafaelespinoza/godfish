@@ -1,0 +1,27 @@
+version: "3.9"
+
+services:
+    client:
+        build:
+            context: "${BUILD_DIR}"
+            dockerfile: "${BUILD_DIR}/.ci/sqlserver/client.Dockerfile"
+        image: godfish_test/sqlserver/client:latest
+        container_name: godfish_ci_sqlserver_client
+        depends_on:
+          - server
+        entrypoint: /client.sh
+        env_file:
+            - env
+        environment:
+            CGO_ENABLED: 0
+        tty: true
+    server:
+        build:
+            context: "${BUILD_DIR}"
+            dockerfile: "${BUILD_DIR}/.ci/sqlserver/server.Dockerfile"
+        image: godfish_test/sqlserver/server:latest
+        container_name: godfish_ci_sqlserver_server
+        env_file:
+            - env
+        environment:
+            ACCEPT_EULA: '1'

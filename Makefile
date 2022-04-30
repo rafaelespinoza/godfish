@@ -5,6 +5,7 @@ GOSEC ?= gosec
 
 CORE_SRC_PKG_PATHS=$(PKG_IMPORT_PATH) $(PKG_IMPORT_PATH)/internal/...
 CASSANDRA_PATH=$(PKG_IMPORT_PATH)/drivers/cassandra
+SQLSERVER_PATH=$(PKG_IMPORT_PATH)/drivers/sqlserver
 MYSQL_PATH=$(PKG_IMPORT_PATH)/drivers/mysql
 POSTGRES_PATH=$(PKG_IMPORT_PATH)/drivers/postgres
 SQLITE3_PATH=$(PKG_IMPORT_PATH)/drivers/sqlite3
@@ -66,6 +67,19 @@ build-postgres: _mkdir
 	@echo "built postgres to $(BIN)"
 test-postgres:
 	$(GO) test $(ARGS) $(POSTGRES_PATH)/...
+
+#
+# Microsoft SQL Server
+#
+build-sqlserver: BIN=$(BIN_DIR)/godfish_sqlserver
+build-sqlserver:
+	$(GO) build -o $(BIN) -v \
+		-ldflags "$(LDFLAGS) \
+		-X $(PKG_IMPORT_PATH)/internal/cmd.versionDriver=sqlserver" \
+		$(SQLSERVER_PATH)/godfish
+	@echo "built sqlserver to $(BIN)"
+test-sqlserver:
+	$(GO) test $(ARGS) $(SQLSERVER_PATH)/...
 
 #
 # MySQL

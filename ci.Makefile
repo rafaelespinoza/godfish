@@ -61,6 +61,13 @@ ci-sqlite3-up: build-base
 ci-sqlite3-down:
 	docker-compose -f $(SQLITE3_FILE) down --rmi all --volumes
 
+SQLSERVER_FILE=$(CI_DIR)/sqlserver/docker-compose.yml
+ci-sqlserver-up: build-base
+	BUILD_DIR=$(BUILD_DIR) docker-compose -f $(SQLSERVER_FILE) up --build --exit-code-from client && \
+		.ci/cp_coverage_to_host.sh $(SQLSERVER_FILE)
+ci-sqlserver-down:
+	docker-compose -f $(SQLSERVER_FILE) down --rmi all --volumes
+
 #
 # Build and tag base image.
 #
