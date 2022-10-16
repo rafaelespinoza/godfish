@@ -51,11 +51,16 @@ func ParseMigration(name Filename) (mig Migration, err error) {
 		return
 	}
 
+	var label string
 	// index of the start of migration label
 	j := i + len(version.String()) + len(filenameDelimeter)
+	if j < len(basename) {
+		label = strings.TrimSuffix(string(basename[j:]), ".sql")
+	}
+
 	mig = &mutation{
 		indirection: indirection,
-		label:       strings.TrimSuffix(string(basename[j:]), ".sql"),
+		label:       label,
 		version:     version,
 	}
 	return

@@ -102,6 +102,7 @@ func TestParseMigration(t *testing.T) {
 	})
 
 	t.Run("timestamp is short", func(t *testing.T) {
+		// short, but ok
 		runTest(t, testCase{
 			filename:        internal.Filename("forward-1234-test.sql"),
 			expIndirection:  internal.Indirection{Value: internal.DirForward},
@@ -109,6 +110,7 @@ func TestParseMigration(t *testing.T) {
 			expVersionInput: "1234",
 		})
 
+		// too short
 		runTest(t, testCase{filename: internal.Filename("forward-123-test.sql"), expErr: true})
 	})
 
@@ -120,12 +122,42 @@ func TestParseMigration(t *testing.T) {
 		runTest(t, testCase{filename: internal.Filename("foo-bar"), expErr: true})
 	})
 
-	t.Run("label has a delimiter", func(t *testing.T) {
-		runTest(t, testCase{
-			filename:        internal.Filename("forward-20191118121314-foo-bar.sql"),
-			expIndirection:  internal.Indirection{Value: internal.DirForward},
-			expLabel:        "foo-bar",
-			expVersionInput: "20191118121314",
+	t.Run("label", func(t *testing.T) {
+		t.Run("has a delimiter", func(t *testing.T) {
+			runTest(t, testCase{
+				filename:        internal.Filename("forward-20191118121314-foo-bar.sql"),
+				expIndirection:  internal.Indirection{Value: internal.DirForward},
+				expLabel:        "foo-bar",
+				expVersionInput: "20191118121314",
+			})
+		})
+
+		t.Run("empty", func(t *testing.T) {
+			runTest(t, testCase{
+				filename:        internal.Filename("forward-20191118121314-.sql"),
+				expIndirection:  internal.Indirection{Value: internal.DirForward},
+				expLabel:        "",
+				expVersionInput: "20191118121314",
+			})
+		})
+
+		// These cases describe outcomes where the user omits the label portion
+		// from the filename. The feature here is that the code doesn't blow up.
+		t.Run("omitted entirely", func(t *testing.T) {
+			runTest(t, testCase{
+				filename:        internal.Filename("forward-20191118121314.sql"),
+				expIndirection:  internal.Indirection{Value: internal.DirForward},
+				expLabel:        "sql",
+				expVersionInput: "20191118121314",
+			})
+
+			// No filename extension
+			runTest(t, testCase{
+				filename:        internal.Filename("forward-20191118121314"),
+				expIndirection:  internal.Indirection{Value: internal.DirForward},
+				expLabel:        "",
+				expVersionInput: "20191118121314",
+			})
 		})
 	})
 
