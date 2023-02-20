@@ -2,14 +2,14 @@ name: sqlite3
 on: [push, pull_request]
 jobs:
   all:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     steps:
     - name: Checkout repo
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
     - name: Build environment and run tests
       run: make -f ci.Makefile ci-sqlite3-up
     - name: Upload code coverage
-      uses: codecov/codecov-action@v2
+      uses: codecov/codecov-action@v3
       with:
         fail_ci_if_error: true
         files: /tmp/cover.out,/tmp/cover_driver.out
