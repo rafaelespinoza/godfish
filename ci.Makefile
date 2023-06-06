@@ -19,19 +19,19 @@ ci-cassandra4-up: build-base
 ci-cassandra4-down:
 	docker-compose -f $(CASSANDRA_V4_FILE) down --rmi all --volumes
 
-POSTGRES_V12_FILE=$(CI_DIR)/postgres/v12.yml
-ci-postgres12-up: build-base
-	BUILD_DIR=$(BUILD_DIR) docker-compose -f $(POSTGRES_V12_FILE) up --build --exit-code-from client && \
-		.ci/cp_coverage_to_host.sh $(POSTGRES_V12_FILE)
-ci-postgres12-down:
-	docker-compose -f $(POSTGRES_V12_FILE) down --rmi all --volumes
+POSTGRES_V14_FILE=$(CI_DIR)/postgres/v14.yml
+ci-postgres14-up: build-base
+	BUILD_DIR=$(BUILD_DIR) docker-compose -f $(POSTGRES_V14_FILE) up --build --exit-code-from client && \
+		.ci/cp_coverage_to_host.sh $(POSTGRES_V14_FILE)
+ci-postgres14-down:
+	docker-compose -f $(POSTGRES_V14_FILE) down --rmi all --volumes
 
-POSTGRES_V13_FILE=$(CI_DIR)/postgres/v13.yml
-ci-postgres13-up: build-base
-	BUILD_DIR=$(BUILD_DIR) docker-compose -f $(POSTGRES_V13_FILE) up --build --exit-code-from client && \
-		.ci/cp_coverage_to_host.sh $(POSTGRES_V13_FILE)
-ci-postgres13-down:
-	docker-compose -f $(POSTGRES_V13_FILE) down --rmi all --volumes
+POSTGRES_V15_FILE=$(CI_DIR)/postgres/v15.yml
+ci-postgres15-up: build-base
+	BUILD_DIR=$(BUILD_DIR) docker-compose -f $(POSTGRES_V15_FILE) up --build --exit-code-from client && \
+		.ci/cp_coverage_to_host.sh $(POSTGRES_V15_FILE)
+ci-postgres15-down:
+	docker-compose -f $(POSTGRES_V15_FILE) down --rmi all --volumes
 
 MARIA_DB_FILE=$(CI_DIR)/mysql/mariadb_v10.yml
 ci-mariadb-up: build-base

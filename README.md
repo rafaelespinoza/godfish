@@ -167,8 +167,8 @@ make -f ci.Makefile ci-mariadb-up
 make -f ci.Makefile ci-mysql57-up
 make -f ci.Makefile ci-mysql8-up
 
-make -f ci.Makefile ci-postgres12-up
-make -f ci.Makefile ci-postgres13-up
+make -f ci.Makefile ci-postgres14-up
+make -f ci.Makefile ci-postgres15-up
 
 make -f ci.Makefile ci-sqlite3-up
 ```
@@ -184,8 +184,8 @@ make -f ci.Makefile ci-mariadb-down
 make -f ci.Makefile ci-mysql57-down
 make -f ci.Makefile ci-mysql8-down
 
-make -f ci.Makefile ci-postgres12-down
-make -f ci.Makefile ci-postgres13-down
+make -f ci.Makefile ci-postgres14-down
+make -f ci.Makefile ci-postgres15-down
 
 make -f ci.Makefile ci-sqlite3-down
 ```

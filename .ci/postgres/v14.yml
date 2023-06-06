@@ -19,9 +19,9 @@ services:
     server:
         build:
             context: "${BUILD_DIR}"
-            dockerfile: "${BUILD_DIR}/.ci/postgres/server_v13.Dockerfile"
-        image: godfish_test/postgres/server_v13:latest
-        container_name: godfish_ci_postgres_server_v13
+            dockerfile: "${BUILD_DIR}/.ci/postgres/server_v14.Dockerfile"
+        image: godfish_test/postgres/server_v14:latest
+        container_name: godfish_ci_postgres_server_v14
         env_file:
             - env
         expose:
