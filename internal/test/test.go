@@ -101,7 +101,7 @@ func teardown(driver godfish.Driver, path string, tablesToDrop ...string) {
 	case "stub":
 		stub.Teardown(driver)
 		truncate = `TRUNCATE TABLE schema_migrations`
-	case "sqlite3":
+	case "sqlite", "sqlite3":
 		truncate = `DELETE FROM schema_migrations`
 	default:
 		truncate = `TRUNCATE TABLE schema_migrations`

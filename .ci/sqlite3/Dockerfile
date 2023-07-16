@@ -1,6 +1,5 @@
 FROM godfish_test/client_base:latest
 
-ENV CGO_ENABLED=1
 ENV DB_DSN="file:/godfish_test.db"
 
 WORKDIR /src

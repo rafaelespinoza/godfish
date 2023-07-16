@@ -99,7 +99,7 @@ test-mysql:
 #
 build-sqlite3: BIN=$(BIN_DIR)/godfish_sqlite3
 build-sqlite3: _mkdir
-	CGO_ENABLED=1 $(GO) build -o $(BIN) -v \
+	$(GO) build -o $(BIN) -v \
 		-ldflags "$(LDFLAGS) \
 		-X $(PKG_IMPORT_PATH)/internal/cmd.versionDriver=sqlite3" \
 		$(SQLITE3_PATH)/godfish

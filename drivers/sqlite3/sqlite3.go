@@ -5,8 +5,8 @@ import (
 	"errors"
 	"strings"
 
-	sqlib "github.com/mattn/go-sqlite3"
 	"github.com/rafaelespinoza/godfish"
+	sqlib "modernc.org/sqlite"
 )
 
 // NewDriver creates a new sqlite3 driver.
@@ -17,7 +17,7 @@ type driver struct {
 	connection *sql.DB
 }
 
-func (d *driver) Name() string { return "sqlite3" }
+func (d *driver) Name() string { return "sqlite" }
 func (d *driver) Connect(dsn string) (err error) {
 	if d.connection != nil {
 		return
@@ -58,8 +58,8 @@ func (d *driver) AppliedVersions() (out godfish.AppliedVersions, err error) {
 		`SELECT migration_id FROM schema_migrations ORDER BY migration_id ASC`,
 	)
 
-	var ierr sqlib.Error
-	if errors.As(err, &ierr) && ierr.Code == 1 && strings.Contains(ierr.Error(), "no such table") {
+	var ierr *sqlib.Error
+	if errors.As(err, &ierr) && ierr.Code() == 1 && strings.Contains(ierr.Error(), "no such table") {
 		err = godfish.ErrSchemaMigrationsDoesNotExist
 	}
 
