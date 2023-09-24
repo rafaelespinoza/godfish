@@ -19,3 +19,10 @@ su - postgres -c "psql -v ON_ERROR_STOP=1" <<-SQL
 	CREATE DATABASE ${dbname} WITH ENCODING utf8 OWNER ${dbuser};
 	GRANT ALL PRIVILEGES ON DATABASE ${dbname} TO ${dbuser};
 SQL
+
+if [ ! -d "${PGDATA}" ]; then
+	echo >&2 "directory, ${PGDATA}, does not exist"
+	exit 1
+fi
+
+echo "host ${dbname} ${dbuser} all trust" >> "${PGDATA}/pg_hba.conf"
