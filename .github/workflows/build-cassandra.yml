@@ -6,7 +6,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Checkout repo
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
     - name: Build environment and run tests
       run: make -f ci.Makefile ci-cassandra3-up
     - name: Upload code coverage
@@ -23,7 +23,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Checkout repo
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
     - name: Build environment and run tests
       run: make -f ci.Makefile ci-cassandra4-up
     - name: Upload code coverage
