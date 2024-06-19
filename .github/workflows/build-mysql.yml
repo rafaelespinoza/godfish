@@ -10,10 +10,11 @@ jobs:
     - name: Build environment and run tests
       run: make -f ci.Makefile ci-mariadb-up
     - name: Upload code coverage
-      uses: codecov/codecov-action@v3
+      uses: codecov/codecov-action@v4
       with:
         fail_ci_if_error: true
         files: /tmp/cover.out,/tmp/cover_driver.out
+        token: ${{ secrets.CODECOV_TOKEN }}
         verbose: true
     - name: Teardown
       run: make -f ci.Makefile ci-mariadb-down
@@ -26,10 +27,11 @@ jobs:
     - name: Build environment and run tests
       run: make -f ci.Makefile ci-mysql57-up
     - name: Upload code coverage
-      uses: codecov/codecov-action@v3
+      uses: codecov/codecov-action@v4
       with:
         fail_ci_if_error: true
         files: /tmp/cover.out,/tmp/cover_driver.out
+        token: ${{ secrets.CODECOV_TOKEN }}
         verbose: true
     - name: Teardown
       run: make -f ci.Makefile ci-mysql57-down
@@ -42,10 +44,11 @@ jobs:
     - name: Build environment and run tests
       run: make -f ci.Makefile ci-mysql8-up
     - name: Upload code coverage
-      uses: codecov/codecov-action@v3
+      uses: codecov/codecov-action@v4
       with:
         fail_ci_if_error: true
         files: /tmp/cover.out,/tmp/cover_driver.out
+        token: ${{ secrets.CODECOV_TOKEN }}
         verbose: true
     - name: Teardown
       run: make -f ci.Makefile ci-mysql8-down
