@@ -1,7 +1,7 @@
 FROM godfish_test/client_base:latest
 
 WORKDIR /src
-RUN make build-cassandra
+RUN just build-cassandra
 
 # Alpine linux doesn't have a cassandra client. Build a golang binary to check
 # if server is ready and setup the test DB. Use it in the entrypoint.

@@ -23,7 +23,9 @@ jobs:
         with:
           version: '~> v2'
           install-only: true
-      - name: Make release
-        run: make release ARGS='--snapshot=false'
+      - name: Install just
+        uses: extractions/setup-just@v3
+      - name: Build release
+        run: just release '--snapshot=false'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
