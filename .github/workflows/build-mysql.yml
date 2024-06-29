@@ -7,8 +7,10 @@ jobs:
     steps:
     - name: Checkout repo
       uses: actions/checkout@v6
+    - name: Install just
+      uses: extractions/setup-just@v3
     - name: Build environment and run tests
-      run: make -f ci.Makefile ci-mariadb-up
+      run: just -f ci.Justfile mariadb-up
     - name: Upload code coverage
       uses: codecov/codecov-action@v5
       with:
@@ -17,4 +19,4 @@ jobs:
         token: ${{ secrets.CODECOV_TOKEN }}
         verbose: true
     - name: Teardown
-      run: make -f ci.Makefile ci-mariadb-down
+      run: just -f ci.Justfile mariadb-down

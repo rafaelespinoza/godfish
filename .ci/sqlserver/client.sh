@@ -5,7 +5,7 @@ set -eu
 ./bin/godfish_sqlserver version
 
 echo "testing godfish"
-make test ARGS='-v -count=1 -coverprofile=/tmp/cover.out'
+just test '-v -count=1 -coverprofile=/tmp/cover.out'
 
 # Wait for db server to be ready, with some limits.
 
@@ -24,4 +24,4 @@ done
 >&2 echo "db is up"
 
 echo "testing godfish against live db"
-make test-sqlserver ARGS='-v -count=1 -coverprofile=/tmp/cover_driver.out'
+just test-sqlserver '-v -count=1 -coverprofile=/tmp/cover_driver.out'

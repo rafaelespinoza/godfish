@@ -7,8 +7,10 @@ jobs:
     steps:
     - name: Checkout repo
       uses: actions/checkout@v6
+    - name: Install just
+      uses: extractions/setup-just@v3
     - name: Build environment and run tests
-      run: make -f ci.Makefile ci-postgres14-up
+      run: just -f ci.Justfile postgres14-up
     - name: Upload code coverage
       uses: codecov/codecov-action@v5
       with:
@@ -17,15 +19,17 @@ jobs:
         token: ${{ secrets.CODECOV_TOKEN }}
         verbose: true
     - name: Teardown
-      run: make -f ci.Makefile ci-postgres14-down
+      run: just -f ci.Justfile postgres14-down
   v15:
     name: postgres v15
     runs-on: ubuntu-latest
     steps:
     - name: Checkout repo
       uses: actions/checkout@v6
+    - name: Install just
+      uses: extractions/setup-just@v3
     - name: Build environment and run tests
-      run: make -f ci.Makefile ci-postgres15-up
+      run: just -f ci.Justfile postgres15-up
     - name: Upload code coverage
       uses: codecov/codecov-action@v5
       with:
@@ -34,4 +38,4 @@ jobs:
         token: ${{ secrets.CODECOV_TOKEN }}
         verbose: true
     - name: Teardown
-      run: make -f ci.Makefile ci-postgres15-down
+      run: just -f ci.Justfile postgres15-down

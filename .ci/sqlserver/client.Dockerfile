@@ -1,7 +1,7 @@
 FROM godfish_test/client_base:latest
 
 WORKDIR /src
-RUN make build-sqlserver
+RUN just build-sqlserver
 
 # Alpine linux doesn't have a SQL Server client. Build a golang binary to
 # check if server is ready. Use it in the entrypoint.

@@ -31,15 +31,17 @@ There is also an installation script at [scripts/install.sh](./scripts/install.s
 ## build
 
 An alternative to using a pre-built release to is to build your own.
+NOTE: these require [just](https://just.systems).
+
 Make a CLI binary for the DB you want to use. This tool comes with some driver
 implementations. Build one like so:
 
 ```
-make build-cassandra
-make build-mysql
-make build-postgres
-make build-sqlite3
-make build-sqlserver
+just build-cassandra
+just build-mysql
+just build-postgres
+just build-sqlite3
+just build-sqlserver
 ```
 
 From there you could move it to `$GOPATH/bin`, move it to your project or
@@ -156,41 +158,41 @@ generated godoc looks weird. There are also tests, those should pass.
 
 The GitHub Actions run a security scanner on all of the source code using
 [gosec](https://github.com/securego/gosec). There should be no rule violations
-here. The Makefile provides a convenience target if you want to run `gosec` on
+here. The Justfile provides a convenience target if you want to run `gosec` on
 your development machine.
 
 ## tests
 
 Docker is used to create environments and run the tests against a live
 database. Each database has a separate configuration. All of this lives in
-`ci.Makefile` and the `.ci/` directory.
+`ci.Justfile` and the `.ci/` directory.
 
 Build environments and run tests
 ```sh
-make -f ci.Makefile ci-cassandra3-up
-make -f ci.Makefile ci-cassandra4-up
+just -f ci.Justfile ci-cassandra3-up
+just -f ci.Justfile ci-cassandra4-up
 
-make -f ci.Makefile ci-sqlserver-up
+just -f ci.Justfile ci-sqlserver-up
 
-make -f ci.Makefile ci-mariadb-up
+just -f ci.Justfile ci-mariadb-up
 
-make -f ci.Makefile ci-postgres14-up
-make -f ci.Makefile ci-postgres15-up
+just -f ci.Justfile ci-postgres14-up
+just -f ci.Justfile ci-postgres15-up
 
-make -f ci.Makefile ci-sqlite3-up
+just -f ci.Justfile ci-sqlite3-up
 ```
 
 Teardown
 ```sh
-make -f ci.Makefile ci-cassandra3-down
-make -f ci.Makefile ci-cassandra4-down
+just -f ci.Justfile ci-cassandra3-down
+just -f ci.Justfile ci-cassandra4-down
 
-make -f ci.Makefile ci-sqlserver-down
+just -f ci.Justfile ci-sqlserver-down
 
-make -f ci.Makefile ci-mariadb-down
+just -f ci.Justfile ci-mariadb-down
 
-make -f ci.Makefile ci-postgres14-down
-make -f ci.Makefile ci-postgres15-down
+just -f ci.Justfile ci-postgres14-down
+just -f ci.Justfile ci-postgres15-down
 
-make -f ci.Makefile ci-sqlite3-down
+just -f ci.Justfile ci-sqlite3-down
 ```

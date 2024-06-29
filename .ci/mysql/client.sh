@@ -8,7 +8,7 @@ dbuser='godfish'
 ./bin/godfish_mysql version
 
 echo "testing godfish"
-make test ARGS='-v -count=1 -coverprofile=/tmp/cover.out'
+just test '-v -count=1 -coverprofile=/tmp/cover.out'
 
 # Wait for db server to be ready, with some limits.
 
@@ -27,4 +27,4 @@ done
 >&2 echo "db is up"
 
 echo "testing godfish against live db"
-make test-mysql ARGS='-v -count=1 -coverprofile=/tmp/cover_driver.out'
+just test-mysql '-v -count=1 -coverprofile=/tmp/cover_driver.out'

@@ -20,5 +20,7 @@ jobs:
       uses: actions/setup-go@v6
       with:
         go-version: 1.24
+    - name: Install just
+      uses: extractions/setup-just@v3
     - name: Vet source
-      run: make vet
+      run: just vet
