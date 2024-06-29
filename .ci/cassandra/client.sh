@@ -7,7 +7,7 @@ dbhost="${1:?missing dbhost}"
 ./bin/godfish_cassandra version
 
 echo "testing godfish"
-make test ARGS='-v -count=1 -coverprofile=/tmp/cover.out'
+just test '-v -count=1 -coverprofile=/tmp/cover.out'
 
 # Wait for db server to be ready, with some limits.
 num_attempts=0
@@ -25,4 +25,4 @@ done
 >&2 echo "db is up"
 
 echo "testing godfish against live db"
-make test-cassandra ARGS='-v -count=1 -coverprofile=/tmp/cover_driver.out'
+just test-cassandra '-v -count=1 -coverprofile=/tmp/cover_driver.out'
