@@ -1,6 +1,7 @@
 package test
 
 import (
+	"database/sql"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -199,50 +200,65 @@ func newMigrationStub(mig internal.Migration, version internal.Version, ind inte
 	return stub.NewMigration(mig, version, ind)
 }
 
-// collectAppliedVersions uses the Driver's AppliedVersions method to retrieve
+// collectAppliedMigrations uses the Driver's AppliedVersions method to retrieve
 // and scan migration version. It opens a new connection in case the connection
 // isn't already on the Driver, but it does close it afterwards.
-func collectAppliedVersions(driver godfish.Driver) (out []string, err error) {
+func collectAppliedMigrations(t *testing.T, driver godfish.Driver) (out []internal.Migration) {
+	t.Helper()
+
 	// Collect output of AppliedVersions.
 	// Reconnect here because ApplyMigration closes the connection.
-	if err = driver.Connect(mustDSN()); err != nil {
-		return
+	if err := driver.Connect(mustDSN()); err != nil {
+		t.Fatal(err)
 	}
 	defer driver.Close()
 
 	appliedVersions, err := driver.AppliedVersions()
 	if err != nil {
-		err = fmt.Errorf("could not retrieve applied versions; %v", err)
-		return
+		t.Fatalf("could not retrieve applied versions; %v", err)
 	}
 	defer appliedVersions.Close()
 
 	for appliedVersions.Next() {
+		// pass in the same types to Scan that are passed in the library's scanAppliedVersions function
 		var version string
-		if err = appliedVersions.Scan(&version); err != nil {
-			err = fmt.Errorf("could not scan applied versions; %v", err)
-			return
+		var label sql.NullString
+		if err = appliedVersions.Scan(&version, &label); err != nil {
+			t.Fatalf("could not scan applied versions; %v", err)
 		}
-		out = append(out, version)
+
+		params, ierr := internal.NewMigrationParams(label.String, false, "", "", "")
+		if ierr != nil {
+			t.Fatal(ierr)
+		}
+
+		out = append(out, newMigrationStub(params.Forward, formattedTime(version), internal.Indirection{}))
 	}
 
 	return
 }
 
-func testAppliedVersions(actual, expected []string) error {
-	if len(actual) != len(expected) {
-		return fmt.Errorf(
-			"wrong output length; got %d, expected %d",
-			len(actual), len(expected),
+func testAppliedMigrations(t *testing.T, actual []internal.Migration, expectedVersions []string) {
+	t.Helper()
+
+	if len(actual) != len(expectedVersions) {
+		t.Fatalf(
+			"wrong number of applied migrations; got %d, expected %d",
+			len(actual), len(expectedVersions),
 		)
 	}
-	for i, version := range actual {
-		if version != expected[i] {
-			return fmt.Errorf(
+
+	for i, act := range actual {
+		version := act.Version().String()
+		if version != expectedVersions[i] {
+			t.Errorf(
 				"index %d; wrong version; got %q, expected %q",
-				i, version, expected[i],
+				i, version, expectedVersions[i],
 			)
 		}
+
+		if act.Label() == "" {
+			t.Errorf("index %d; label for migration %q should be non-empty", i, version)
+		}
 	}
-	return nil
 }

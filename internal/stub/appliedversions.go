@@ -1,6 +1,8 @@
 package stub
 
 import (
+	"database/sql"
+	"errors"
 	"fmt"
 
 	"github.com/rafaelespinoza/godfish"
@@ -9,17 +11,17 @@ import (
 
 type appliedVersions struct {
 	counter  int
-	versions []string
+	versions []internal.Migration
 }
 
 // NewAppliedVersions constructs an in-memory AppliedVersions implementation for
 // testing purposes.
 func NewAppliedVersions(migrations ...internal.Migration) godfish.AppliedVersions {
 	out := appliedVersions{
-		versions: make([]string, len(migrations)),
+		versions: make([]internal.Migration, len(migrations)),
 	}
 	for i, mig := range migrations {
-		out.versions[i] = mig.Version().String()
+		out.versions[i] = mig
 	}
 	return &out
 }
@@ -31,16 +33,34 @@ func (r *appliedVersions) Close() error {
 
 func (r *appliedVersions) Next() bool { return r.counter < len(r.versions) }
 
-func (r *appliedVersions) Scan(dest ...interface{}) error {
-	var out *string
-	if s, ok := dest[0].(*string); !ok {
-		return fmt.Errorf("pass in *string; got %T", s)
-	} else if !r.Next() {
-		return fmt.Errorf("no more results")
-	} else {
-		out = s
+func (r *appliedVersions) Scan(dest ...interface{}) (err error) {
+	if len(dest) != 2 {
+		err = fmt.Errorf("expected 2 args, got %d", len(dest))
+		return
 	}
-	*out = r.versions[r.counter]
+	if !r.Next() {
+		err = errors.New("no more results")
+		return
+	}
+
+	curr := r.versions[r.counter]
 	r.counter++
+
+	switch val := dest[0].(type) {
+	case *string:
+		*val = curr.Version().String()
+	default:
+		return fmt.Errorf("unexpected type (%T) for %q field", val, "version")
+	}
+
+	switch val := dest[1].(type) {
+	case *sql.NullString:
+		if err = val.Scan(curr.Label()); err != nil {
+			return fmt.Errorf("failed to Scan %q field: %w", "label", err)
+		}
+	default:
+		return fmt.Errorf("unexpected type (got %T) for %q field", val, "label")
+	}
+
 	return nil
 }
