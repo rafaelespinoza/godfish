@@ -65,14 +65,17 @@ func (d *driver) Execute(query string, args ...interface{}) (err error) {
 
 func (d *driver) CreateSchemaMigrationsTable() (err error) {
 	err = d.connection.Query(
-		`CREATE TABLE IF NOT EXISTS schema_migrations (migration_id TEXT PRIMARY KEY)`,
+		`CREATE TABLE IF NOT EXISTS schema_migrations (
+			migration_id TEXT PRIMARY KEY,
+			label TEXT
+		)`,
 	).Exec()
 	return
 }
 
 func (d *driver) AppliedVersions() (out godfish.AppliedVersions, err error) {
 	query := d.connection.Query(
-		`SELECT migration_id FROM schema_migrations`,
+		`SELECT migration_id, label FROM schema_migrations`,
 	)
 
 	av := execAllAscending(query)
@@ -101,13 +104,13 @@ func (d *driver) AppliedVersions() (out godfish.AppliedVersions, err error) {
 	return
 }
 
-func (d *driver) UpdateSchemaMigrations(forward bool, version string) (err error) {
+func (d *driver) UpdateSchemaMigrations(forward bool, version, label string) (err error) {
 	conn := d.connection
 	if forward {
 		err = conn.Query(`
-			INSERT INTO schema_migrations (migration_id)
-			VALUES (?)`,
-			version,
+			INSERT INTO schema_migrations (migration_id, label)
+			VALUES (?, ?)`,
+			version, label,
 		).Exec()
 	} else {
 		err = conn.Query(`

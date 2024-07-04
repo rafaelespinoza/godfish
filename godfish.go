@@ -3,6 +3,7 @@
 package godfish
 
 import (
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -185,6 +186,7 @@ func runMigration(driver Driver, pathToFile string, mig internal.Migration) (err
 	err = driver.UpdateSchemaMigrations(
 		mig.Indirection().Value == internal.DirForward,
 		mig.Version().String(),
+		mig.Label(),
 	)
 	if err == nil {
 		fmt.Fprintln(os.Stderr, "ok")
@@ -373,8 +375,9 @@ func scanAppliedVersions(driver Driver, directoryPath string) (out []internal.Mi
 	defer rows.Close()
 	for rows.Next() {
 		var version, basename string
+		var label sql.NullString
 		var mig internal.Migration
-		if err = rows.Scan(&version); err != nil {
+		if err = rows.Scan(&version, &label); err != nil {
 			return
 		}
 		basename, err = figureOutBasename(directoryPath, internal.DirForward, version)

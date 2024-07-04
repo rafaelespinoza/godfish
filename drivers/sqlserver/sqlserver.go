@@ -54,13 +54,16 @@ func (d *driver) CreateSchemaMigrationsTable() (err error) {
 		IF NOT EXISTS (
 			SELECT 1 FROM information_schema.tables WHERE table_schema = (SELECT schema_name()) AND table_name = 'schema_migrations'
 		)
-		CREATE TABLE schema_migrations (migration_id VARCHAR(128) PRIMARY KEY NOT NULL)
+		CREATE TABLE schema_migrations (
+			migration_id VARCHAR(128) PRIMARY KEY NOT NULL,
+			label VARCHAR(255) DEFAULT ''
+		)
 	`)
 	return
 }
 
 func (d *driver) AppliedVersions() (out godfish.AppliedVersions, err error) {
-	rows, err := d.connection.Query(`SELECT migration_id FROM schema_migrations ORDER BY migration_id ASC`)
+	rows, err := d.connection.Query(`SELECT migration_id, label FROM schema_migrations ORDER BY migration_id ASC`)
 
 	var ierr mssql.Error
 	// https://docs.microsoft.com/en-us/sql/relational-databases/errors-events/database-engine-events-and-errors
@@ -72,13 +75,13 @@ func (d *driver) AppliedVersions() (out godfish.AppliedVersions, err error) {
 	return
 }
 
-func (d *driver) UpdateSchemaMigrations(forward bool, version string) (err error) {
+func (d *driver) UpdateSchemaMigrations(forward bool, version, label string) (err error) {
 	conn := d.connection
 	if forward {
 		_, err = conn.Exec(`
-			INSERT INTO schema_migrations (migration_id)
-			VALUES (@p1)`,
-			version,
+			INSERT INTO schema_migrations (migration_id, label)
+			VALUES (@p1, @p2)`,
+			version, label,
 		)
 	} else {
 		_, err = conn.Exec(`
