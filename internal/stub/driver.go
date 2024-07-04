@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/rafaelespinoza/godfish"
+	"github.com/rafaelespinoza/godfish/internal"
 )
 
 type driver struct {
@@ -33,7 +34,7 @@ func (d *driver) Execute(q string, a ...any) error {
 	return nil
 }
 
-func (d *driver) UpdateSchemaMigrations(forward bool, version string) error {
+func (d *driver) UpdateSchemaMigrations(forward bool, version, label string) error {
 	var stubbedAV *appliedVersions
 	av, err := d.AppliedVersions()
 	if err != nil {
@@ -50,10 +51,16 @@ func (d *driver) UpdateSchemaMigrations(forward bool, version string) error {
 		)
 	}
 	if forward {
-		stubbedAV.versions = append(stubbedAV.versions, version)
+		ind := internal.Indirection{Value: internal.DirForward, Label: "forward"}
+		filename := internal.MakeFilename(version, ind, label)
+		mig, err := internal.ParseMigration(filename)
+		if err != nil {
+			return fmt.Errorf("failed to parse migration from filename %q: %w", filename, err)
+		}
+		stubbedAV.versions = append(stubbedAV.versions, *mig)
 	} else {
 		for i, v := range stubbedAV.versions {
-			if v == version {
+			if version == v.Version.String() {
 				stubbedAV.versions = append(
 					stubbedAV.versions[:i],
 					stubbedAV.versions[i+1:]...,

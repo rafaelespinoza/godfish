@@ -26,7 +26,7 @@ type Driver interface {
 	// UpdateSchemaMigrations records a timestamped version of a migration that
 	// has been successfully applied by adding a new row to the schema
 	// migrations table.
-	UpdateSchemaMigrations(forward bool, version string) error
+	UpdateSchemaMigrations(forward bool, version string, label string) error
 }
 
 // AppliedVersions represents an iterative list of migrations that have been run

@@ -3,6 +3,7 @@
 package godfish
 
 import (
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -210,6 +211,7 @@ func runMigration(driver Driver, dir fs.FS, pathToFile string, mig *internal.Mig
 	err = driver.UpdateSchemaMigrations(
 		mig.Indirection.Value == internal.DirForward,
 		mig.Version.String(),
+		mig.Label,
 	)
 	if err != nil {
 		lgr.Error("updating schema migrations table", slog.Any("error", err), makeDurationMSAttr(startTime))
@@ -408,8 +410,9 @@ func scanAppliedVersions(driver Driver, dirFS fs.FS) (out []*internal.Migration,
 	}()
 	for rows.Next() {
 		var version, basename string
+		var label sql.NullString
 		var mig *internal.Migration
-		if err = rows.Scan(&version); err != nil {
+		if err = rows.Scan(&version, &label); err != nil {
 			return
 		}
 		basename, err = figureOutBasename(dirFS, internal.DirForward, version)

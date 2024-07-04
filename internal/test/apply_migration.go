@@ -49,15 +49,8 @@ func testApplyMigration(t *testing.T, driver godfish.Driver, queries testdataQue
 			return
 		}
 
-		actualVersions, err := collectAppliedVersions(driver)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		err = testAppliedVersions(actualVersions, expected.appliedVersions)
-		if err != nil {
-			t.Error(err)
-		}
+		actualVersions := collectAppliedMigrations(t, driver)
+		testAppliedMigrations(t, actualVersions, expected.appliedVersions)
 	}
 
 	var defaultStubs = []testDriverStub{
