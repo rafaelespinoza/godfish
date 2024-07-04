@@ -73,14 +73,15 @@ func (d *driver) Execute(query string, args ...any) (err error) {
 func (d *driver) CreateSchemaMigrationsTable() (err error) {
 	_, err = d.connection.Exec(
 		`CREATE TABLE IF NOT EXISTS schema_migrations (
-			migration_id VARCHAR(128) PRIMARY KEY NOT NULL
+			migration_id VARCHAR(128) PRIMARY KEY NOT NULL,
+			label VARCHAR(255) DEFAULT ''
 		)`)
 	return
 }
 
 func (d *driver) AppliedVersions() (out godfish.AppliedVersions, err error) {
 	rows, err := d.connection.Query(
-		`SELECT migration_id FROM schema_migrations ORDER BY migration_id ASC`,
+		`SELECT migration_id, label FROM schema_migrations ORDER BY migration_id ASC`,
 	)
 	if ierr, ok := err.(*my.MySQLError); ok {
 		// https://dev.mysql.com/doc/refman/8.0/en/server-error-reference.html#error_er_no_such_table
@@ -92,18 +93,18 @@ func (d *driver) AppliedVersions() (out godfish.AppliedVersions, err error) {
 	return
 }
 
-func (d *driver) UpdateSchemaMigrations(forward bool, version string) (err error) {
+func (d *driver) UpdateSchemaMigrations(forward bool, version, label string) (err error) {
 	conn := d.connection
 	if forward {
 		_, err = conn.Exec(`
-			INSERT INTO schema_migrations (migration_id)
-			VALUES (?)`,
+			INSERT INTO schema_migrations (migration_id, label)
+			VALUES (?, ?)`,
 			version,
+			label,
 		)
 	} else {
-		_, err = conn.Exec(`
-			DELETE FROM schema_migrations
-			WHERE migration_id = ?`,
+		_, err = conn.Exec(
+			`DELETE FROM schema_migrations WHERE migration_id = ?`,
 			version,
 		)
 	}
