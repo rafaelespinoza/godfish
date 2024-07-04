@@ -33,28 +33,16 @@ func testMigrate(t *testing.T, driver godfish.Driver, queries Queries) {
 		t.Errorf("could not Migrate in %s Direction; %v", internal.DirForward, err)
 	}
 
-	appliedVersions, err := collectAppliedVersions(driver)
-	if err != nil {
-		t.Fatal(err)
-	}
+	appliedVersions := collectAppliedMigrations(t, driver)
 	expectedVersions := []string{"12340102030405", "23450102030405", "34560102030405"}
-	err = testAppliedVersions(appliedVersions, expectedVersions)
-	if err != nil {
-		t.Error(err)
-	}
+	testAppliedMigrations(t, appliedVersions, expectedVersions)
 
 	err = godfish.Migrate(driver, path, false, "12340102030405")
 	if err != nil {
-		t.Errorf("could not Migrate in %s Direction; %v", internal.DirReverse, err)
+		t.Fatalf("could not Migrate in %s Direction; %v", internal.DirReverse, err)
 	}
 
-	appliedVersions, err = collectAppliedVersions(driver)
-	if err != nil {
-		t.Fatal(err)
-	}
+	appliedVersions = collectAppliedMigrations(t, driver)
 	expectedVersions = []string{}
-	err = testAppliedVersions(appliedVersions, expectedVersions)
-	if err != nil {
-		t.Error(err)
-	}
+	testAppliedMigrations(t, appliedVersions, expectedVersions)
 }
