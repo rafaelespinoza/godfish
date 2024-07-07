@@ -140,12 +140,12 @@ func (m *MigrationParams) GenerateFiles() (err error) {
 }
 
 func newMigrationFile(m Migration, baseDir string) (*os.File, error) {
-	name := filepath.Join(baseDir, MakeMigrationFilename(m))
+	name := filepath.Join(baseDir, string(MakeMigrationFilename(m)))
 	return os.Create(filepath.Clean(name))
 }
 
 // MakeMigrationFilename converts a Migration m to a filename.
-func MakeMigrationFilename(m Migration) string {
+func MakeMigrationFilename(m Migration) Filename {
 	return MakeFilename(
 		m.Version().String(),
 		m.Indirection(),

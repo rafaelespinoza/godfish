@@ -65,7 +65,7 @@ func Migrate(driver Driver, directoryPath string, forward bool, finishAtVersion 
 	}
 
 	for _, mig := range migrations {
-		pathToFile := directoryPath + "/" + internal.MakeMigrationFilename(mig)
+		pathToFile := filepath.Join(directoryPath, string(internal.MakeMigrationFilename(mig)))
 		if err = runMigration(driver, pathToFile, mig); err != nil {
 			return
 		}
@@ -124,7 +124,7 @@ func ApplyMigration(driver Driver, directoryPath string, forward bool, version s
 	if pathToFile, err = figureOutBasename(directoryPath, direction, version); err != nil {
 		return
 	}
-	fn := internal.Filename(directoryPath + "/" + pathToFile)
+	fn := internal.Filename(filepath.Join(directoryPath, pathToFile))
 	if mig, err = internal.ParseMigration(fn); err != nil {
 		return
 	}
@@ -136,7 +136,7 @@ func figureOutBasename(directoryPath string, direction internal.Direction, versi
 	var filenames []string
 	// glob as many filenames as possible that match the "version" segment, then
 	// narrow it down from there.
-	glob := directoryPath + "/" + internal.MakeFilename(version, internal.Indirection{}, "*")
+	glob := filepath.Join(directoryPath, string(internal.MakeFilename(version, internal.Indirection{}, "*")))
 	if filenames, e = filepath.Glob(glob); e != nil {
 		return
 	}

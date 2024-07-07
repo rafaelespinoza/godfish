@@ -74,7 +74,7 @@ func TestFilename(t *testing.T) {
 	}
 	for i, test := range tests {
 		out := internal.MakeFilename(test.version, test.direction, test.label)
-		if out != string(test.expOut) {
+		if out != test.expOut {
 			t.Errorf(
 				"test %d; wrong filename; got %q, expected %q",
 				i, out, test.expOut,

@@ -10,7 +10,7 @@ type Filename string
 
 // MakeFilename creates a filename based on the independent parts. Format:
 // "${direction}-${version}-${label}.sql"
-func MakeFilename(version string, indirection Indirection, label string) string {
+func MakeFilename(version string, indirection Indirection, label string) Filename {
 	var dir string
 	if indirection.Value == DirUnknown {
 		dir = "*" + filenameDelimeter
@@ -20,5 +20,5 @@ func MakeFilename(version string, indirection Indirection, label string) string 
 
 	// the length will top out at the high quantifier for this regexp.
 	ver := timeformatMatcher.FindString(version) + filenameDelimeter
-	return dir + ver + label + ".sql"
+	return Filename(dir + ver + label + ".sql")
 }
