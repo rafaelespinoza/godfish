@@ -36,14 +36,10 @@ func testApplyMigration(t *testing.T, driver godfish.Driver, queries Queries) {
 
 	runTest := func(t *testing.T, setupState testSetupState, input testInput, expected expectedOutput) {
 		t.Helper()
-		pathToFiles, err := setup(driver, t.Name(), setupState.stubs, setupState.migrateTo)
-		if err != nil {
-			t.Errorf("could not setup test; %v", err)
-			return
-		}
-		defer teardown(driver, pathToFiles, "foos", "bars")
+		pathToFiles := setup(t, driver, setupState.stubs, setupState.migrateTo)
+		defer teardown(t, driver, pathToFiles, "foos", "bars")
 
-		err = godfish.ApplyMigration(driver, pathToFiles, input.direction == internal.DirForward, input.version)
+		err := godfish.ApplyMigration(driver, pathToFiles, input.direction == internal.DirForward, input.version)
 		if err != nil && !expected.err {
 			t.Errorf("could not apply migration; %v", err)
 			return

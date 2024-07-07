@@ -69,30 +69,35 @@ const (
 )
 
 // setup prepares state before running a test.
-func setup(driver godfish.Driver, testName string, stubs []testDriverStub, migrateTo string) (path string, err error) {
-	path = filepath.Join("/tmp/godfish_test/drivers/", driver.Name(), testName)
-	if err = os.MkdirAll(path, 0750); err != nil {
-		return
-	}
-	if err = generateMigrationFiles(path, stubs); err != nil {
-		return
-	}
+func setup(t *testing.T, driver godfish.Driver, stubs []testDriverStub, migrateTo string) (path string) {
+	t.Helper()
+
+	path = t.TempDir()
+
+	generateMigrationFiles(t, path, stubs)
+
 	if migrateTo != skipMigration {
-		err = godfish.Migrate(driver, path, true, migrateTo)
+		err := godfish.Migrate(driver, path, true, migrateTo)
+		if err != nil {
+			t.Fatalf("Migrate failed during setup: %v", err)
+		}
 	}
+
 	return
 }
 
 // teardown clears state after running a test.
-func teardown(driver godfish.Driver, path string, tablesToDrop ...string) {
+func teardown(t *testing.T, driver godfish.Driver, path string, tablesToDrop ...string) {
+	t.Helper()
+
 	var err error
 	if err = driver.Connect(mustDSN()); err != nil {
-		panic(err)
+		t.Fatalf("error connecting to DB in teardown: %v", err)
 	}
 
 	for _, table := range tablesToDrop {
 		if err = driver.Execute("DROP TABLE IF EXISTS " + table); err != nil {
-			panic(err)
+			t.Fatalf("error dropping table in teardown: %v", err)
 		}
 	}
 
@@ -107,11 +112,11 @@ func teardown(driver godfish.Driver, path string, tablesToDrop ...string) {
 		truncate = `TRUNCATE TABLE schema_migrations`
 	}
 	if err = driver.Execute(truncate); err != nil {
-		panic(err)
+		t.Fatalf("error executing query (%q) in teardown: %v", truncate, err)
 	}
 	_ = os.RemoveAll(path)
 	if err := driver.Close(); err != nil {
-		panic(err)
+		t.Fatalf("error closing driver in teardown: %v", err)
 	}
 }
 
@@ -131,19 +136,21 @@ type testDriverStub struct {
 	version      internal.Version
 }
 
-func generateMigrationFiles(pathToTestDir string, stubs []testDriverStub) error {
+func generateMigrationFiles(t *testing.T, pathToTestDir string, stubs []testDriverStub) {
+	t.Helper()
+
 	for i, stub := range stubs {
 		var reversible bool
 		if stub.content.Forward != "" && stub.content.Reverse != "" {
 			reversible = true
 		} else if stub.content.Forward == "" {
-			panic(fmt.Errorf("test setup should have content in forward direction"))
+			t.Fatalf("error in generateMigrationFiles, stubs[%d] should have content in forward direction", i)
 		}
 
 		fwd, rev := stub.indirectives.forward, stub.indirectives.reverse
 		params, err := internal.NewMigrationParams(strconv.Itoa(i), reversible, pathToTestDir, fwd.Label, rev.Label)
 		if err != nil {
-			return err
+			t.Fatalf("error in generateMigrationFiles, stubs[%d] failure from NewMigrationParams: %v", i, err)
 		}
 
 		// replace migrations before generating files to maintain control of
@@ -153,7 +160,7 @@ func generateMigrationFiles(pathToTestDir string, stubs []testDriverStub) error 
 			params.Reverse = newMigrationStub(params.Reverse, stub.version, rev)
 		}
 		if err = params.GenerateFiles(); err != nil {
-			return err
+			t.Fatalf("error in generateMigrationFiles, stubs[%d] failure from GenerateFiles: %v", i, err)
 		}
 
 		for j, mig := range []internal.Migration{params.Forward, params.Reverse} {
@@ -161,13 +168,14 @@ func generateMigrationFiles(pathToTestDir string, stubs []testDriverStub) error 
 				continue
 			}
 
-			filename := fmt.Sprintf(
-				"%s/%s-%s-%s.sql",
-				pathToTestDir, mig.Indirection().Label, mig.Version().String(), mig.Label(),
-			)
+			filename := filepath.Join(pathToTestDir, fmt.Sprintf(
+				"%s-%s-%s.sql",
+				mig.Indirection().Label, mig.Version().String(), mig.Label(),
+			))
+
 			file, err := os.OpenFile(filepath.Clean(filename), os.O_RDWR|os.O_CREATE, 0600)
 			if err != nil {
-				return err
+				t.Fatalf("error in generateMigrationFiles, stubs[%d] failure from OpenFile: %v", i, err)
 			}
 			defer func() { _ = file.Close() }()
 
@@ -176,17 +184,15 @@ func generateMigrationFiles(pathToTestDir string, stubs []testDriverStub) error 
 			// [forward, reverse]
 			if j == 0 {
 				if _, err = file.WriteString(stub.content.Forward); err != nil {
-					return err
+					t.Fatalf("error in generateMigrationFiles, stubs[%d] failure writing forward migration: %v", i, err)
 				}
 				continue
 			}
 			if _, err = file.WriteString(stub.content.Reverse); err != nil {
-				return err
+				t.Fatalf("error in generateMigrationFiles, stubs[%d] failure writing reverse migration: %v", i, err)
 			}
 		}
 	}
-
-	return nil
 }
 
 func newMigrationStub(mig internal.Migration, version internal.Version, ind internal.Indirection) internal.Migration {

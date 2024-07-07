@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"os"
 	"strconv"
 	"strings"
 	"testing"
@@ -18,7 +17,7 @@ func TestTSV(t *testing.T) {
 	var buf bytes.Buffer
 	names := []string{"alfa", "bravo", "charlie", "delta"}
 
-	if err := printMigrations(internal.NewTSV(&buf), "up", mustMakeMigrations(names...)); err != nil {
+	if err := printMigrations(internal.NewTSV(&buf), "up", mustMakeMigrations(t, names...)); err != nil {
 		t.Fatal(err)
 	}
 
@@ -62,7 +61,7 @@ func TestJSON(t *testing.T) {
 	var buf bytes.Buffer
 	names := []string{"alfa", "bravo", "charlie", "delta"}
 
-	if err := printMigrations(internal.NewJSON(&buf), "up", mustMakeMigrations(names...)); err != nil {
+	if err := printMigrations(internal.NewJSON(&buf), "up", mustMakeMigrations(t, names...)); err != nil {
 		t.Fatal(err)
 	}
 
@@ -105,22 +104,21 @@ func TestJSON(t *testing.T) {
 	}
 }
 
-func mustMakeMigrations(names ...string) []internal.Migration {
-	dir, err := os.MkdirTemp(os.TempDir(), "godfish_test_*")
-	if err != nil {
-		panic(err)
-	}
+func mustMakeMigrations(t *testing.T, names ...string) []internal.Migration {
+	t.Helper()
+
+	dir := t.TempDir()
 
 	out := make([]internal.Migration, len(names))
 
 	for i := 0; i < len(names); i++ {
 		params, err := internal.NewMigrationParams(names[i], false, dir, "forward", "reverse")
 		if err != nil {
-			panic(err)
+			t.Fatalf("error on names[%d]: %v", i, err)
 		}
 		version, err := internal.ParseVersion(strconv.Itoa((i + 1) * 1000))
 		if err != nil {
-			panic(err)
+			t.Fatalf("error on names[%d]: %v", i, err)
 		}
 		out[i] = stub.NewMigration(params.Forward, version, internal.Indirection{})
 	}

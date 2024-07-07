@@ -23,12 +23,8 @@ func testInfo(t *testing.T, driver godfish.Driver, queries Queries) {
 			version: formattedTime("34560102030405"),
 		},
 	}
-	path, err := setup(driver, t.Name(), stubs, "34560102030405")
-	if err != nil {
-		t.Errorf("could not setup test; %v", err)
-		return
-	}
-	defer teardown(driver, path, "foos", "bars")
+	path := setup(t, driver, stubs, "34560102030405")
+	defer teardown(t, driver, path, "foos", "bars")
 
 	t.Run("forward", func(t *testing.T) {
 		err := godfish.Info(driver, path, true, "", os.Stderr, "tsv")

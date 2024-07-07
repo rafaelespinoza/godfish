@@ -14,37 +14,18 @@ import (
 	"github.com/rafaelespinoza/godfish/internal/test"
 )
 
-const (
-	baseTestOutputDir = "/tmp/godfish_test"
-	dsnKey            = "DB_DSN"
-)
-
-func makeTestDir(t *testing.T, basedir string) (outpath string) {
-	if basedir == "" {
-		basedir = os.TempDir()
-	}
-	err := os.MkdirAll(basedir, 0750)
-	if err != nil {
-		t.Fatal(err)
-	}
-	outpath, err = os.MkdirTemp(basedir, strings.Replace(t.Name(), "/", "_", -1))
-	if err != nil {
-		t.Fatal(err)
-	}
-	return
-}
+const dsnKey = "DB_DSN"
 
 func TestCreateMigrationFiles(t *testing.T) {
 	t.Run("err", func(t *testing.T) {
-		testdir := makeTestDir(t, baseTestOutputDir)
-		err := godfish.CreateMigrationFiles("err_test", true, testdir, "bad", "bad2")
+		err := godfish.CreateMigrationFiles("err_test", true, t.TempDir(), "bad", "bad2")
 		if err == nil {
 			t.Fatal(err)
 		}
 	})
 
 	t.Run("ok", func(t *testing.T) {
-		testdir := makeTestDir(t, "")
+		testdir := t.TempDir()
 		err := godfish.CreateMigrationFiles("err_test", true, testdir, "", "")
 		if err != nil {
 			t.Fatal(err)
@@ -74,8 +55,7 @@ func TestMigrate(t *testing.T) {
 	t.Run("missing DB_DSN", func(t *testing.T) {
 		t.Setenv(dsnKey, "")
 
-		testdir := makeTestDir(t, baseTestOutputDir)
-		err := godfish.Migrate(stub.NewDriver(), testdir, false, "")
+		err := godfish.Migrate(stub.NewDriver(), t.TempDir(), false, "")
 		if err == nil {
 			t.Fatalf("expected an error, got %v", err)
 		}
@@ -90,8 +70,7 @@ func TestApplyMigration(t *testing.T) {
 	t.Run("missing DB_DSN", func(t *testing.T) {
 		t.Setenv(dsnKey, "")
 
-		testdir := makeTestDir(t, baseTestOutputDir)
-		err := godfish.ApplyMigration(stub.NewDriver(), testdir, false, "")
+		err := godfish.ApplyMigration(stub.NewDriver(), t.TempDir(), false, "")
 		if err == nil {
 			t.Fatalf("expected an error, got %v", err)
 		}
@@ -106,8 +85,7 @@ func TestInfo(t *testing.T) {
 	t.Run("missing DB_DSN", func(t *testing.T) {
 		t.Setenv(dsnKey, "")
 
-		testdir := makeTestDir(t, baseTestOutputDir)
-		err := godfish.Info(stub.NewDriver(), testdir, false, "", os.Stderr, "")
+		err := godfish.Info(stub.NewDriver(), t.TempDir(), false, "", os.Stderr, "")
 		if err == nil {
 			t.Fatalf("expected an error, got %v", err)
 		}
@@ -120,8 +98,7 @@ func TestInfo(t *testing.T) {
 	t.Run("unknown format does not error out", func(t *testing.T) {
 		t.Setenv(dsnKey, "test")
 
-		testdir := makeTestDir(t, baseTestOutputDir)
-		err := godfish.Info(stub.NewDriver(), testdir, false, "", os.Stderr, "tea_ess_vee")
+		err := godfish.Info(stub.NewDriver(), t.TempDir(), false, "", os.Stderr, "tea_ess_vee")
 		if err != nil {
 			t.Fatalf("unexpected error, %v", err)
 		}
@@ -130,7 +107,7 @@ func TestInfo(t *testing.T) {
 
 func TestInit(t *testing.T) {
 	var err error
-	testOutputDir := makeTestDir(t, "")
+	testOutputDir := t.TempDir()
 
 	pathToFile := filepath.Clean(filepath.Join(testOutputDir, "config.json"))
 

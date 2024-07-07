@@ -202,11 +202,6 @@ func TestParseMigration(t *testing.T) {
 }
 
 func TestMigrationParams(t *testing.T) {
-	testOutputDir := baseTestOutputDir + "/" + t.Name()
-	if err := os.MkdirAll(testOutputDir, 0750); err != nil {
-		t.Fatal(err)
-	}
-
 	type testCase struct {
 		name               string
 		reversible         bool
@@ -296,14 +291,10 @@ func TestMigrationParams(t *testing.T) {
 	}
 
 	t.Run("reversible", func(t *testing.T) {
-		dirpath, err := os.MkdirTemp(testOutputDir, "")
-		if err != nil {
-			t.Fatal(err)
-		}
 		runTest(t, testCase{
 			name:               "foo",
 			reversible:         true,
-			dirpath:            dirpath,
+			dirpath:            t.TempDir(),
 			fwdLabel:           "forward",
 			revLabel:           "reverse",
 			expectedDirections: []string{"forward", "reverse"},
@@ -311,28 +302,20 @@ func TestMigrationParams(t *testing.T) {
 	})
 
 	t.Run("forward only", func(t *testing.T) {
-		dirpath, err := os.MkdirTemp(testOutputDir, "")
-		if err != nil {
-			t.Fatal(err)
-		}
 		runTest(t, testCase{
 			name:               "bar",
 			reversible:         false,
-			dirpath:            dirpath,
+			dirpath:            t.TempDir(),
 			fwdLabel:           "forward",
 			expectedDirections: []string{"forward"},
 		})
 	})
 
 	t.Run("delimiter in the name", func(t *testing.T) {
-		dirpath, err := os.MkdirTemp(testOutputDir, "")
-		if err != nil {
-			t.Fatal(err)
-		}
 		runTest(t, testCase{
 			name:               "delimiter-in-the-name",
 			reversible:         false,
-			dirpath:            dirpath,
+			dirpath:            t.TempDir(),
 			fwdLabel:           "forward",
 			revLabel:           "reverse",
 			expectedDirections: []string{"forward"},
@@ -340,14 +323,10 @@ func TestMigrationParams(t *testing.T) {
 	})
 
 	t.Run("alternative direction names", func(t *testing.T) {
-		dirpath, err := os.MkdirTemp(testOutputDir, "")
-		if err != nil {
-			t.Fatal(err)
-		}
 		runTest(t, testCase{
 			name:               "alternatives",
 			reversible:         true,
-			dirpath:            dirpath,
+			dirpath:            t.TempDir(),
 			fwdLabel:           "up",
 			revLabel:           "down",
 			expectedDirections: []string{"up", "down"},
@@ -355,15 +334,10 @@ func TestMigrationParams(t *testing.T) {
 	})
 
 	t.Run("err", func(t *testing.T) {
-		dirpath, err := os.MkdirTemp(testOutputDir, "")
-		if err != nil {
-			t.Fatal(err)
-		}
-
 		runTest(t, testCase{
 			name:        "bad",
 			reversible:  false,
-			dirpath:     dirpath + "/this_should_not_exist",
+			dirpath:     filepath.Join(t.TempDir(), "this_should_not_exist"),
 			fwdLabel:    "forward",
 			revLabel:    "reverse",
 			expectError: true,

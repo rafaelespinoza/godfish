@@ -22,17 +22,13 @@ func testMigrate(t *testing.T, driver godfish.Driver, queries Queries) {
 			version: formattedTime("34560102030405"),
 		},
 	}
-	path, err := setup(driver, t.Name(), stubs, skipMigration)
-	if err != nil {
-		t.Errorf("could not setup test; %v", err)
-		return
-	}
+	path := setup(t, driver, stubs, skipMigration)
 	// Migrating all the way in reverse should also remove these tables
 	// teardown. In case it doesn't, teardown tables anyways so it doesn't
 	// affect other tests.
-	defer teardown(driver, path, "foos", "bars")
+	defer teardown(t, driver, path, "foos", "bars")
 
-	err = godfish.Migrate(driver, path, true, "")
+	err := godfish.Migrate(driver, path, true, "")
 	if err != nil {
 		t.Errorf("could not Migrate in %s Direction; %v", internal.DirForward, err)
 	}
