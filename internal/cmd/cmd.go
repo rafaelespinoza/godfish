@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -13,6 +14,7 @@ import (
 	"github.com/rafaelespinoza/alf"
 	"github.com/rafaelespinoza/godfish"
 	"github.com/rafaelespinoza/godfish/internal"
+	"github.com/rafaelespinoza/godfish/internal/log"
 )
 
 var (
@@ -91,7 +93,16 @@ Examples:
 			strings.Join(del.DescribeSubcommands(), "\n\t"), bin)
 	}
 
-	var pathToConfig string
+	var (
+		pathToConfig string
+
+		// Other args for logging. For now the inputs are flags, but maybe put
+		// into configuration file as well.
+		loggingOff bool
+		logLevel   string
+		logFormat  string
+	)
+
 	rootFlags.StringVar(&pathToConfig, "conf", ".godfish.json", "path to godfish config file")
 	rootFlags.StringVar(
 		&commonArgs.Files,
@@ -99,11 +110,20 @@ Examples:
 		"",
 		"path to migration files, can also set with config file",
 	)
+	rootFlags.BoolVar(&loggingOff, "q", false, "if true, then all logging is effectively off")
+	rootFlags.StringVar(&logLevel, "loglevel", log.Levels[0].String(), fmt.Sprintf("minimum severity for which to log events, should be one of %q", log.Levels))
+	rootFlags.StringVar(&logFormat, "logformat", log.Formats[len(log.Formats)-1], fmt.Sprintf("output format for logs, should be one of %q", log.Formats))
 	del.Flags = rootFlags
 
 	return &alf.Root{
 		Delegator: del,
 		PrePerform: func(_ context.Context) error {
+			var w io.Writer
+			if !loggingOff {
+				w = os.Stderr
+			}
+			log.SetLogger(w, logLevel, logFormat)
+
 			// Look for config file and if present, merge those values with
 			// input flag values.
 			var conf internal.Config
