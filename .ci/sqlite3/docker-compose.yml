@@ -13,8 +13,6 @@ services:
     #     service called client, so it's just easier to set it up like this.
     client:
         build:
-            context: "${BUILD_DIR}"
-            dockerfile: "${BUILD_DIR}/.ci/sqlite3/Dockerfile"
-        image: godfish_test/sqlite3:latest
-        container_name: godfish_ci_sqlite3
+            context: ../..
+            dockerfile: .ci/sqlite3/Dockerfile
         tty: true

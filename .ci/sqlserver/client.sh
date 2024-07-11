@@ -2,8 +2,8 @@
 
 set -eu
 
-echo "building binary"
-make build-sqlserver
+./bin/godfish_sqlserver version
+
 echo "testing godfish"
 make test ARGS='-v -count=1 -coverprofile=/tmp/cover.out'
 

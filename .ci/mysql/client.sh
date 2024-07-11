@@ -5,8 +5,8 @@ set -eu
 dbhost="${1:?missing dbhost}"
 dbuser='godfish'
 
-echo "building binary"
-make build-mysql
+./bin/godfish_mysql version
+
 echo "testing godfish"
 make test ARGS='-v -count=1 -coverprofile=/tmp/cover.out'
 

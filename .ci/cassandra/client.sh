@@ -4,8 +4,8 @@ set -eu
 
 dbhost="${1:?missing dbhost}"
 
-echo "building binary"
-make build-cassandra
+./bin/godfish_cassandra version
+
 echo "testing godfish"
 make test ARGS='-v -count=1 -coverprofile=/tmp/cover.out'
 

@@ -3,10 +3,8 @@ version: "3.9"
 services:
     client:
         build:
-            context: "${BUILD_DIR}"
-            dockerfile: "${BUILD_DIR}/.ci/cassandra/client.Dockerfile"
-        image: godfish_test/cassandra/client:latest
-        container_name: godfish_ci_cassandra_client
+            context: ../..
+            dockerfile: .ci/cassandra/client.Dockerfile
         depends_on:
             - server
         entrypoint: /client.sh server
@@ -15,11 +13,7 @@ services:
             DB_DSN: "cassandra://server:9042/godfish_test?timeout_ms=2000&connect_timeout_ms=2000"
         tty: true
     server:
-        build:
-            context: "${BUILD_DIR}"
-            dockerfile: "${BUILD_DIR}/.ci/cassandra/server_v4.Dockerfile"
-        image: godfish_test/cassandra/server_v4:latest
-        container_name: godfish_ci_cassandra_server_v4
+        image: docker.io/cassandra:4.0.3
         expose:
             - "9042"
         volumes:

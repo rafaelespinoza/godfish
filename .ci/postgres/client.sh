@@ -6,8 +6,8 @@ dbhost="${1:?missing dbhost}"
 dbname='godfish_test'
 dbuser='godfish'
 
-echo "building binary"
-make build-postgres
+./bin/godfish_postgres version
+
 echo "testing godfish"
 make test ARGS='-v -count=1 -coverprofile=/tmp/cover.out'
 

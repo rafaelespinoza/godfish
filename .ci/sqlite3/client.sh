@@ -2,8 +2,7 @@
 
 set -eu
 
-echo "building binary"
-make build-sqlite3
+./bin/godfish_sqlite3 version
 
 echo "testing godfish"
 make test ARGS='-v -count=1 -coverprofile=/tmp/cover.out'
