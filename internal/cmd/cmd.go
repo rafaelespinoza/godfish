@@ -126,7 +126,7 @@ Examples:
 }
 
 func newFlagSet(name string) (out *flag.FlagSet) {
-	out = flag.NewFlagSet(name, flag.ExitOnError)
+	out = flag.NewFlagSet(name, flag.ContinueOnError)
 	out.SetOutput(os.Stdout)
 	return
 }

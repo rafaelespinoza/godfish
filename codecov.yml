@@ -3,6 +3,10 @@ coverage:
     project: off
     patch: off
 
+ignore:
+  # This package tests implementations of Driver. Shouldn't be counted in coverage.
+  - ./internal/test
+
 parsers:
   go:
     # Codecov has the concept of partial hits, which have a lower code coverage
