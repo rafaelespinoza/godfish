@@ -14,7 +14,7 @@ make test ARGS='-v -count=1 -coverprofile=/tmp/cover.out'
 
 num_attempts=0
 
-until mysqladmin --host="${dbhost}" --user="${dbuser}" --password="${MYSQL_PASSWORD}" ping; do
+until mariadb-admin --host="${dbhost}" --user="${dbuser}" --password="${MYSQL_PASSWORD}" --skip-ssl ping; do
 	num_attempts=$((num_attempts+1))
 	if [ $num_attempts -gt 12 ]; then
 		>&2 echo "ERROR: max attempts exceeded"
