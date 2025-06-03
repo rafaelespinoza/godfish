@@ -1,0 +1,29 @@
+name: release
+
+on:
+  push:
+    tags: ['v*']
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Setup go
+        uses: actions/setup-go@v5
+        with:
+          go-version: 1.23
+      - name: Get, tidy dependencies
+        run: go mod tidy
+      - name: Install goreleaser
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          version: '~> v2'
+          install-only: true
+      - name: Make release
+        run: make release ARGS='--snapshot=false'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

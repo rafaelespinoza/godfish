@@ -20,8 +20,15 @@
 - light on dependencies
 - not terrible error messages
 
+## releases
+
+The Releases page of the GitHub repository has pre-built artifacts for supported platforms.
+Each archive file contains an executable binary per driver. Each executable binary will only work
+for the targeted DB. Pick the one(s) you need.
+
 ## build
 
+An alternative to using a pre-built release to is to build your own.
 Make a CLI binary for the DB you want to use. This tool comes with some driver
 implementations. Build one like so:
 

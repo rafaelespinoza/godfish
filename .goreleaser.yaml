@@ -1,0 +1,109 @@
+---
+project_name: godfish
+
+version: 2
+
+# env vars are put together with the Makefile.
+#
+# For each build item (https://goreleaser.com/customization/builds/), it'd be
+# nice if we could set the common values for "ldflags" somewhere, such as this
+# env section, and then tack on any driver-specific values, such as
+# .versionDriver, for each driver. As of goreleaser v2.0.1, it does not look
+# possible to access common Name Template values (https://goreleaser.com/customization/templates)
+# from this env section. An alternative approach would be to set the ldflags
+# value for each build item, which can access both Name Template, and
+# Environment variable values. Example:
+#
+#   ldflags:
+#     ->
+#       -X {{ .ModulePath }}/internal/cmd.versionBranchName={{ .Branch }}
+#       -X {{ .ModulePath }}/internal/cmd.versionBuildTime={{ .CommitDate }}
+#       -X {{ .ModulePath }}/internal/cmd.versionCommitHash={{ .ShortCommit }}
+#       -X {{ .ModulePath }}/internal/cmd.versionGoVersion={{ .Env.GOVERSION }}
+#       -X {{ .ModulePath }}/internal/cmd.versionTag={{ .Tag }}
+#       -X {{ .ModulePath }}/internal/cmd.versionDriver=name_of_driver_here
+#
+# But I'd prefer to not repeat that same structure for each driver to build at
+# this time.
+env:
+
+builds:
+  -
+    id: cassandra
+    dir: ./drivers/cassandra/godfish
+    binary: ./godfish_cassandra
+    goarch:
+      - amd64
+      - arm64
+    goos:
+      - darwin
+      - linux
+      - windows
+    ldflags:
+      - >
+        {{ .Env.LDFLAGS }} -X {{ .Env.PKG_IMPORT_PATH }}/internal/cmd.versionDriver=cassandra
+  -
+    id: mysql
+    dir: ./drivers/mysql/godfish
+    binary: ./godfish_mysql
+    goarch:
+      - amd64
+      - arm64
+    goos:
+      - darwin
+      - linux
+      - windows
+    ldflags:
+      - >
+        {{ .Env.LDFLAGS }} -X {{ .Env.PKG_IMPORT_PATH }}/internal/cmd.versionDriver=mysql
+  -
+    id: postgres
+    dir: ./drivers/postgres/godfish
+    binary: ./godfish_postgres
+    goarch:
+      - amd64
+      - arm64
+    goos:
+      - darwin
+      - linux
+      - windows
+    ldflags:
+      - >
+        {{ .Env.LDFLAGS }} -X {{ .Env.PKG_IMPORT_PATH }}/internal/cmd.versionDriver=postgres
+  -
+    id: sqlite3
+    dir: ./drivers/sqlite3/godfish
+    binary: ./godfish_sqlite3
+    goarch:
+      - amd64
+      - arm64
+    goos:
+      - darwin
+      - linux
+      - windows
+    ldflags:
+      - >
+        {{ .Env.LDFLAGS }} -X {{ .Env.PKG_IMPORT_PATH }}/internal/cmd.versionDriver=sqlite3
+  -
+    id: sqlserver
+    dir: ./drivers/sqlserver/godfish
+    binary: ./godfish_sqlserver
+    goarch:
+      - amd64
+      - arm64
+    goos:
+      - darwin
+      - linux
+      - windows
+    ldflags:
+      - >
+        {{ .Env.LDFLAGS }} -X {{ .Env.PKG_IMPORT_PATH }}/internal/cmd.versionDriver=sqlserver
+
+checksum:
+  name_template: checksums.txt
+
+release:
+  draft: true
+
+announce:
+  skip: true
