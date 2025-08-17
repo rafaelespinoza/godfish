@@ -1,0 +1,104 @@
+---
+name: install
+on: [push, pull_request]
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+      - name: Install shellcheck
+        run: sudo apt-get update && sudo apt-get install -y shellcheck
+      - name: Run shellcheck
+        run: shellcheck .github/workflows/setup_install_test.sh ./scripts/install.sh
+
+  test:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        selected_driver: [all, cassandra, mysql, postgres, sqlite3, sqlserver]
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+    env:
+      LOG_LEVEL: 3
+      INSTALL_BASE_DIR: /tmp/bin
+      IS_LINUX: ${{ contains(matrix.os, 'ubuntu') }}
+      IS_MACOS: ${{ contains(matrix.os, 'macos') }}
+      DB_DRIVER: ${{ matrix.selected_driver }}
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Test using gh
+        timeout-minutes: 5
+        env:
+          WANT_GH: true
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          INSTALL_DIR: ${{ env.INSTALL_BASE_DIR }}/want_gh
+        run: |
+          echo >&2 "# running setup_install_test.sh"
+          .github/workflows/setup_install_test.sh
+
+          echo >&2 "# running install.sh"
+          ./scripts/install.sh -d "${DB_DRIVER:?missing DB_DRIVER}" -o "${INSTALL_DIR:?missing INSTALL_DIR}"
+
+      - name: Test w/o gh; use curl for downloads; use jq to parse responses
+        timeout-minutes: 5
+        env:
+          WANT_GH: false
+          WANT_CURL: true
+          WANT_JQ: true
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          INSTALL_DIR: ${{ env.INSTALL_BASE_DIR }}/no_gh_use_curl
+        run: |
+          echo >&2 "# running setup_install_test.sh"
+          .github/workflows/setup_install_test.sh
+
+          echo >&2 "# running install.sh"
+          ./scripts/install.sh -d "${DB_DRIVER:?missing DB_DRIVER}" -o "${INSTALL_DIR:?missing INSTALL_DIR}"
+
+      - name: Test w/o gh or curl; use wget for downloads; use jq to parse responses
+        timeout-minutes: 5
+        env:
+          WANT_GH: false
+          WANT_CURL: false
+          WANT_JQ: true
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          INSTALL_DIR: ${{ env.INSTALL_BASE_DIR }}/no_gh_use_wget
+        run: |
+          echo >&2 "# running setup_install_test.sh"
+          .github/workflows/setup_install_test.sh
+
+          echo >&2 "# running install.sh"
+          ./scripts/install.sh -d "${DB_DRIVER:?missing DB_DRIVER}" -o "${INSTALL_DIR:?missing INSTALL_DIR}"
+
+      - name: Test w/o gh or jq; use curl for downloads; use a pipeline to parse responses
+        timeout-minutes: 5
+        env:
+          WANT_GH: false
+          WANT_CURL: true
+          WANT_JQ: false
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          INSTALL_DIR: ${{ env.INSTALL_BASE_DIR }}/no_gh_use_curl_no_jq
+        run: |
+          echo >&2 "# running setup_install_test.sh"
+          .github/workflows/setup_install_test.sh
+
+          echo >&2 "# running install.sh"
+          ./scripts/install.sh -d "${DB_DRIVER:?missing DB_DRIVER}" -o "${INSTALL_DIR:?missing INSTALL_DIR}"
+
+      - name: Test w/o gh, curl or jq; use wget for downloads; use a pipeline to parse responses
+        timeout-minutes: 5
+        env:
+          WANT_GH: false
+          WANT_CURL: false
+          WANT_JQ: false
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          INSTALL_DIR: ${{ env.INSTALL_BASE_DIR }}/no_gh_use_wget_no_jq
+        run: |
+          echo >&2 "# running setup_install_test.sh"
+          .github/workflows/setup_install_test.sh
+
+          echo >&2 "# running install.sh"
+          ./scripts/install.sh -d "${DB_DRIVER:?missing DB_DRIVER}" -o "${INSTALL_DIR:?missing INSTALL_DIR}"

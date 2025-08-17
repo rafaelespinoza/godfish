@@ -26,6 +26,8 @@ The Releases page of the GitHub repository has pre-built artifacts for supported
 Each archive file contains an executable binary per driver. Each executable binary will only work
 for the targeted DB. Pick the one(s) you need.
 
+There is also an installation script at [scripts/install.sh](./scripts/install.sh). Check it out.
+
 ## build
 
 An alternative to using a pre-built release to is to build your own.
