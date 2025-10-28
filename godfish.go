@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/rafaelespinoza/godfish/internal"
 	"github.com/rafaelespinoza/logg"
@@ -178,22 +179,34 @@ func runMigration(driver Driver, pathToFile string, mig internal.Migration) (err
 
 	lgr := logg.New("", slog.String("path_to_file", pathToFile), slog.String("version", mig.Version().String()))
 	lgr.Info(gerund + " ...")
+	startTime := time.Now()
 
 	if err = driver.Execute(string(data)); err != nil {
 		err = fmt.Errorf("%w, path_to_file: %q", err, pathToFile)
+		lgr.Error("executing migration", slog.Any("error", err), makeDurationMSAttr(startTime))
 		return
 	}
 	if err = driver.CreateSchemaMigrationsTable(); err != nil {
+		lgr.Error("creating schema migrations table", slog.Any("error", err), makeDurationMSAttr(startTime))
 		return
 	}
 	err = driver.UpdateSchemaMigrations(
 		mig.Indirection().Value == internal.DirForward,
 		mig.Version().String(),
 	)
-	if err == nil {
-		lgr.Info("ok")
+	if err != nil {
+		lgr.Error("updating schema migrations table", slog.Any("error", err), makeDurationMSAttr(startTime))
+	} else {
+		lgr.Info("ok", makeDurationMSAttr(startTime))
 	}
 	return
+}
+
+// makeDurationMSAttr calculates how much time, in milliseconds, has transpired
+// since startedAt and returns a slog.KindInt64 attr with the key duration_ms.
+func makeDurationMSAttr(startedAt time.Time) slog.Attr {
+	dur := time.Since(startedAt)
+	return slog.Int64("duration_ms", dur.Milliseconds())
 }
 
 // Info writes status of migrations to w in formats json or tsv.
