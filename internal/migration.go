@@ -1,15 +1,12 @@
 package internal
 
 import (
-	"context"
 	"fmt"
 	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
-
-	"github.com/rafaelespinoza/godfish/internal/log"
 )
 
 // A Migration is a database change with a direction name and timestamp.
@@ -127,20 +124,19 @@ func (m *MigrationParams) GenerateFiles() (err error) {
 	if forwardFile, err = newMigrationFile(m.Forward, m.Dirpath); err != nil {
 		return
 	}
-	ctx := context.TODO()
 
-	log.Info(ctx, "created forward file", slog.String("filename", forwardFile.Name()))
+	slog.Info("created forward file", slog.String("filename", forwardFile.Name()))
 	defer func() { _ = forwardFile.Close() }()
 
 	if !m.Reversible {
-		log.Info(ctx, "migration marked irreversible, did not create reverse file")
+		slog.Info("migration marked irreversible, did not create reverse file")
 		return
 	}
 
 	if reverseFile, err = newMigrationFile(m.Reverse, m.Dirpath); err != nil {
 		return
 	}
-	log.Info(ctx, "created reverse file", slog.String("filename", reverseFile.Name()))
+	slog.Info("created reverse file", slog.String("filename", reverseFile.Name()))
 	defer func() { _ = reverseFile.Close() }()
 	return
 }

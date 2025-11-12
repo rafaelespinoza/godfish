@@ -3,7 +3,6 @@
 package godfish
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -15,7 +14,7 @@ import (
 	"strings"
 
 	"github.com/rafaelespinoza/godfish/internal"
-	"github.com/rafaelespinoza/godfish/internal/log"
+	"github.com/rafaelespinoza/logg"
 )
 
 // CreateMigrationFiles takes care of setting up a new DB migration by
@@ -177,9 +176,8 @@ func runMigration(driver Driver, pathToFile string, mig internal.Migration) (err
 		gerund = "rolling back"
 	}
 
-	fields := []slog.Attr{slog.String("path_to_file", pathToFile), slog.String("version", mig.Version().String())}
-
-	log.Info(context.TODO(), gerund+" ...", fields...)
+	lgr := logg.New("", slog.String("path_to_file", pathToFile), slog.String("version", mig.Version().String()))
+	lgr.Info(gerund + " ...")
 
 	if err = driver.Execute(string(data)); err != nil {
 		err = fmt.Errorf("%w, path_to_file: %q", err, pathToFile)
@@ -193,7 +191,7 @@ func runMigration(driver Driver, pathToFile string, mig internal.Migration) (err
 		mig.Version().String(),
 	)
 	if err == nil {
-		log.Info(context.TODO(), "ok", fields...)
+		lgr.Info("ok")
 	}
 	return
 }
@@ -231,7 +229,7 @@ func choosePrinter(format string, w io.Writer) (out internal.InfoPrinter) {
 	}
 
 	if format != "tsv" && format != "" {
-		log.Warn(context.TODO(), "unknown format, defaulting to tsv", slog.String("format", format))
+		slog.Warn("unknown format, defaulting to tsv", slog.String("format", format))
 	}
 	out = internal.NewTSV(w)
 	return
@@ -241,7 +239,7 @@ func choosePrinter(format string, w io.Writer) (out internal.InfoPrinter) {
 func Init(pathToFile string) (err error) {
 	_, err = os.Stat(pathToFile)
 	if err == nil {
-		log.Info(context.TODO(), "config file already present", slog.String("path_to_file", pathToFile))
+		slog.Info("config file already present", slog.String("path_to_file", pathToFile))
 		return nil
 	}
 	if !os.IsNotExist(err) {
@@ -279,7 +277,7 @@ func (m *migrationFinder) query(driver Driver) (out []internal.Migration, err er
 	if err == ErrSchemaMigrationsDoesNotExist {
 		// The next invocation of CreateSchemaMigrationsTable should fix this.
 		// We can continue with zero value for now.
-		log.Info(context.TODO(), "no migrations applied yet, continuing...", slog.Any("message", err))
+		slog.Info("no migrations applied yet, continuing...", slog.Any("message", err))
 	} else if err != nil {
 		return
 	}
@@ -342,7 +340,7 @@ func (m *migrationFinder) available() (out []internal.Migration, err error) {
 	}
 	defer func() {
 		if ierr := fileDir.Close(); ierr != nil {
-			log.Warn(context.TODO(), "closing fileDir after looking for available migrations", slog.String("filedir", fileDir.Name()), slog.String("error", ierr.Error()))
+			slog.Warn("closing fileDir after looking for available migrations", slog.String("filedir", fileDir.Name()), slog.String("error", ierr.Error()))
 		}
 	}()
 	if filenames, err = fileDir.Readdirnames(0); err != nil {
@@ -356,7 +354,7 @@ func (m *migrationFinder) available() (out []internal.Migration, err error) {
 	for _, fn := range filenames {
 		mig, ierr := internal.ParseMigration(internal.Filename(fn))
 		if errors.Is(ierr, internal.ErrDataInvalid) {
-			log.Warn(context.TODO(), "parsing migration filename, skipping over this one", slog.String("filename", fn), slog.String("error", ierr.Error()))
+			slog.Warn("parsing migration filename, skipping over this one", slog.String("filename", fn), slog.String("error", ierr.Error()))
 			continue
 		} else if ierr != nil {
 			err = ierr
