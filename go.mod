@@ -9,6 +9,7 @@ require (
 	github.com/go-sql-driver/mysql v1.5.0
 	github.com/gocql/gocql v0.0.0-20211222173705-d73e6b1002a7
 	github.com/lib/pq v1.10.0
+	github.com/lmittmann/tint v1.1.2
 	github.com/rafaelespinoza/alf v0.2.0
 	modernc.org/sqlite v1.24.0
 )

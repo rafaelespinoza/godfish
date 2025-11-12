@@ -17,6 +17,8 @@ func TestNewLogHandler(t *testing.T) {
 		{name: "logging off", loggingOff: true, expOutput: false},
 		{name: "invalid log level", logLevel: "BAD", logFormat: "JSON", expOutput: true},
 		{name: "invalid log format", logLevel: "INFO", logFormat: "BAD", expOutput: true},
+		{name: "ok COLORS", logLevel: "INFO", logFormat: "COLORS", expOutput: true},
+		{name: "ok CoLoRs", logLevel: "INFO", logFormat: "CoLoRs", expOutput: true},
 		{name: "ok JSON", logLevel: "INFO", logFormat: "JSON", expOutput: true},
 		{name: "ok JsOn", logLevel: "INFO", logFormat: "JsOn", expOutput: true},
 		{name: "ok TEXT", logLevel: "INFO", logFormat: "TEXT", expOutput: true},
