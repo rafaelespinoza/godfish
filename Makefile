@@ -13,6 +13,7 @@ SQLITE3_PATH=$(PKG_IMPORT_PATH)/drivers/sqlite3
 # inject this metadata when building a binary.
 GO_VERSION := $(shell $(GO) version | awk '{ print $$3 }')
 define LDFLAGS
+-extldflags '-static' \
 -X $(PKG_IMPORT_PATH)/internal/cmd.versionBranchName=$(shell git rev-parse --abbrev-ref HEAD) \
 -X $(PKG_IMPORT_PATH)/internal/cmd.versionBuildTime=$(shell date --utc +%FT%T%z) \
 -X $(PKG_IMPORT_PATH)/internal/cmd.versionCommitHash=$(shell git rev-parse --short=7 HEAD) \

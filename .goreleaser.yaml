@@ -26,6 +26,7 @@ version: 2
 # But I'd prefer to not repeat that same structure for each driver to build at
 # this time.
 env:
+  - CGO_ENABLED=0
 
 builds:
   -
@@ -41,7 +42,7 @@ builds:
       - windows
     ldflags:
       - >
-        {{ .Env.LDFLAGS }} -X {{ .Env.PKG_IMPORT_PATH }}/internal/cmd.versionDriver=cassandra
+        -s {{ .Env.LDFLAGS }} -X {{ .Env.PKG_IMPORT_PATH }}/internal/cmd.versionDriver=cassandra
   -
     id: mysql
     dir: ./drivers/mysql/godfish
@@ -55,7 +56,7 @@ builds:
       - windows
     ldflags:
       - >
-        {{ .Env.LDFLAGS }} -X {{ .Env.PKG_IMPORT_PATH }}/internal/cmd.versionDriver=mysql
+        -s {{ .Env.LDFLAGS }} -X {{ .Env.PKG_IMPORT_PATH }}/internal/cmd.versionDriver=mysql
   -
     id: postgres
     dir: ./drivers/postgres/godfish
@@ -69,7 +70,7 @@ builds:
       - windows
     ldflags:
       - >
-        {{ .Env.LDFLAGS }} -X {{ .Env.PKG_IMPORT_PATH }}/internal/cmd.versionDriver=postgres
+        -s {{ .Env.LDFLAGS }} -X {{ .Env.PKG_IMPORT_PATH }}/internal/cmd.versionDriver=postgres
   -
     id: sqlite3
     dir: ./drivers/sqlite3/godfish
@@ -83,7 +84,7 @@ builds:
       - windows
     ldflags:
       - >
-        {{ .Env.LDFLAGS }} -X {{ .Env.PKG_IMPORT_PATH }}/internal/cmd.versionDriver=sqlite3
+        -s {{ .Env.LDFLAGS }} -X {{ .Env.PKG_IMPORT_PATH }}/internal/cmd.versionDriver=sqlite3
   -
     id: sqlserver
     dir: ./drivers/sqlserver/godfish
@@ -97,7 +98,7 @@ builds:
       - windows
     ldflags:
       - >
-        {{ .Env.LDFLAGS }} -X {{ .Env.PKG_IMPORT_PATH }}/internal/cmd.versionDriver=sqlserver
+        -s {{ .Env.LDFLAGS }} -X {{ .Env.PKG_IMPORT_PATH }}/internal/cmd.versionDriver=sqlserver
 
 checksum:
   name_template: checksums.txt
