@@ -1,6 +1,6 @@
 module github.com/rafaelespinoza/godfish
 
-go 1.23.0
+go 1.24.0
 
 toolchain go1.24.2
 
@@ -25,10 +25,10 @@ require (
 	github.com/mattn/go-isatty v0.0.16 // indirect
 	github.com/rafaelespinoza/logg v0.1.1
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
-	golang.org/x/crypto v0.31.0 // indirect
+	golang.org/x/crypto v0.45.0 // indirect
 	golang.org/x/mod v0.17.0 // indirect
 	golang.org/x/sync v0.13.0 // indirect
-	golang.org/x/sys v0.32.0 // indirect
+	golang.org/x/sys v0.38.0 // indirect
 	golang.org/x/tools v0.21.1-0.20240508182429-e35e4ccd0d2d // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	lukechampine.com/uint128 v1.2.0 // indirect
@@ -41,5 +41,3 @@ require (
 	modernc.org/strutil v1.1.3 // indirect
 	modernc.org/token v1.0.1 // indirect
 )
-
-replace golang.org/x/crypto => golang.org/x/crypto v0.37.0

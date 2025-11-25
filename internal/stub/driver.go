@@ -2,6 +2,7 @@
 package stub
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
@@ -27,7 +28,7 @@ func (d *driver) CreateSchemaMigrationsTable() error {
 
 func (d *driver) Execute(q string, a ...interface{}) error {
 	if strings.Contains(q, "invalid SQL") {
-		return fmt.Errorf(q)
+		return errors.New(q)
 	}
 	return nil
 }
