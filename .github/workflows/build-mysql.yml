@@ -6,11 +6,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Checkout repo
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
     - name: Build environment and run tests
       run: make -f ci.Makefile ci-mariadb-up
     - name: Upload code coverage
-      uses: codecov/codecov-action@v4
+      uses: codecov/codecov-action@v5
       with:
         fail_ci_if_error: true
         files: /tmp/cover.out,/tmp/cover_driver.out
