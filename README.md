@@ -161,7 +161,15 @@ The GitHub Actions run a security scanner on all of the source code using
 here. The Justfile provides a convenience target if you want to run `gosec` on
 your development machine.
 
-## tests
+## development notes
+
+The code is organized as a DB migration library, and DB-specific
+implementations as separate go modules. It's a small monorepo. The goal here is
+to ease development of drivers, so that working on just one of them does not
+require downloading a bunch of other dependencies. It could also allow make it
+easier to follow changes to individual driver implementations.
+
+### tests
 
 Docker (or equivalent) is used to create environments and run the tests against
 a live database. Each database has a separate configuration. All of this lives
