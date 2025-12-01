@@ -22,7 +22,7 @@ type Driver interface {
 	// Execute runs the schema change and commits it to the database. The query
 	// parameter is a SQL string and may contain placeholders for the values in
 	// args. Input should be passed to conn so it could be sanitized, escaped.
-	Execute(query string, args ...interface{}) error
+	Execute(query string, args ...any) error
 	// UpdateSchemaMigrations records a timestamped version of a migration that
 	// has been successfully applied by adding a new row to the schema
 	// migrations table.
@@ -37,5 +37,5 @@ type Driver interface {
 type AppliedVersions interface {
 	Close() error
 	Next() bool
-	Scan(dest ...interface{}) error
+	Scan(dest ...any) error
 }

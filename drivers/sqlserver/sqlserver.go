@@ -44,7 +44,7 @@ func (d *driver) Close() (err error) {
 	return
 }
 
-func (d *driver) Execute(query string, args ...interface{}) (err error) {
+func (d *driver) Execute(query string, args ...any) (err error) {
 	_, err = d.connection.Exec(query)
 	return
 }

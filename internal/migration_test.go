@@ -11,8 +11,6 @@ import (
 	"github.com/rafaelespinoza/godfish/internal"
 )
 
-const baseTestOutputDir = "/tmp/godfish_test"
-
 func TestParseMigration(t *testing.T) {
 	type testCase struct {
 		filename       internal.Filename

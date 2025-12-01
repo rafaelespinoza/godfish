@@ -24,7 +24,7 @@ func makeMigrate(name string) alf.Directive {
 				fmt.Sprintf("timestamp of migration, format: %s", internal.TimeFormat),
 			)
 			flags.Usage = func() {
-				fmt.Fprintf(flags.Output(), `Usage: %s [godfish-flags] %s [%s-flags]
+				_, _ = fmt.Fprintf(flags.Output(), `Usage: %s [godfish-flags] %s [%s-flags]
 
 	Execute migration(s) in the forward direction. If the "version" is left
 	unspecified, then all available migrations are executed. Otherwise,
@@ -59,7 +59,7 @@ func makeRemigrate(name string) alf.Directive {
 		Setup: func(p flag.FlagSet) *flag.FlagSet {
 			flags := newFlagSet(name)
 			flags.Usage = func() {
-				fmt.Fprintf(flags.Output(), `Usage: %s [godfish-flags] %s [%s-flags]
+				_, _ = fmt.Fprintf(flags.Output(), `Usage: %s [godfish-flags] %s [%s-flags]
 
 	Execute the last migration in reverse (rollback) and then execute the same
 	one forward. This could be useful for development.
@@ -97,7 +97,7 @@ func makeRollback(name string) alf.Directive {
 				fmt.Sprintf("timestamp of migration, format: %s", internal.TimeFormat),
 			)
 			flags.Usage = func() {
-				fmt.Fprintf(flags.Output(), `Usage: %s [godfish-flags] %s [%s-flags]
+				_, _ = fmt.Fprintf(flags.Output(), `Usage: %s [godfish-flags] %s [%s-flags]
 
 	Execute migration(s) in the reverse direction. If the "version" is left
 	unspecified, then only the first available migration is executed. Otherwise,

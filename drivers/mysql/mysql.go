@@ -43,7 +43,7 @@ func (d *driver) Close() (err error) {
 
 var statementDelimiter = regexp.MustCompile(`;\s*\n`)
 
-func (d *driver) Execute(query string, args ...interface{}) (err error) {
+func (d *driver) Execute(query string, args ...any) (err error) {
 	// Attempt to support migrations with 1 or more statements. AFAIK, the
 	// standard library does not support executing multiple statements at once.
 	// As a workaround, break them up and apply them.

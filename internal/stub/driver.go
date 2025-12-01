@@ -26,7 +26,7 @@ func (d *driver) CreateSchemaMigrationsTable() error {
 	return nil
 }
 
-func (d *driver) Execute(q string, a ...interface{}) error {
+func (d *driver) Execute(q string, a ...any) error {
 	if strings.Contains(q, "invalid SQL") {
 		return errors.New(q)
 	}

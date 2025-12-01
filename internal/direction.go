@@ -2,6 +2,7 @@ package internal
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 )
 
@@ -38,13 +39,7 @@ var (
 )
 
 func validateDirectionLabel(okVals []string, val string) (err error) {
-	var ok bool
-	for _, okVal := range okVals {
-		if val == okVal {
-			ok = true
-			break
-		}
-	}
+	ok := slices.Contains(okVals, val)
 	if !ok {
 		err = fmt.Errorf(
 			"invalid value (%q); should be one of: %s",

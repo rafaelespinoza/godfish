@@ -29,12 +29,9 @@ func TestTSV(t *testing.T) {
 		{"up", "4000", "forward-4000-delta.sql"},
 	}
 
-	for i := 0; i < len(names); i++ {
+	for i := range len(names) {
 		line, ierr := buf.ReadString('\n')
-		switch ierr {
-		case nil:
-			break
-		default:
+		if ierr != nil {
 			t.Fatal(ierr)
 		}
 
@@ -42,7 +39,7 @@ func TestTSV(t *testing.T) {
 		if len(parts) != numExpectedParts {
 			t.Fatalf("wrong number of parts per line; got %d, expected %d", len(parts), numExpectedParts)
 		}
-		for j := 0; j < numExpectedParts; j++ {
+		for j := range numExpectedParts {
 			// this newline only appears in the last item, but it's annoying.
 			got := strings.TrimSuffix(parts[j], "\n")
 			if got != expected[i][j] {
@@ -72,12 +69,9 @@ func TestJSON(t *testing.T) {
 		{"state": "up", "version": "4000", "filename": "forward-4000-delta.sql"},
 	}
 
-	for i := 0; i < len(names); i++ {
+	for i := range len(names) {
 		line, ierr := buf.ReadBytes('\n')
-		switch ierr {
-		case nil:
-			break
-		default:
+		if ierr != nil {
 			t.Fatal(ierr)
 		}
 
@@ -111,7 +105,7 @@ func mustMakeMigrations(t *testing.T, names ...string) []internal.Migration {
 
 	out := make([]internal.Migration, len(names))
 
-	for i := 0; i < len(names); i++ {
+	for i := range len(names) {
 		params, err := internal.NewMigrationParams(names[i], false, dir, "forward", "reverse")
 		if err != nil {
 			t.Fatalf("error on names[%d]: %v", i, err)

@@ -55,7 +55,8 @@ func (a *appliedVersions) Next() bool {
 	}
 	return a.counter < len(a.versions)
 }
-func (a *appliedVersions) Scan(dest ...interface{}) error {
+
+func (a *appliedVersions) Scan(dest ...any) error {
 	if a.err != nil {
 		return a.err
 	}

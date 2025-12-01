@@ -46,7 +46,7 @@ func (d *driver) Close() (err error) {
 
 var statementDelimiter = regexp.MustCompile(`;\s*\n`)
 
-func (d *driver) Execute(query string, args ...interface{}) (err error) {
+func (d *driver) Execute(query string, args ...any) (err error) {
 	statements := statementDelimiter.Split(query, -1)
 	if len(statements) < 1 {
 		return

@@ -23,7 +23,7 @@ func makeInit(name string) alf.Directive {
 				"path to godfish config file",
 			)
 			flags.Usage = func() {
-				fmt.Fprintf(flags.Output(), `Usage: %s [godfish-flags] %s [%s-flags]
+				_, _ = fmt.Fprintf(flags.Output(), `Usage: %s [godfish-flags] %s [%s-flags]
 
 	Creates a configuration file, unless it already exists.
 `,

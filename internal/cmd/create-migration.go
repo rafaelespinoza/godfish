@@ -48,7 +48,7 @@ func makeCreateMigration(subcmdName string) alf.Directive {
 				"customize the directional part of the filename for reverse migration",
 			)
 			flags.Usage = func() {
-				fmt.Fprintf(flags.Output(), `Usage: %s [godfish-flags] %s [%s-flags]
+				_, _ = fmt.Fprintf(flags.Output(), `Usage: %s [godfish-flags] %s [%s-flags]
 
 	Generate migration files: one meant for the "forward" direction,
 	another meant for "reverse". Optionally create a migration in the forward

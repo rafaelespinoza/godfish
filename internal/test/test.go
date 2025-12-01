@@ -2,6 +2,7 @@ package test
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -130,7 +131,6 @@ func formattedTime(v string) internal.Version {
 
 // testDriverStub encompasses some data to use with interface tests.
 type testDriverStub struct {
-	migration    internal.Migration
 	content      MigrationContent
 	indirectives struct{ forward, reverse internal.Indirection }
 	version      internal.Version
@@ -208,14 +208,22 @@ func collectAppliedVersions(driver godfish.Driver) (out []string, err error) {
 	if err = driver.Connect(mustDSN()); err != nil {
 		return
 	}
-	defer driver.Close()
+	defer func() {
+		if cerr := driver.Close(); cerr != nil {
+			slog.Warn("closing driver from func collectAppliedVersions", slog.Any("error", cerr))
+		}
+	}()
 
 	appliedVersions, err := driver.AppliedVersions()
 	if err != nil {
 		err = fmt.Errorf("could not retrieve applied versions; %v", err)
 		return
 	}
-	defer appliedVersions.Close()
+	defer func() {
+		if cerr := appliedVersions.Close(); cerr != nil {
+			slog.Warn("closing appliedVersions from func collectAppliedVersions", slog.Any("error", cerr))
+		}
+	}()
 
 	for appliedVersions.Next() {
 		var version string

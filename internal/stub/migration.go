@@ -1,8 +1,6 @@
 package stub
 
-import (
-	"github.com/rafaelespinoza/godfish/internal"
-)
+import "github.com/rafaelespinoza/godfish/internal"
 
 type migration struct {
 	indirection internal.Indirection

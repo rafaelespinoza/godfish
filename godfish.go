@@ -45,7 +45,11 @@ func Migrate(driver Driver, directoryPath string, forward bool, finishAtVersion 
 	if err = driver.Connect(dsn); err != nil {
 		return
 	}
-	defer driver.Close()
+	defer func() {
+		if cerr := driver.Close(); cerr != nil {
+			slog.Warn("closing driver from func Migrate", slog.Any("error", cerr))
+		}
+	}()
 
 	direction := internal.DirReverse
 	if forward {
@@ -95,7 +99,11 @@ func ApplyMigration(driver Driver, directoryPath string, forward bool, version s
 	if err = driver.Connect(dsn); err != nil {
 		return
 	}
-	defer driver.Close()
+	defer func() {
+		if cerr := driver.Close(); cerr != nil {
+			slog.Warn("closing driver from func ApplyMigration", slog.Any("error", cerr))
+		}
+	}()
 
 	direction := internal.DirReverse
 	if forward {
@@ -145,9 +153,10 @@ func figureOutBasename(directoryPath string, direction internal.Direction, versi
 	}
 
 	var directionNames []string
-	if direction == internal.DirForward {
+	switch direction {
+	case internal.DirForward:
 		directionNames = internal.ForwardDirections
-	} else if direction == internal.DirReverse {
+	case internal.DirReverse:
 		directionNames = internal.ReverseDirections
 	}
 
@@ -218,7 +227,11 @@ func Info(driver Driver, directoryPath string, forward bool, finishAtVersion str
 	if err = driver.Connect(dsn); err != nil {
 		return err
 	}
-	defer driver.Close()
+	defer func() {
+		if cerr := driver.Close(); cerr != nil {
+			slog.Warn("closing driver from func Info", slog.Any("error", cerr))
+		}
+	}()
 
 	direction := internal.DirReverse
 	if forward {
@@ -387,7 +400,11 @@ func scanAppliedVersions(driver Driver, directoryPath string) (out []internal.Mi
 	if rows, err = driver.AppliedVersions(); err != nil {
 		return
 	}
-	defer rows.Close()
+	defer func() {
+		if cerr := rows.Close(); cerr != nil {
+			slog.Warn("closing rows from func scanscanAppliedVersions", slog.Any("error", cerr))
+		}
+	}()
 	for rows.Next() {
 		var version, basename string
 		var mig internal.Migration

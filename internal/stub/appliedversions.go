@@ -31,7 +31,7 @@ func (r *appliedVersions) Close() error {
 
 func (r *appliedVersions) Next() bool { return r.counter < len(r.versions) }
 
-func (r *appliedVersions) Scan(dest ...interface{}) error {
+func (r *appliedVersions) Scan(dest ...any) error {
 	var out *string
 	if s, ok := dest[0].(*string); !ok {
 		return fmt.Errorf("pass in *string; got %T", s)

@@ -157,7 +157,7 @@ func TestInit(t *testing.T) {
 func TestAppliedVersions(t *testing.T) {
 	// Regression test on the API. It's supposed to wrap this type from the
 	// standard library for the most common cases.
-	var thing interface{} = new(sql.Rows)
+	var thing any = new(sql.Rows)
 	if _, ok := thing.(godfish.AppliedVersions); !ok {
 		t.Fatalf("expected %T to implement godfish.AppliedVersions", thing)
 	}

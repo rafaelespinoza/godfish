@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"text/tabwriter"
 
 	"github.com/rafaelespinoza/alf"
 )
@@ -30,7 +31,7 @@ func makeVersion(name string) alf.Directive {
 			flags := newFlagSet(name)
 			flags.BoolVar(&formatJSON, "json", false, "format output as JSON")
 			flags.Usage = func() {
-				fmt.Fprintf(flags.Output(), `Usage: %s [flags]
+				_, _ = fmt.Fprintf(flags.Output(), `Usage: %s [flags]
 
 	Prints some versioning info to stdout. Pass the -json flag to get JSON.
 `,
@@ -45,13 +46,19 @@ func makeVersion(name string) alf.Directive {
 			// about where this subcommand output goes.
 			w := os.Stdout
 			if !formatJSON {
-				fmt.Fprintf(w, "BranchName:	%s\n", versionBranchName)
-				fmt.Fprintf(w, "BuildTime: 	%s\n", versionBuildTime)
-				fmt.Fprintf(w, "Driver: 	%s\n", versionDriver)
-				fmt.Fprintf(w, "CommitHash:	%s\n", versionCommitHash)
-				fmt.Fprintf(w, "GoVersion: 	%s\n", versionGoVersion)
-				fmt.Fprintf(w, "Tag:		%s\n", versionTag)
-				return nil
+				tw := tabwriter.NewWriter(w, 8, 4, 1, '\t', 0)
+				tuples := []struct{ key, val string }{
+					{"BranchName", versionBranchName},
+					{"BuildTime", versionBuildTime},
+					{"Driver", versionDriver},
+					{"CommitHash", versionCommitHash},
+					{"GoVersion", versionGoVersion},
+					{"Tag", versionTag},
+				}
+				for _, tuple := range tuples {
+					_, _ = fmt.Fprintf(tw, "%s:\t%s\n", tuple.key, tuple.val)
+				}
+				return tw.Flush()
 			}
 			out, err := json.Marshal(
 				map[string]string{
@@ -66,7 +73,7 @@ func makeVersion(name string) alf.Directive {
 			if err != nil {
 				return err
 			}
-			fmt.Fprintf(w, "%s\n", out)
+			_, _ = fmt.Fprintf(w, "%s\n", out)
 			return nil
 		},
 	}

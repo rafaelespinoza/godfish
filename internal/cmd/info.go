@@ -38,7 +38,7 @@ func makeInfo(name string) alf.Directive {
 				fmt.Sprintf("timestamp of migration, format: %s", internal.TimeFormat),
 			)
 			flags.Usage = func() {
-				fmt.Fprintf(flags.Output(), `Usage: %s [godfish-flags] %s [%s-flags]
+				_, _ = fmt.Fprintf(flags.Output(), `Usage: %s [godfish-flags] %s [%s-flags]
 
 	List applied migrations, preview migrations to apply.
 
