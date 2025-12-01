@@ -19,7 +19,7 @@
 # vendor/
 
 ### Go Patch ###
-/vendor/
+vendor/
 /Godeps/
 
 ### Linux ###

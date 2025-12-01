@@ -20,6 +20,14 @@ _LDFLAGS := ("-extldflags '-static'" + _LDFLAGS_DELIMITER + _LDFLAGS_BASE_PREFIX
 @default:
     {{ justfile() }} --list --unsorted
 
+mod-tidy:
+    #!/bin/sh
+    set -eu
+    {{ GO }} mod tidy
+    for d in cassandra mysql postgres sqlite3 sqlserver; do
+        {{ GO }} -C "drivers/${d}" mod tidy
+    done
+
 # Run unit tests on core source packages
 test *args:
     {{ GO }} test {{ args }} {{ _CORE_SRC_PKG_PATHS }}
