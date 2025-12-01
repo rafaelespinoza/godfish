@@ -8,7 +8,7 @@ _CORE_SRC_PKG_PATHS := PKG_IMPORT_PATH + " " + PKG_IMPORT_PATH / "internal" / ".
 [private]
 _GO_VERSION := `go version | awk '{ print $3 }'`
 [private]
-_BASE_DRIVER_PATH := PKG_IMPORT_PATH / "drivers"
+_BASE_DRIVER_PATH := "drivers"
 [private]
 _LDFLAGS_BASE_PREFIX := "-X " + PKG_IMPORT_PATH + "/internal/cmd"
 [private]
@@ -136,6 +136,6 @@ _build_driver driver_name src_path:
     bin={{ clean(BIN_DIR / "godfish_" + driver_name) }}
     mkdir -pv {{ BIN_DIR }}
     ldflags="{{ _LDFLAGS }}{{ _LDFLAGS_BASE_PREFIX }}.versionDriver={{ driver_name }}"
-    {{ GO }} build -o="${bin}" -v -ldflags="${ldflags}" {{ src_path }}
+    {{ GO }} -C '{{ parent_directory(src_path) }}' build -o="${bin}" -v -ldflags="${ldflags}" './{{ file_stem(src_path) }}'
     "${bin}" version
     echo "built {{ driver_name }} to ${bin}"
