@@ -79,8 +79,7 @@ build-cassandra: (_build_driver "cassandra" (_CASSANDRA_PATH / "godfish"))
 
 # Run tests on a live cassandra instance at DB_DSN
 [group('driver-cassandra')]
-test-cassandra *args:
-    {{ GO }} test {{ args }} {{ _CASSANDRA_PATH }}/...
+test-cassandra *args: (_test_driver _CASSANDRA_PATH args)
 
 [private]
 _MYSQL_PATH := _BASE_DRIVER_PATH / "mysql"
@@ -91,8 +90,7 @@ build-mysql: (_build_driver "mysql" (_MYSQL_PATH / "godfish"))
 
 # Run tests on a live mysql instance at DB_DSN
 [group('driver-mysql')]
-test-mysql *args:
-    {{ GO }} test {{ args }} {{ _MYSQL_PATH }}/...
+test-mysql *args: (_test_driver _MYSQL_PATH args)
 
 [private]
 _POSTGRES_PATH := _BASE_DRIVER_PATH / "postgres"
@@ -103,8 +101,7 @@ build-postgres: (_build_driver "postgres" (_POSTGRES_PATH / "godfish"))
 
 # Run tests on a live postgres instance at DB_DSN
 [group('driver-postgres')]
-test-postgres *args:
-    {{ GO }} test {{ args }} {{ _POSTGRES_PATH }}/...
+test-postgres *args: (_test_driver _POSTGRES_PATH args)
 
 [private]
 _SQLITE3_PATH := _BASE_DRIVER_PATH / "sqlite3"
@@ -115,8 +112,7 @@ build-sqlite3: (_build_driver "sqlite3" (_SQLITE3_PATH / "godfish"))
 
 # Run tests on a live sqlite3 instance at DB_DSN
 [group('driver-sqlite3')]
-test-sqlite3 *args:
-    {{ GO }} test {{ args }} {{ _SQLITE3_PATH }}/...
+test-sqlite3 *args: (_test_driver _SQLITE3_PATH args)
 
 [private]
 _SQLSERVER_PATH := _BASE_DRIVER_PATH / "sqlserver"
@@ -127,8 +123,7 @@ build-sqlserver: (_build_driver "sqlserver" (_SQLSERVER_PATH / "godfish"))
 
 # Run tests on a live sqlserver instance at DB_DSN
 [group('driver-sqlserver')]
-test-sqlserver *args:
-    {{ GO }} test {{ args }} {{ _SQLSERVER_PATH }}/...
+test-sqlserver *args: (_test_driver _SQLSERVER_PATH args)
 
 _build_driver driver_name src_path:
     #!/bin/sh
@@ -139,3 +134,6 @@ _build_driver driver_name src_path:
     {{ GO }} -C '{{ parent_directory(src_path) }}' build -o="${bin}" -v -ldflags="${ldflags}" './{{ file_stem(src_path) }}'
     "${bin}" version
     echo "built {{ driver_name }} to ${bin}"
+
+_test_driver src_path *args:
+    {{ GO }} -C {{ src_path }} test {{ args }} ./...
