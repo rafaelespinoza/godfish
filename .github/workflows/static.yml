@@ -6,10 +6,10 @@ jobs:
     steps:
     - name: Checkout repo
       uses: actions/checkout@v6
+    - name: Run shellcheck
+      run: shellcheck .github/workflows/security_scan.sh
     - name: Run gosec
-      uses: securego/gosec@master
-      with:
-        args: --tests . ./internal/... ./drivers/...
+      run: .github/workflows/security_scan.sh
 
   vet:
     runs-on: ubuntu-latest
