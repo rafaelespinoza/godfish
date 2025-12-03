@@ -2,7 +2,7 @@ services:
     client:
         build:
             context: ../..
-            dockerfile: .ci/postgres/client.Dockerfile
+            dockerfile: .ci/postgres/client.Containerfile
         depends_on:
           - server
         entrypoint: /client.sh server
@@ -15,7 +15,7 @@ services:
     server:
         build:
             context: ../..
-            dockerfile: .ci/postgres/server_v14.Dockerfile
+            dockerfile: .ci/postgres/server_v14.Containerfile
         env_file:
             - env
         expose:

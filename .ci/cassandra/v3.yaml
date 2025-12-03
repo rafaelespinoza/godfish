@@ -2,7 +2,7 @@ services:
     client:
         build:
             context: ../..
-            dockerfile: .ci/cassandra/client.Dockerfile
+            dockerfile: .ci/cassandra/client.Containerfile
         depends_on:
             - server
         entrypoint: /client.sh server
@@ -11,7 +11,7 @@ services:
             DB_DSN: "cassandra://server:9042/godfish_test?timeout_ms=2000&connect_timeout_ms=2000"
         tty: true
     server:
-        image: docker.io/cassandra:4.0.3
+        image: docker.io/cassandra:3.11.12
         expose:
             - "9042"
         volumes:

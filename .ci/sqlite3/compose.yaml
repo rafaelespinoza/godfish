@@ -12,5 +12,5 @@ services:
     client:
         build:
             context: ../..
-            dockerfile: .ci/sqlite3/Dockerfile
+            dockerfile: .ci/sqlite3/Containerfile
         tty: true

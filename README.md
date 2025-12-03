@@ -163,9 +163,14 @@ your development machine.
 
 ## tests
 
-Docker is used to create environments and run the tests against a live
-database. Each database has a separate configuration. All of this lives in
-`ci.Justfile` and the `.ci/` directory.
+Docker (or equivalent) is used to create environments and run the tests against
+a live database. Each database has a separate configuration. All of this lives
+in `ci.Justfile` and the `.ci/` directory.
+
+Using an OCI-compatible tool other than `docker` (ie: `podman`)?
+```sh
+$ just --set CONTAINER_TOOL podman -f ci.Justfile
+```
 
 Build environments and run tests
 ```sh

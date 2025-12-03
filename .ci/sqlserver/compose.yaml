@@ -2,7 +2,7 @@ services:
     client:
         build:
             context: ../..
-            dockerfile: .ci/sqlserver/client.Dockerfile
+            dockerfile: .ci/sqlserver/client.Containerfile
         depends_on:
           - server
         entrypoint: /client.sh
