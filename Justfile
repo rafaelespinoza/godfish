@@ -26,7 +26,9 @@ test *args:
 
 # Examine source code for suspicious constructs
 vet *args:
-    {{ GO }} vet {{ args }} {{ _CORE_SRC_PKG_PATHS }} {{ PKG_IMPORT_PATH }}/drivers/...
+    {{ GO }} vet {{ args }} {{ _CORE_SRC_PKG_PATHS }}
+    find ./{{ _BASE_DRIVER_PATH }} -mindepth 1 -maxdepth 1 -type d -exec \
+        {{ GO }} -C {} vet {{ args }} ./... \;
 
 # Remove BIN_DIR
 clean:
