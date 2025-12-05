@@ -12,6 +12,11 @@ services:
             CGO_ENABLED: 0
             DB_DSN: "postgresql://godfish:password@server:5432/godfish_test?sslmode=disable"
         tty: true
+        volumes:
+            -
+              type: bind
+              source: /tmp/godfish_test/postgres_v14/.test_coverage
+              target: /tmp
     server:
         build:
             context: ../..

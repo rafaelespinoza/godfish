@@ -91,13 +91,10 @@ sqlserver-up: (_up "sqlserver" _SQLSERVER_FILE)
 [group('driver-sqlserver')]
 sqlserver-down: (_compose_down _SQLSERVER_FILE)
 
-_up driver_basename compose_file: (make-builder-img driver_basename) (_compose_up compose_file) (_cp_coverage_to_host compose_file)
+_up driver_basename compose_file: (make-builder-img driver_basename) (_compose_up compose_file)
 
 _compose_up compose_file:
     {{ CONTAINER_TOOL }} compose -f {{ compose_file }} up --build --exit-code-from client
-
-_cp_coverage_to_host compose_file:
-    CONTAINER_TOOL='{{ CONTAINER_TOOL }}' {{ CI_DIR }}/cp_coverage_to_host.sh {{ compose_file }}
 
 _compose_down compose_file:
     {{ CONTAINER_TOOL }} compose -f {{ compose_file }} down --rmi all --volumes
@@ -111,6 +108,9 @@ make-builder-img driver_basename:
     mkdir -pv "${build_dir}" && chmod -v 700 "${build_dir}"
     git clone --depth=1 'file://{{ justfile_directory() }}' "${build_dir}"
     {{ CONTAINER_TOOL }} image build -f {{ CI_DIR }}/client_base.Containerfile -t {{ BASENAME }}/client_base "${build_dir}"
+    # Also make directory for capturing test coverage. The GitHub action will
+    # look here for files to copy up to the code coverage service.
+    mkdir -pv "${build_dir}/.test_coverage"
 
 # Remove builder image
 rm-builder-img:

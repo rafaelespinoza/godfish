@@ -14,6 +14,11 @@ services:
             #   "$db_user:$db_password@tcp($db_host)/$db_name"
             DB_DSN: "godfish:password@tcp(server)/godfish_test"
         tty: true
+        volumes:
+            -
+              type: bind
+              source: /tmp/godfish_test/mariadb/.test_coverage
+              target: /tmp
     server:
         image: docker.io/mariadb:10.6
         env_file: env

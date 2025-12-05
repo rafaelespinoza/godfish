@@ -11,6 +11,11 @@ services:
         environment:
             CGO_ENABLED: 0
         tty: true
+        volumes:
+          -
+            type: bind
+            source: /tmp/godfish_test/sqlserver/.test_coverage
+            target: /tmp
     server:
         image: mcr.microsoft.com/mssql/server:latest
         env_file:

@@ -14,3 +14,8 @@ services:
             context: ../..
             dockerfile: .ci/sqlite3/Containerfile
         tty: true
+        volumes:
+          -
+            type: bind
+            source: /tmp/godfish_test/sqlite3/.test_coverage
+            target: /tmp

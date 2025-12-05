@@ -10,6 +10,11 @@ services:
             CGO_ENABLED: 0
             DB_DSN: "cassandra://server:9042/godfish_test?timeout_ms=2000&connect_timeout_ms=2000"
         tty: true
+        volumes:
+            -
+              type: bind
+              source: /tmp/godfish_test/cassandra_v3/.test_coverage
+              target: /tmp
     server:
         image: docker.io/cassandra:3.11.12
         expose:
