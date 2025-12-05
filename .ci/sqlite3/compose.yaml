@@ -1,3 +1,5 @@
+name: localhost/godfish_test/sqlite3
+
 services:
     # SQLite3 doesn't actually have a client-server model. Instead, it's linked
     # to the application. The other databases in this project build test
@@ -14,3 +16,11 @@ services:
             context: ../..
             dockerfile: .ci/sqlite3/Containerfile
         tty: true
+        volumes:
+          - # Put test coverage files here.
+            type: volume
+            source: client
+            target: /tmp
+
+volumes:
+    client:

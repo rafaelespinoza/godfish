@@ -1,3 +1,5 @@
+name: localhost/godfish_test/mariadb
+
 services:
     client:
         build:
@@ -14,6 +16,11 @@ services:
             #   "$db_user:$db_password@tcp($db_host)/$db_name"
             DB_DSN: "godfish:password@tcp(server)/godfish_test"
         tty: true
+        volumes:
+          - # Put test coverage files here.
+            type: volume
+            source: client
+            target: /tmp
     server:
         image: docker.io/mariadb:10.6
         env_file: env
@@ -26,4 +33,5 @@ services:
               target: /var/lib/mysql
 
 volumes:
+    client:
     server:
