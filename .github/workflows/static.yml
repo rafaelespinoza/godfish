@@ -3,13 +3,19 @@ on: [push, pull_request]
 jobs:
   security_scan:
     runs-on: ubuntu-latest
+    env:
+      BIN_DIR: /usr/local/bin
     steps:
     - name: Checkout repo
       uses: actions/checkout@v6
-    - name: Run shellcheck
-      run: shellcheck .github/workflows/security_scan.sh
+    - name: Install just
+      uses: extractions/setup-just@v3
+    - name: Install gosec
+      run: |
+        wget -O - -q https://raw.githubusercontent.com/securego/gosec/master/install.sh |
+          sh -s -- -b ${{ env.BIN_DIR }}
     - name: Run gosec
-      run: .github/workflows/security_scan.sh
+      run: just --set GOSEC ${{ env.BIN_DIR }}/gosec gosec
 
   vet:
     runs-on: ubuntu-latest

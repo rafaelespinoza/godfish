@@ -15,17 +15,20 @@ _LDFLAGS_BASE_PREFIX := "-X " + PKG_IMPORT_PATH + "/internal/cmd"
 _LDFLAGS_DELIMITER := "\n\t"
 [private]
 _LDFLAGS := ("-extldflags '-static'" + _LDFLAGS_DELIMITER + _LDFLAGS_BASE_PREFIX + ".versionBranchName=" + `git rev-parse --abbrev-ref HEAD` + _LDFLAGS_DELIMITER + _LDFLAGS_BASE_PREFIX + ".versionBuildTime=" + `date --utc +%FT%T%z` + _LDFLAGS_DELIMITER + _LDFLAGS_BASE_PREFIX + ".versionCommitHash=" + `git rev-parse --short=7 HEAD` + _LDFLAGS_DELIMITER + _LDFLAGS_BASE_PREFIX + ".versionGoVersion=" + _GO_VERSION + _LDFLAGS_DELIMITER + _LDFLAGS_BASE_PREFIX + ".versionTag=" + `git describe --tag 2>/dev/null || echo 'dev'` + _LDFLAGS_DELIMITER)
+[private]
+_DRIVERS := 'cassandra mysql postgres sqlite3 sqlserver'
 
 # List available recipes
 @default:
     {{ justfile() }} --list --unsorted
 
-mod-tidy:
+# Tidy up dependecies
+mod-tidy *args:
     #!/bin/sh
     set -eu
-    {{ GO }} mod tidy
-    for d in cassandra mysql postgres sqlite3 sqlserver; do
-        {{ GO }} -C "drivers/${d}" mod tidy
+    {{ GO }} mod tidy {{ args }}
+    for d in {{ _DRIVERS }}; do
+        {{ GO }} -C "{{ _BASE_DRIVER_PATH }}/${d}" mod tidy {{ args }}
     done
 
 # Run unit tests on core source packages
@@ -34,7 +37,12 @@ test *args:
 
 # Examine source code for suspicious constructs
 vet *args:
-    {{ GO }} vet {{ args }} {{ _CORE_SRC_PKG_PATHS }} {{ PKG_IMPORT_PATH }}/drivers/...
+    #!/bin/sh
+    set -eu
+    {{ GO }} vet {{ args }} {{ _CORE_SRC_PKG_PATHS }}
+    for d in {{ _DRIVERS }}; do
+        {{ GO }} -C "{{ _BASE_DRIVER_PATH }}/${d}" vet ./... {{ args }}
+    done
 
 # Remove BIN_DIR
 clean:
@@ -49,11 +57,22 @@ GOSEC := "gosec"
 #
 # Also note, the package paths (last positional input to gosec command) should
 # be a "relative" package path. That is, starting with a dot.
-#
 
 # Run a security scanner over the source code
 gosec *args:
-    {{ GOSEC }} {{ args }} . ./internal/... ./drivers/...
+    #!/bin/sh
+    set -eu
+    # As of 2025-12, gosec does not work very well with multiple module
+    # projects. See https://redirect.github.com/securego/gosec/pull/1100.
+    # As a workaround, run the commands from each module directory.
+    printf 'running gosec on core library...\n'
+    {{ GOSEC }} --tests -exclude-dir {{ _BASE_DRIVER_PATH}}/ ./...
+    for d in {{ _DRIVERS }}; do
+        cd "{{ _BASE_DRIVER_PATH }}/${d}"
+        printf 'running gosec on driver %s...\n' "${d}"
+        {{ GOSEC }} --tests  ./...
+        cd -
+    done
 
 GORELEASER := "goreleaser"
 
