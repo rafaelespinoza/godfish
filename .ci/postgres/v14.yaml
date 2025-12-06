@@ -1,5 +1,3 @@
-name: localhost/godfish_test/postgres_v14
-
 services:
     client:
         build:

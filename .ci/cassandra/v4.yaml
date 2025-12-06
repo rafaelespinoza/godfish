@@ -1,5 +1,3 @@
-name: localhost/godfish_test/cassandra_v4
-
 services:
     client:
         build:

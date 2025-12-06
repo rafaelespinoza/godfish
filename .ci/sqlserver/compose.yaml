@@ -1,5 +1,3 @@
-name: localhost/godfish_test/sqlserver
-
 services:
     client:
         build:
