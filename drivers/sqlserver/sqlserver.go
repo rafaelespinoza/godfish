@@ -5,7 +5,7 @@ import (
 	"errors"
 	"strings"
 
-	mssql "github.com/denisenkom/go-mssqldb"
+	mssql "github.com/microsoft/go-mssqldb"
 	"github.com/rafaelespinoza/godfish"
 )
 

@@ -17,7 +17,7 @@ services:
             source: /tmp/godfish_test/sqlserver/.test_coverage
             target: /tmp
     server:
-        image: mcr.microsoft.com/mssql/server:latest
+        image: mcr.microsoft.com/mssql/server:2022-latest
         env_file:
             - env
         environment:

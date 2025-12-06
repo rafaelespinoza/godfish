@@ -16,7 +16,7 @@ services:
               source: /tmp/godfish_test/cassandra_v4/.test_coverage
               target: /tmp
     server:
-        image: docker.io/cassandra:4.0.3
+        image: docker.io/cassandra:4.1.10
         expose:
             - "9042"
         volumes:

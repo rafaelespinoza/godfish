@@ -1,25 +1,6 @@
 name: cassandra
 on: [push, pull_request]
 jobs:
-  v3:
-    name: cassandra_v3
-    runs-on: ubuntu-latest
-    steps:
-    - name: Checkout repo
-      uses: actions/checkout@v6
-    - name: Install just
-      uses: extractions/setup-just@v3
-    - name: Build environment and run tests
-      run: just -f ci.Justfile cassandra3-up
-    - name: Upload code coverage
-      uses: codecov/codecov-action@v5
-      with:
-        fail_ci_if_error: true
-        files: /tmp/godfish_test/cassandra_v3/.test_coverage/cover.out,/tmp/godfish_test/cassandra_v3/.test_coverage/cover_driver.out
-        token: ${{ secrets.CODECOV_TOKEN }}
-        verbose: true
-    - name: Teardown
-      run: just -f ci.Justfile cassandra3-down
   v4:
     name: cassandra_v4
     runs-on: ubuntu-latest
@@ -39,3 +20,22 @@ jobs:
         verbose: true
     - name: Teardown
       run: just -f ci.Justfile cassandra4-down
+  v5:
+    name: cassandra_v5
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout repo
+      uses: actions/checkout@v6
+    - name: Install just
+      uses: extractions/setup-just@v3
+    - name: Build environment and run tests
+      run: just -f ci.Justfile cassandra5-up
+    - name: Upload code coverage
+      uses: codecov/codecov-action@v5
+      with:
+        fail_ci_if_error: true
+        files: /tmp/godfish_test/cassandra_v5/.test_coverage/cover.out,/tmp/godfish_test/cassandra_v5/.test_coverage/cover_driver.out
+        token: ${{ secrets.CODECOV_TOKEN }}
+        verbose: true
+    - name: Teardown
+      run: just -f ci.Justfile cassandra5-down

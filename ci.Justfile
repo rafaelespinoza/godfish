@@ -15,17 +15,6 @@ CONTAINER_TOOL := 'docker'
     just --list --unsorted -f 'ci.Justfile'
 
 [private]
-_CASSANDRA_V3_FILE := CI_DIR / "cassandra" / "v3.yaml"
-
-# Setup, perform integration tests for cassandra driver, server v3
-[group('driver-cassandra')]
-cassandra3-up: (_up "cassandra_v3" _CASSANDRA_V3_FILE)
-
-# Cleanup integration test environment for cassandra driver, cassandra server v3
-[group('driver-cassandra')]
-cassandra3-down: (_compose_down _CASSANDRA_V3_FILE)
-
-[private]
 _CASSANDRA_V4_FILE := CI_DIR / "cassandra" / "v4.yaml"
 
 # Setup, perform integration tests for cassandra driver, cassandra server v4
@@ -35,6 +24,17 @@ cassandra4-up: (_up "cassandra_v4" _CASSANDRA_V4_FILE)
 # Cleanup integration test environment for cassandra driver, cassandra server v4
 [group('driver-cassandra')]
 cassandra4-down: (_compose_down _CASSANDRA_V4_FILE)
+
+[private]
+_CASSANDRA_V5_FILE := CI_DIR / "cassandra" / "v5.yaml"
+
+# Setup, perform integration tests for cassandra driver, server v5
+[group('driver-cassandra')]
+cassandra5-up: (_up "cassandra_v5" _CASSANDRA_V5_FILE)
+
+# Cleanup integration test environment for cassandra driver, cassandra server v5
+[group('driver-cassandra')]
+cassandra5-down: (_compose_down _CASSANDRA_V5_FILE)
 
 [private]
 _MARIA_DB_FILE := CI_DIR / "mysql" / "mariadb_v10.yaml"

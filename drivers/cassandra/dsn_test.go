@@ -13,7 +13,7 @@ func TestNewClusterConfig(t *testing.T) {
 		expected *gocql.ClusterConfig
 		expErr   bool
 	}
-	const defaultExpectedTimeout = 600 * time.Millisecond
+	const defaultExpectedTimeout = 11 * time.Second
 
 	runTest := func(t *testing.T, test testCase) {
 		t.Helper()

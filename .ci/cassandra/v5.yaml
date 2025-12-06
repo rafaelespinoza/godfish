@@ -13,10 +13,10 @@ services:
         volumes:
             -
               type: bind
-              source: /tmp/godfish_test/cassandra_v3/.test_coverage
+              source: /tmp/godfish_test/cassandra_v5/.test_coverage
               target: /tmp
     server:
-        image: docker.io/cassandra:3.11.12
+        image: docker.io/cassandra:5.0.6
         expose:
             - "9042"
         volumes:

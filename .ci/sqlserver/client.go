@@ -6,7 +6,7 @@ import (
 	"os"
 
 	// Imported for the side effect of registering the driver.
-	_ "github.com/denisenkom/go-mssqldb"
+	_ "github.com/microsoft/go-mssqldb"
 )
 
 var dsn string
