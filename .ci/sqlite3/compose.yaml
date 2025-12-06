@@ -17,10 +17,7 @@ services:
             dockerfile: .ci/sqlite3/Containerfile
         tty: true
         volumes:
-          - # Put test coverage files here.
-            type: volume
-            source: client
+          -
+            type: bind
+            source: /tmp/godfish_test/sqlite3/.test_coverage
             target: /tmp
-
-volumes:
-    client:
