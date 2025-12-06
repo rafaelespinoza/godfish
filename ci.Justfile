@@ -91,14 +91,10 @@ sqlserver-up: (_up "sqlserver" _SQLSERVER_FILE)
 [group('driver-sqlserver')]
 sqlserver-down: (_compose_down _SQLSERVER_FILE)
 
-_up driver_basename compose_file: (make-builder-img driver_basename) (_compose_up compose_file) (_cp_coverage_to_host compose_file)
+_up driver_basename compose_file: (make-builder-img driver_basename) (_compose_up compose_file)
 
 _compose_up compose_file:
     {{ CONTAINER_TOOL }} compose -f {{ compose_file }} up --build --exit-code-from client
-
-# TODO: remove this after testing the coverage changes
-_cp_coverage_to_host compose_file:
-    # CONTAINER_TOOL='{{ CONTAINER_TOOL }}' {{ CI_DIR }}/cp_coverage_to_host.sh {{ compose_file }}
 
 _compose_down compose_file:
     {{ CONTAINER_TOOL }} compose -f {{ compose_file }} down --rmi all --volumes
