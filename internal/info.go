@@ -23,7 +23,7 @@ func (p *tsvPrinter) PrintInfo(state string, mig Migration) (e error) {
 	_, e = fmt.Fprintf(
 		p.w,
 		"%s\t%s\t%s\n",
-		state, mig.Version().String(), MakeMigrationFilename(mig),
+		state, mig.Version.String(), mig.ToFilename(),
 	)
 	return
 }
@@ -33,7 +33,7 @@ func (p *jsonPrinter) PrintInfo(state string, mig Migration) (e error) {
 		p.w,
 		`{"state":%q,"version":%q,"filename":%q}
 `, // delimit each migration by a newline.
-		state, mig.Version().String(), MakeMigrationFilename(mig),
+		state, mig.Version.String(), mig.ToFilename(),
 	)
 	return
 }

@@ -37,7 +37,7 @@ func CreateMigrationFiles(migrationName string, reversible bool, dirpath, fwdlab
 func Migrate(driver Driver, directoryPath string, forward bool, finishAtVersion string) (err error) {
 	var (
 		dsn        string
-		migrations []internal.Migration
+		migrations []*internal.Migration
 	)
 	if dsn, err = getDSN(); err != nil {
 		return
@@ -72,7 +72,7 @@ func Migrate(driver Driver, directoryPath string, forward bool, finishAtVersion 
 	}
 
 	for _, mig := range migrations {
-		pathToFile := filepath.Join(directoryPath, string(internal.MakeMigrationFilename(mig)))
+		pathToFile := filepath.Join(directoryPath, string(mig.ToFilename()))
 		if err = runMigration(driver, pathToFile, mig); err != nil {
 			return
 		}
@@ -90,7 +90,7 @@ func ApplyMigration(driver Driver, directoryPath string, forward bool, version s
 	var (
 		dsn        string
 		pathToFile string
-		mig        internal.Migration
+		mig        *internal.Migration
 	)
 
 	if dsn, err = getDSN(); err != nil {
@@ -128,7 +128,7 @@ func ApplyMigration(driver Driver, directoryPath string, forward bool, version s
 			err = fmt.Errorf("version %w", internal.ErrNotFound)
 			return
 		} else {
-			version = toApply[0].Version().String()
+			version = toApply[0].Version.String()
 		}
 	}
 
@@ -176,17 +176,17 @@ func figureOutBasename(directoryPath string, direction internal.Direction, versi
 
 // runMigration executes a migration against the database. The input, pathToFile
 // should be relative to the current working directory.
-func runMigration(driver Driver, pathToFile string, mig internal.Migration) (err error) {
+func runMigration(driver Driver, pathToFile string, mig *internal.Migration) (err error) {
 	var data []byte
 	if data, err = os.ReadFile(filepath.Clean(pathToFile)); err != nil {
 		return
 	}
 	gerund := "migrating"
-	if mig.Indirection().Value == internal.DirReverse {
+	if mig.Indirection.Value == internal.DirReverse {
 		gerund = "rolling back"
 	}
 
-	lgr := logg.New("", slog.String("path_to_file", pathToFile), slog.String("version", mig.Version().String()))
+	lgr := logg.New("", slog.String("path_to_file", pathToFile), slog.String("version", mig.Version.String()))
 	lgr.Info(gerund + " ...")
 	startTime := time.Now()
 
@@ -200,8 +200,8 @@ func runMigration(driver Driver, pathToFile string, mig internal.Migration) (err
 		return
 	}
 	err = driver.UpdateSchemaMigrations(
-		mig.Indirection().Value == internal.DirForward,
-		mig.Version().String(),
+		mig.Indirection.Value == internal.DirForward,
+		mig.Version.String(),
 	)
 	if err != nil {
 		lgr.Error("updating schema migrations table", slog.Any("error", err), makeDurationMSAttr(startTime))
@@ -293,7 +293,7 @@ type migrationFinder struct {
 }
 
 // query returns a list of Migrations to apply.
-func (m *migrationFinder) query(driver Driver) (out []internal.Migration, err error) {
+func (m *migrationFinder) query(driver Driver) (out []*internal.Migration, err error) {
 	available, err := m.available()
 	if err != nil {
 		return
@@ -325,14 +325,14 @@ func (m *migrationFinder) query(driver Driver) (out []internal.Migration, err er
 			return
 		}
 		useDefaultRollbackVersion = true
-		m.finishAtVersion = toApply[0].Version().String()
+		m.finishAtVersion = toApply[0].Version.String()
 	}
 	var finish internal.Version
 	if finish, err = internal.ParseVersion(m.finishAtVersion); err != nil {
 		return
 	}
 	for _, mig := range toApply {
-		version := mig.Version()
+		version := mig.Version
 		if m.direction == internal.DirForward && finish.Before(version) {
 			break
 		}
@@ -355,7 +355,7 @@ func (m *migrationFinder) query(driver Driver) (out []internal.Migration, err er
 }
 
 // available returns a list of Migration values in a specified direction.
-func (m *migrationFinder) available() (out []internal.Migration, err error) {
+func (m *migrationFinder) available() (out []*internal.Migration, err error) {
 	var fileDir *os.File
 	var filenames []string
 	if fileDir, err = os.Open(m.directoryPath); err != nil {
@@ -386,7 +386,7 @@ func (m *migrationFinder) available() (out []internal.Migration, err error) {
 			err = ierr
 			return
 		}
-		dir := mig.Indirection().Value
+		dir := mig.Indirection.Value
 		if dir != m.direction {
 			continue
 		}
@@ -395,7 +395,7 @@ func (m *migrationFinder) available() (out []internal.Migration, err error) {
 	return
 }
 
-func scanAppliedVersions(driver Driver, directoryPath string) (out []internal.Migration, err error) {
+func scanAppliedVersions(driver Driver, directoryPath string) (out []*internal.Migration, err error) {
 	var rows AppliedVersions
 	if rows, err = driver.AppliedVersions(); err != nil {
 		return
@@ -407,7 +407,7 @@ func scanAppliedVersions(driver Driver, directoryPath string) (out []internal.Mi
 	}()
 	for rows.Next() {
 		var version, basename string
-		var mig internal.Migration
+		var mig *internal.Migration
 		if err = rows.Scan(&version); err != nil {
 			return
 		}
@@ -429,17 +429,17 @@ func scanAppliedVersions(driver Driver, directoryPath string) (out []internal.Mi
 
 // filter compares lists of applied and available migrations, then selects a
 // list of migrations to apply.
-func (m *migrationFinder) filter(applied, available []internal.Migration) (out []internal.Migration, err error) {
-	allVersions := make(map[int64]internal.Migration)
-	uniqueToApplied := make(map[int64]internal.Migration)
+func (m *migrationFinder) filter(applied, available []*internal.Migration) (out []*internal.Migration, err error) {
+	allVersions := make(map[int64]*internal.Migration)
+	uniqueToApplied := make(map[int64]*internal.Migration)
 	for _, mig := range applied {
-		version := mig.Version().Value()
+		version := mig.Version.Value()
 		uniqueToApplied[version] = mig
 		allVersions[version] = mig
 	}
-	uniqueToAvailable := make(map[int64]internal.Migration)
+	uniqueToAvailable := make(map[int64]*internal.Migration)
 	for _, mig := range available {
-		version := mig.Version().Value()
+		version := mig.Version.Value()
 		if _, ok := uniqueToApplied[version]; ok {
 			delete(uniqueToApplied, version)
 		} else {
@@ -466,12 +466,12 @@ func (m *migrationFinder) filter(applied, available []internal.Migration) (out [
 				// the original filename was, by assuming that the list of
 				// forward directions is in the same order as the corresponding
 				// reverse directions. It's kind of hacky, I know.
-				var mut internal.Migration
+				var mut *internal.Migration
 				indirection := internal.Indirection{
 					Value: internal.DirReverse,
 					Label: "reverse", // need to have something here, it gets restored later.
 				}
-				mut, err = newMigration(mig.Version().String(), indirection, mig.Label())
+				mut, err = newMigration(mig.Version.String(), indirection, mig.Label)
 				if err != nil {
 					return
 				}
@@ -483,19 +483,19 @@ func (m *migrationFinder) filter(applied, available []internal.Migration) (out [
 					// change. If it does change, for example: it is
 					// "${version}-${direction}-${label}", instead of
 					// "${direction}-${version}-${label}", then this won't work.
-					if mig.Indirection().Label == fwd {
+					if mig.Indirection.Label == fwd {
 						indirection.Label = internal.ReverseDirections[i]
-						mut, err = newMigration(mig.Version().String(), indirection, mig.Label())
+						mut, err = newMigration(mig.Version.String(), indirection, mig.Label)
 						if err != nil {
 							return
 						}
 						break
 					}
 				}
-				if mut.Label() == "" {
+				if mut.Label == "" {
 					err = fmt.Errorf(
 						"direction.Label empty; direction.Value: %q, version: %v, label: %q",
-						mut.Indirection(), mut.Version().String(), mut.Label(),
+						mut.Indirection, mut.Version.String(), mut.Label,
 					)
 					return
 				}
@@ -505,25 +505,25 @@ func (m *migrationFinder) filter(applied, available []internal.Migration) (out [
 	}
 	if m.direction == internal.DirForward {
 		sort.Slice(out, func(i, j int) bool {
-			return out[i].Version().Before(out[j].Version())
+			return out[i].Version.Before(out[j].Version)
 		})
 	} else {
 		sort.Slice(out, func(i, j int) bool {
-			return out[j].Version().Before(out[i].Version())
+			return out[j].Version.Before(out[i].Version)
 		})
 	}
 	return
 }
 
-func newMigration(version string, ind internal.Indirection, label string) (out internal.Migration, err error) {
+func newMigration(version string, ind internal.Indirection, label string) (out *internal.Migration, err error) {
 	fn := internal.MakeFilename(version, ind, label)
-	out, err = internal.ParseMigration(internal.Filename(fn))
+	out, err = internal.ParseMigration(fn)
 	return
 }
 
-func printMigrations(p internal.InfoPrinter, state string, migrations []internal.Migration) (err error) {
+func printMigrations(p internal.InfoPrinter, state string, migrations []*internal.Migration) (err error) {
 	for i, mig := range migrations {
-		if err = p.PrintInfo(state, mig); err != nil {
+		if err = p.PrintInfo(state, *mig); err != nil {
 			err = fmt.Errorf("%w; item %d", err, i)
 			return
 		}

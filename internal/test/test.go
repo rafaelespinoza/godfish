@@ -168,7 +168,7 @@ func generateMigrationFiles(t *testing.T, pathToTestDir string, stubs []testDriv
 
 			filename := filepath.Join(pathToTestDir, fmt.Sprintf(
 				"%s-%s-%s.sql",
-				mig.Indirection().Label, mig.Version().String(), mig.Label(),
+				mig.Indirection.Label, mig.Version.String(), mig.Label,
 			))
 
 			file, err := os.OpenFile(filepath.Clean(filename), os.O_RDWR|os.O_CREATE, 0600)
@@ -194,7 +194,7 @@ func generateMigrationFiles(t *testing.T, pathToTestDir string, stubs []testDriv
 }
 
 func newMigrationStub(mig internal.Migration, version internal.Version, ind internal.Indirection) internal.Migration {
-	return stub.NewMigration(mig, version, ind)
+	return *stub.NewMigration(mig, version, ind)
 }
 
 // collectAppliedVersions uses the Driver's AppliedVersions method to retrieve

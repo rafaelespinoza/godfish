@@ -98,12 +98,12 @@ func TestJSON(t *testing.T) {
 	}
 }
 
-func mustMakeMigrations(t *testing.T, names ...string) []internal.Migration {
+func mustMakeMigrations(t *testing.T, names ...string) []*internal.Migration {
 	t.Helper()
 
 	dir := t.TempDir()
 
-	out := make([]internal.Migration, len(names))
+	out := make([]*internal.Migration, len(names))
 
 	for i := range len(names) {
 		params, err := internal.NewMigrationParams(names[i], false, dir, "forward", "reverse")
@@ -119,9 +119,9 @@ func mustMakeMigrations(t *testing.T, names ...string) []internal.Migration {
 	return out
 }
 
-func printMigrations(p internal.InfoPrinter, state string, migrations []internal.Migration) (err error) {
+func printMigrations(p internal.InfoPrinter, state string, migrations []*internal.Migration) (err error) {
 	for i, mig := range migrations {
-		if err = p.PrintInfo(state, mig); err != nil {
+		if err = p.PrintInfo(state, *mig); err != nil {
 			err = fmt.Errorf("%w; item %d", err, i)
 			return
 		}

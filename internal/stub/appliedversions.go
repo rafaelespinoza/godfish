@@ -19,7 +19,7 @@ func NewAppliedVersions(migrations ...internal.Migration) godfish.AppliedVersion
 		versions: make([]string, len(migrations)),
 	}
 	for i, mig := range migrations {
-		out.versions[i] = mig.Version().String()
+		out.versions[i] = mig.Version.String()
 	}
 	return &out
 }

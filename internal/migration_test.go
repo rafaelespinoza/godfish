@@ -38,17 +38,17 @@ func TestParseMigration(t *testing.T) {
 			return // ok, nothing more to test.
 		}
 
-		if actual.Indirection().Value != test.expIndirection.Value {
+		if actual.Indirection.Value != test.expIndirection.Value {
 			t.Errorf(
 				"wrong Direction; got %s, expected %s",
-				actual.Indirection().Value, test.expIndirection.Value,
+				actual.Indirection.Value, test.expIndirection.Value,
 			)
 		}
 
-		if actual.Label() != test.expLabel {
+		if actual.Label != test.expLabel {
 			t.Errorf(
 				"wrong Name; got %s, expected %s",
-				actual.Label(), test.expLabel,
+				actual.Label, test.expLabel,
 			)
 		}
 
@@ -56,7 +56,7 @@ func TestParseMigration(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		gotVersion := actual.Version()
+		gotVersion := actual.Version
 		if gotVersion.Before(expVersion) || expVersion.Before(gotVersion) {
 			t.Errorf(
 				"wrong Version timestamp; got %s, expected %s",
@@ -221,26 +221,26 @@ func TestMigrationParams(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if migParams.Forward.Indirection().Value != internal.DirForward {
+		if migParams.Forward.Indirection.Value != internal.DirForward {
 			t.Errorf(
 				"wrong Direction; expected %s, got %s",
-				internal.DirForward, migParams.Forward.Indirection().Value,
+				internal.DirForward, migParams.Forward.Indirection.Value,
 			)
 		}
-		if migParams.Reverse.Indirection().Value != internal.DirReverse {
+		if migParams.Reverse.Indirection.Value != internal.DirReverse {
 			t.Errorf(
 				"wrong Direction; expected %s, got %s",
-				internal.DirReverse, migParams.Reverse.Indirection().Value,
+				internal.DirReverse, migParams.Reverse.Indirection.Value,
 			)
 		}
 		for i, mig := range []internal.Migration{migParams.Forward, migParams.Reverse} {
 			if i > 0 && !test.reversible {
 				continue
 			}
-			if mig.Label() != test.name {
+			if mig.Label != test.name {
 				t.Errorf("test [%d]; Name should be unchanged", i)
 			}
-			if mig.Version().String() == "" {
+			if mig.Version.String() == "" {
 				t.Errorf("test [%d]; got empty Timestamp", i)
 			}
 		}
