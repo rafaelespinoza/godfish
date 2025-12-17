@@ -17,3 +17,6 @@ var (
 	ErrNotFound    = errors.New("not found")
 	ErrDataInvalid = errors.New("data invalid")
 )
+
+// DSNKey is the name of the environment variable for connecting to the DB.
+const DSNKey = "DB_DSN"

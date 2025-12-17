@@ -10,7 +10,8 @@ import (
 )
 
 func main() {
-	root := cmd.New(sqlite3.NewDriver())
+	const dsnSample = `file:///path/to/db.sqlite`
+	root := cmd.New(sqlite3.NewDriver(), dsnSample)
 	if err := root.Run(context.TODO(), os.Args[1:]); err != nil {
 		log.Println(err)
 		os.Exit(1)

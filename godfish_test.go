@@ -14,8 +14,6 @@ import (
 	"github.com/rafaelespinoza/godfish/internal/test"
 )
 
-const dsnKey = "DB_DSN"
-
 func TestCreateMigrationFiles(t *testing.T) {
 	t.Run("err", func(t *testing.T) {
 		err := godfish.CreateMigrationFiles("err_test", true, t.TempDir(), "bad", "bad2")
@@ -53,50 +51,50 @@ func TestCreateMigrationFiles(t *testing.T) {
 
 func TestMigrate(t *testing.T) {
 	t.Run("missing DB_DSN", func(t *testing.T) {
-		t.Setenv(dsnKey, "")
+		t.Setenv(internal.DSNKey, "")
 
 		err := godfish.Migrate(stub.NewDriver(), t.TempDir(), false, "")
 		if err == nil {
 			t.Fatalf("expected an error, got %v", err)
 		}
 		got := err.Error()
-		if !strings.Contains(got, dsnKey) {
-			t.Errorf("expected error message %q to mention %q", got, dsnKey)
+		if !strings.Contains(got, internal.DSNKey) {
+			t.Errorf("expected error message %q to mention %q", got, internal.DSNKey)
 		}
 	})
 }
 
 func TestApplyMigration(t *testing.T) {
 	t.Run("missing DB_DSN", func(t *testing.T) {
-		t.Setenv(dsnKey, "")
+		t.Setenv(internal.DSNKey, "")
 
 		err := godfish.ApplyMigration(stub.NewDriver(), t.TempDir(), false, "")
 		if err == nil {
 			t.Fatalf("expected an error, got %v", err)
 		}
 		got := err.Error()
-		if !strings.Contains(got, dsnKey) {
-			t.Errorf("expected error message %q to mention %q", got, dsnKey)
+		if !strings.Contains(got, internal.DSNKey) {
+			t.Errorf("expected error message %q to mention %q", got, internal.DSNKey)
 		}
 	})
 }
 
 func TestInfo(t *testing.T) {
 	t.Run("missing DB_DSN", func(t *testing.T) {
-		t.Setenv(dsnKey, "")
+		t.Setenv(internal.DSNKey, "")
 
 		err := godfish.Info(stub.NewDriver(), t.TempDir(), false, "", os.Stderr, "")
 		if err == nil {
 			t.Fatalf("expected an error, got %v", err)
 		}
 		got := err.Error()
-		if !strings.Contains(got, dsnKey) {
-			t.Errorf("expected error message %q to mention %q", got, dsnKey)
+		if !strings.Contains(got, internal.DSNKey) {
+			t.Errorf("expected error message %q to mention %q", got, internal.DSNKey)
 		}
 	})
 
 	t.Run("unknown format does not error out", func(t *testing.T) {
-		t.Setenv(dsnKey, "test")
+		t.Setenv(internal.DSNKey, "test")
 
 		err := godfish.Info(stub.NewDriver(), t.TempDir(), false, "", os.Stderr, "tea_ess_vee")
 		if err != nil {
@@ -166,6 +164,6 @@ func TestAppliedVersions(t *testing.T) {
 func TestDriver(t *testing.T) {
 	// These tests also run in the stub package. They are duplicated here to
 	// make test coverage tool consider the tests in godfish.go as covered.
-	t.Setenv("DB_DSN", "stub_dsn")
+	t.Setenv(internal.DSNKey, "stub_dsn")
 	test.RunDriverTests(t, stub.NewDriver(), test.DefaultQueries)
 }

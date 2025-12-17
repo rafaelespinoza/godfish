@@ -54,12 +54,10 @@ var DefaultQueries = Queries{
 
 type MigrationContent struct{ Forward, Reverse string }
 
-const dsnKey = "DB_DSN"
-
 func mustDSN() string {
-	dsn := os.Getenv(dsnKey)
+	dsn := os.Getenv(internal.DSNKey)
 	if dsn == "" {
-		panic("empty environment variable " + dsnKey)
+		panic("empty environment variable " + internal.DSNKey)
 	}
 	return dsn
 }

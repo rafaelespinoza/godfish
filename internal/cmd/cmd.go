@@ -23,6 +23,7 @@ var (
 	// values in here.
 	commonArgs struct {
 		Files                            string
+		DataSourceName                   string
 		DefaultFwdLabel, DefaultRevLabel string
 	}
 	// bin is the name of the binary.
@@ -38,7 +39,7 @@ type Root interface {
 }
 
 // New constructs a top-level command with subcommands.
-func New(driver godfish.Driver) Root {
+func New(driver godfish.Driver, sampleDSN string) Root {
 	theDriver = driver
 	del := &alf.Delegator{
 		Description: "main command for " + bin,
@@ -71,12 +72,16 @@ Description:
 	Configuration options are set with flags or with a configuration file. Options
 	specified via flags will take precedence over the config file.
 
-	Specify database connection params with environment variable:
-		DB_DSN=
+	Database connection params can be specified in these ways:
+		* Environment variable: %s
+		* Command line flag, -dsn. This has higher precedence than the
+		  environment variable.
+	Sample DSN:
+		%s
 
 	The following flags should go before the command.
 `,
-			bin)
+			bin, internal.DSNKey, sampleDSN)
 		printFlagDefaults(rootFlags)
 		_, _ = fmt.Fprintf(
 			rootFlags.Output(), `
@@ -110,6 +115,12 @@ Examples:
 		"",
 		"path to migration files, can also set with config file",
 	)
+	rootFlags.StringVar(
+		&commonArgs.DataSourceName,
+		"dsn",
+		"",
+		fmt.Sprintf("database DSN, if empty then fallback to environment variable %s", internal.DSNKey),
+	)
 	rootFlags.BoolVar(&loggingOff, "q", false, "if true, then all logging is effectively off")
 	rootFlags.StringVar(&logLevel, "loglevel", defaultLoggingLevel.String(), fmt.Sprintf("minimum severity for which to log events, should be one of %q", validLoggingLevels))
 	rootFlags.StringVar(&logFormat, "logformat", defaultLoggingFormat, fmt.Sprintf("output format for logs, should be one of %q", validLoggingFormats))
@@ -136,6 +147,13 @@ Examples:
 			// Subcommands may override these with their own flags.
 			commonArgs.DefaultFwdLabel = conf.ForwardLabel
 			commonArgs.DefaultRevLabel = conf.ReverseLabel
+
+			if val := strings.TrimSpace(commonArgs.DataSourceName); val != "" {
+				err := os.Setenv(internal.DSNKey, val)
+				if err != nil {
+					return fmt.Errorf("setting env var %s with flag -dsn: %w", internal.DSNKey, err)
+				}
+			}
 
 			return nil
 		},

@@ -60,10 +60,13 @@ set, then it checks the configuration file.
 
 #### connecting to the db
 
-Database connection parameters are always read from environment variables. Set:
+Database connection parameters may be read from an environment variable. Set:
 ```
 DB_DSN=
 ```
+When using one of the pre-built binaries, the database may also be specified
+with a command line flag, `-dsn`. If specified in both places, then the command
+line value will have higher precedence than the environment variable.
 
 #### configure file paths
 

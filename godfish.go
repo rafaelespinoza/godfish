@@ -531,12 +531,10 @@ func printMigrations(p internal.InfoPrinter, state string, migrations []internal
 	return
 }
 
-const dsnKey = "DB_DSN"
-
 func getDSN() (dsn string, err error) {
-	dsn = os.Getenv(dsnKey)
+	dsn = os.Getenv(internal.DSNKey)
 	if dsn == "" {
-		err = fmt.Errorf("missing environment variable: %s", dsnKey)
+		err = fmt.Errorf("missing environment variable: %s", internal.DSNKey)
 	}
 	return
 }
