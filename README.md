@@ -47,6 +47,34 @@ just build-sqlserver
 From there you could move it to `$GOPATH/bin`, move it to your project or
 whatever else you need to do.
 
+## concepts
+
+Like any db migration tool, this helps you and your team manage the shape of
+your application's database throughout time. Migrations are written in the
+native language of the database, and exist as files in a directory. All
+migrations to consider should live in the same directory. A migration is one of
+these files, which may have metadata components as part of the filename:
+
+* "direction": Migrations that introduce new changes to the DB shape are
+  considered to have a "forward" direction. A migration intended as the
+  inverse of a corresponding forward migration is considered to have a
+  "reverse" direction.
+* "version": Describe where a migration exists relative to the other migrations
+  with the same direction. By default, it's a timestamp in the layout
+  `YYYYMMDDHHmmss`.
+* "name": A label you give to describe the migration's contents.
+
+The delimiter of each part is a `-`. Each migration filename has this format:
+```
+${direction}-${version}-${name}.sql
+```
+
+There is an implicit ordering to migrations, denoted by the "version", where
+subsequent migrations may build upon the shape created by preceding migrations.
+When a migration is successfully applied, a new row in the `schema_migrations`
+table is inserted. A migration that has not yet been applied will be a file in
+the directory, but without a corresponding entry in the DB table.
+
 ## usage
 
 ```
@@ -135,34 +163,31 @@ Filenames:
 
 Note, dogfish uses the words, "migrate" and "rollback" to describe the
 migration's direction whereas godfish uses "forward" and "reverse". They are
-the same in that they are two complementaries. This change has one trivial
-benefit, the pieces of metadata encoded into the filename naturally align:
+the same in that they are two complementaries.
 
-```
-cd /path/to/db/migrations && ls -1
+```sh
+ls -1 /path/to/db/migrations
 
 forward-20191112050547-init_foos.sql
-forward-20191127051242-add_bars.sql
-forward-20191205031405-update_more_stuff.sql
+forward-20221067051242-add_bars.sql
+forward-20250805031405-update_more_stuff.sql
 reverse-20191112050547-init_foos.sql
-reverse-20191127051242-add_bars.sql
-reverse-20191205031405-update_more_stuff.sql
+reverse-20221067051242-add_bars.sql
+reverse-20250805031405-update_more_stuff.sql
 ```
 
-## contributing
+## project organization
 
-These are welcome. To get you started, the code has some documentation, a godoc
-page, at least one implementation of each interface and tests.
+One of the goals of this project is to minimize the amount of dependencies.
+Driver-specific code is placed in `drivers/` so that building a binary for one
+database does not require building code for another database.
 
-Comments line lengths should be limited to 80 characters wide. Try not to make
-source code lines too long. More lines is fine with the exception of
-declarations of exported identifiers; they should be on one line, otherwise the
-generated godoc looks weird. There are also tests, those should pass.
+The `godfish` package defines library functions, interfaces needed to build a
+driver implementation.
 
-The GitHub Actions run a security scanner on all of the source code using
-[gosec](https://github.com/securego/gosec). There should be no rule violations
-here. The Justfile provides a convenience target if you want to run `gosec` on
-your development machine.
+Test infrastructure mostly lives in the `.ci/` and `.github/` directories. Many
+integration tests may be run in isolation on your local machine without GitHub
+actions.
 
 ## tests
 
@@ -172,35 +197,35 @@ in `ci.Justfile` and the `.ci/` directory.
 
 Using an OCI-compatible tool other than `docker` (ie: `podman`)?
 ```sh
-$ just --set CONTAINER_TOOL podman -f ci.Justfile
+just --set CONTAINER_TOOL podman -f ci.Justfile
 ```
 
 Build environments and run tests
 ```sh
-just -f ci.Justfile ci-cassandra3-up
-just -f ci.Justfile ci-cassandra4-up
+just -f ci.Justfile cassandra3-up
+just -f ci.Justfile cassandra4-up
 
-just -f ci.Justfile ci-sqlserver-up
+just -f ci.Justfile sqlserver-up
 
-just -f ci.Justfile ci-mariadb-up
+just -f ci.Justfile mariadb-up
 
-just -f ci.Justfile ci-postgres14-up
-just -f ci.Justfile ci-postgres15-up
+just -f ci.Justfile postgres14-up
+just -f ci.Justfile postgres15-up
 
-just -f ci.Justfile ci-sqlite3-up
+just -f ci.Justfile sqlite3-up
 ```
 
 Teardown
 ```sh
-just -f ci.Justfile ci-cassandra3-down
-just -f ci.Justfile ci-cassandra4-down
+just -f ci.Justfile cassandra3-down
+just -f ci.Justfile cassandra4-down
 
-just -f ci.Justfile ci-sqlserver-down
+just -f ci.Justfile sqlserver-down
 
-just -f ci.Justfile ci-mariadb-down
+just -f ci.Justfile mariadb-down
 
-just -f ci.Justfile ci-postgres14-down
-just -f ci.Justfile ci-postgres15-down
+just -f ci.Justfile postgres14-down
+just -f ci.Justfile postgres15-down
 
-just -f ci.Justfile ci-sqlite3-down
+just -f ci.Justfile sqlite3-down
 ```

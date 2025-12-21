@@ -69,7 +69,7 @@ _CASSANDRA_PATH := _BASE_DRIVER_PATH / "cassandra"
 [group('driver-cassandra')]
 build-cassandra: (_build_driver "cassandra" (_CASSANDRA_PATH / "godfish"))
 
-# Run unit tests on a live cassandra instance at DB_DSN
+# Run tests on a live cassandra instance at DB_DSN
 [group('driver-cassandra')]
 test-cassandra *args:
     {{ GO }} test {{ args }} {{ _CASSANDRA_PATH }}/...
@@ -81,7 +81,7 @@ _MYSQL_PATH := _BASE_DRIVER_PATH / "mysql"
 [group('driver-mysql')]
 build-mysql: (_build_driver "mysql" (_MYSQL_PATH / "godfish"))
 
-# Run unit tests on a live mysql instance at DB_DSN
+# Run tests on a live mysql instance at DB_DSN
 [group('driver-mysql')]
 test-mysql *args:
     {{ GO }} test {{ args }} {{ _MYSQL_PATH }}/...
@@ -93,7 +93,7 @@ _POSTGRES_PATH := _BASE_DRIVER_PATH / "postgres"
 [group('driver-postgres')]
 build-postgres: (_build_driver "postgres" (_POSTGRES_PATH / "godfish"))
 
-# Run unit tests on a live postgres instance at DB_DSN
+# Run tests on a live postgres instance at DB_DSN
 [group('driver-postgres')]
 test-postgres *args:
     {{ GO }} test {{ args }} {{ _POSTGRES_PATH }}/...
@@ -105,7 +105,7 @@ _SQLITE3_PATH := _BASE_DRIVER_PATH / "sqlite3"
 [group('driver-sqlite3')]
 build-sqlite3: (_build_driver "sqlite3" (_SQLITE3_PATH / "godfish"))
 
-# Run unit tests on a live sqlite3 instance at DB_DSN
+# Run tests on a live sqlite3 instance at DB_DSN
 [group('driver-sqlite3')]
 test-sqlite3 *args:
     {{ GO }} test {{ args }} {{ _SQLITE3_PATH }}/...
@@ -117,7 +117,7 @@ _SQLSERVER_PATH := _BASE_DRIVER_PATH / "sqlserver"
 [group('driver-sqlserver')]
 build-sqlserver: (_build_driver "sqlserver" (_SQLSERVER_PATH / "godfish"))
 
-# Run unit tests on a live sqlserver instance at DB_DSN
+# Run tests on a live sqlserver instance at DB_DSN
 [group('driver-sqlserver')]
 test-sqlserver *args:
     {{ GO }} test {{ args }} {{ _SQLSERVER_PATH }}/...
