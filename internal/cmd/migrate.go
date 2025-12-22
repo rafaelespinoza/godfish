@@ -77,6 +77,85 @@ func runMigrate(ctx context.Context, driverConn DriverConnector, timeout time.Du
 	return err
 }
 
+func makeApplyMigration(name string) *cli.Command {
+	return &cli.Command{
+		Name:  name,
+		Usage: "run 1 migration, regardless of order",
+		Flags: []cli.Flag{
+			&cli.StringFlag{
+				Name:  "version",
+				Value: "",
+				Usage: fmt.Sprintf("timestamp of migration, format: %s", internal.TimeFormat),
+			},
+			&cli.BoolFlag{
+				Name:  "reverse",
+				Value: false,
+				Usage: "run a reverse migration",
+			},
+			&cli.DurationFlag{
+				Name:  "timeout",
+				Value: 0,
+				Usage: fmt.Sprintf("max duration to run, ignored if non-positive, example vals %q", exampleDurationVals),
+			},
+		},
+		Description: `Run one migration matching the input version, regardless of its order.
+
+For example,
+* You already have these migrations applied: 1.
+* Alice teammate cuts a branch and adds a migration 2, but it's not merged.
+* Bob works on another branch, adds migration 3, and it's merged into main.
+* You run migration 3 on the production DB. Now migrations 1, 3 are applied.
+* Alice, who was working on migration 2, gets it merged into main.
+* You try to run the migrations, using the migrate subcommand.
+  Nothing happens, why?
+
+The schema migrations table sees that migration 3 has been applied. The tool
+looks for a migration with a version greater than 3, doesn't see one, so it
+returns early. Migration 2 is there, but it is not considered available for
+migration because it's "out-of-order". How to apply migration 2?
+
+There are a few options:
+* Take Alice's migration, 2, and change its filename to so that it's lexically
+  greater than the filename of 3. The migration would be considered available.
+* Alternatively, you can apply any one migration with this subcommand by
+  specifying the -version, even those that are out-of-order.
+
+Use the info subcommand to view the state of the schema migrations table.
+
+As mentioned for other subcommands, the "files" flag can specify the path to a
+directory with migration files.`,
+		Action: func(ctx context.Context, c *cli.Command) error {
+			version := c.String("version")
+			if version == "" {
+				return errors.New("version is required")
+			}
+
+			driver, err := getDriver(ctx)
+			if err != nil {
+				return fmt.Errorf("getting driver from %s command: %w", name, err)
+			}
+			timeout := c.Duration("timeout")
+			dirFS := os.DirFS(c.String(pathToFilesFlagname))
+			migrationsTable := c.String(migrationsTableFlagname)
+			reverse := c.Bool("reverse")
+
+			return runApplyMigration(ctx, driver, timeout, dirFS, migrationsTable, reverse, version)
+		},
+	}
+}
+
+func runApplyMigration(ctx context.Context, driverConn DriverConnector, timeout time.Duration, dirFS fs.FS, migrationsTable string, reverse bool, version string) error {
+	if timeout > 0 {
+		var cancel func()
+		ctx, cancel = context.WithTimeout(ctx, timeout)
+		defer cancel()
+	}
+
+	return withConnection(ctx, "", driverConn, func(ictx context.Context) error {
+		return godfish.ApplyMigration(ictx, driverConn, dirFS, !reverse, version, migrationsTable)
+	})
+}
+
 func makeRemigrate(name string) *cli.Command {
 	return &cli.Command{
 		Name:  name,

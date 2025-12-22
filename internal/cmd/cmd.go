@@ -93,6 +93,7 @@ Sample DSN:
 			},
 		},
 		Commands: []*cli.Command{
+			makeApplyMigration("apply-migration"),
 			makeCreateMigration("create-migration", &pathToConfig),
 			makeInfo("info"),
 			makeInit("init"),
