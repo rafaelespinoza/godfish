@@ -1,6 +1,7 @@
 package test
 
 import (
+	"os"
 	"strings"
 	"testing"
 
@@ -8,7 +9,7 @@ import (
 	"github.com/rafaelespinoza/godfish/internal"
 )
 
-func testApplyMigration(t *testing.T, driver godfish.Driver, queries Queries) {
+func testApplyMigration(t *testing.T, driver godfish.Driver, queries testdataQueries) {
 	// testSetupState is the database state before calling ApplyMigration.
 	type testSetupState struct {
 		// migrateTo is the version that the DB should be at.
@@ -39,7 +40,7 @@ func testApplyMigration(t *testing.T, driver godfish.Driver, queries Queries) {
 		pathToFiles := setup(t, driver, setupState.stubs, setupState.migrateTo)
 		defer teardown(t, driver, pathToFiles, "foos", "bars")
 
-		err := godfish.ApplyMigration(driver, pathToFiles, input.direction == internal.DirForward, input.version)
+		err := godfish.ApplyMigration(driver, os.DirFS(pathToFiles), input.direction == internal.DirForward, input.version)
 		if err != nil && !expected.err {
 			t.Errorf("could not apply migration; %v", err)
 			return
@@ -225,18 +226,18 @@ func testApplyMigration(t *testing.T, driver godfish.Driver, queries Queries) {
 					migrateTo: "12340102030405",
 					stubs: []testDriverStub{
 						{
-							content: MigrationContent{Forward: queries.CreateFoos.Forward},
+							content: migrationContent{Forward: queries.CreateFoos.Forward},
 							version: formattedTime("12340102030405"),
 						},
 						{
-							content: MigrationContent{
+							content: migrationContent{
 								Forward: queries.AlterFoos.Forward,
 								Reverse: queries.AlterFoos.Reverse,
 							},
 							version: formattedTime("23450102030405"),
 						},
 						{
-							content: MigrationContent{Forward: queries.CreateBars.Forward},
+							content: migrationContent{Forward: queries.CreateBars.Forward},
 							version: formattedTime("34560102030405"),
 						},
 					},
@@ -287,18 +288,18 @@ func testApplyMigration(t *testing.T, driver godfish.Driver, queries Queries) {
 	t.Run("migration file does not exist", func(t *testing.T) {
 		var stubs = []testDriverStub{
 			{
-				content: MigrationContent{Forward: queries.CreateFoos.Forward},
+				content: migrationContent{Forward: queries.CreateFoos.Forward},
 				version: formattedTime("12340102030405"),
 			},
 			{
-				content: MigrationContent{
+				content: migrationContent{
 					Forward: queries.AlterFoos.Forward,
 					Reverse: queries.AlterFoos.Reverse,
 				},
 				version: formattedTime("23450102030405"),
 			},
 			{
-				content: MigrationContent{Forward: queries.CreateBars.Forward},
+				content: migrationContent{Forward: queries.CreateBars.Forward},
 				version: formattedTime("34560102030405"),
 			},
 		}
@@ -381,7 +382,7 @@ func testApplyMigration(t *testing.T, driver godfish.Driver, queries Queries) {
 			testSetupState{
 				migrateTo: "34560102030405",
 				stubs: append(stubs, testDriverStub{
-					content: MigrationContent{
+					content: migrationContent{
 						Forward: "invalid SQL",
 					},
 					version: formattedTime("45670102030405"),
@@ -435,7 +436,7 @@ func testApplyMigration(t *testing.T, driver godfish.Driver, queries Queries) {
 				migrateTo: skipMigration,
 				stubs: []testDriverStub{
 					{
-						content: MigrationContent{
+						content: migrationContent{
 							Forward: strings.Join([]string{
 								queries.CreateFoos.Forward,
 								"",
@@ -466,7 +467,7 @@ func testApplyMigration(t *testing.T, driver godfish.Driver, queries Queries) {
 				migrateTo: skipMigration,
 				stubs: []testDriverStub{
 					{
-						content: MigrationContent{
+						content: migrationContent{
 							Forward: strings.Join([]string{
 								queries.CreateFoos.Forward,
 								"invalid SQL;",

@@ -1,0 +1,1 @@
+CREATE TABLE bars (id int PRIMARY KEY);

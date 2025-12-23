@@ -7,9 +7,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"log/slog"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -33,8 +35,12 @@ func CreateMigrationFiles(migrationName string, reversible bool, dirpath, fwdlab
 	return
 }
 
-// Migrate executes all migrations at directoryPath in the specified direction.
-func Migrate(driver Driver, directoryPath string, forward bool, finishAtVersion string) (err error) {
+// Migrate executes all migrations at the directory dirFS in the specified
+// direction. When forward is true, it will seek migrations with a forward
+// direction and apply them up to and including the one with a version matching
+// finishAtVersion. Likewise, when forward is false, then it seeks migrations
+// with a reverse direction and runs them.
+func Migrate(driver Driver, dirFS fs.FS, forward bool, finishAtVersion string) (err error) {
 	var (
 		dsn        string
 		migrations []*internal.Migration
@@ -64,7 +70,7 @@ func Migrate(driver Driver, directoryPath string, forward bool, finishAtVersion 
 
 	finder := migrationFinder{
 		direction:       direction,
-		directoryPath:   directoryPath,
+		dirFS:           dirFS,
 		finishAtVersion: finishAtVersion,
 	}
 	if migrations, err = finder.query(driver); err != nil {
@@ -72,8 +78,8 @@ func Migrate(driver Driver, directoryPath string, forward bool, finishAtVersion 
 	}
 
 	for _, mig := range migrations {
-		pathToFile := filepath.Join(directoryPath, string(mig.ToFilename()))
-		if err = runMigration(driver, pathToFile, mig); err != nil {
+		pathToFile := string(mig.ToFilename())
+		if err = runMigration(driver, dirFS, pathToFile, mig); err != nil {
 			return
 		}
 	}
@@ -84,9 +90,11 @@ func Migrate(driver Driver, directoryPath string, forward bool, finishAtVersion 
 // record migration status.
 var ErrSchemaMigrationsDoesNotExist = errors.New("schema migrations table does not exist")
 
-// ApplyMigration runs a migration at directoryPath with the specified version
-// and direction.
-func ApplyMigration(driver Driver, directoryPath string, forward bool, version string) (err error) {
+// ApplyMigration runs a migration at the directory dirFS with the specified
+// version and direction. When forward is true, it will target a migration with
+// a forward direction. Likewise when forward is false, then it targets a
+// migration with a reverse direction.
+func ApplyMigration(driver Driver, dirFS fs.FS, forward bool, version string) (err error) {
 	var (
 		dsn        string
 		pathToFile string
@@ -118,7 +126,7 @@ func ApplyMigration(driver Driver, directoryPath string, forward bool, version s
 		}
 		finder := migrationFinder{
 			direction:       direction,
-			directoryPath:   directoryPath,
+			dirFS:           dirFS,
 			finishAtVersion: limit,
 		}
 		if toApply, ierr := finder.query(driver); ierr != nil {
@@ -132,23 +140,23 @@ func ApplyMigration(driver Driver, directoryPath string, forward bool, version s
 		}
 	}
 
-	if pathToFile, err = figureOutBasename(directoryPath, direction, version); err != nil {
+	if pathToFile, err = figureOutBasename(dirFS, direction, version); err != nil {
 		return
 	}
-	fn := internal.Filename(filepath.Join(directoryPath, pathToFile))
+	fn := internal.Filename(filepath.Clean(pathToFile))
 	if mig, err = internal.ParseMigration(fn); err != nil {
 		return
 	}
-	err = runMigration(driver, pathToFile, mig)
+	err = runMigration(driver, dirFS, pathToFile, mig)
 	return
 }
 
-func figureOutBasename(directoryPath string, direction internal.Direction, version string) (f string, e error) {
+func figureOutBasename(dirFS fs.FS, direction internal.Direction, version string) (f string, e error) {
 	var filenames []string
 	// glob as many filenames as possible that match the "version" segment, then
 	// narrow it down from there.
-	glob := filepath.Join(directoryPath, string(internal.MakeFilename(version, internal.Indirection{}, "*")))
-	if filenames, e = filepath.Glob(glob); e != nil {
+	glob := internal.MakeFilename(version, internal.Indirection{}, "*")
+	if filenames, e = fs.Glob(dirFS, string(glob)); e != nil {
 		return
 	}
 
@@ -176,9 +184,9 @@ func figureOutBasename(directoryPath string, direction internal.Direction, versi
 
 // runMigration executes a migration against the database. The input, pathToFile
 // should be relative to the current working directory.
-func runMigration(driver Driver, pathToFile string, mig *internal.Migration) (err error) {
+func runMigration(driver Driver, dir fs.FS, pathToFile string, mig *internal.Migration) (err error) {
 	var data []byte
-	if data, err = os.ReadFile(filepath.Clean(pathToFile)); err != nil {
+	if data, err = fs.ReadFile(dir, filepath.Clean(pathToFile)); err != nil {
 		return
 	}
 	gerund := "migrating"
@@ -219,7 +227,7 @@ func makeDurationMSAttr(startedAt time.Time) slog.Attr {
 }
 
 // Info writes status of migrations to w in formats json or tsv.
-func Info(driver Driver, directoryPath string, forward bool, finishAtVersion string, w io.Writer, format string) (err error) {
+func Info(driver Driver, directory fs.FS, forward bool, finishAtVersion string, w io.Writer, format string) (err error) {
 	var dsn string
 	if dsn, err = getDSN(); err != nil {
 		return
@@ -240,7 +248,7 @@ func Info(driver Driver, directoryPath string, forward bool, finishAtVersion str
 
 	finder := migrationFinder{
 		direction:       direction,
-		directoryPath:   directoryPath,
+		dirFS:           directory,
 		finishAtVersion: finishAtVersion,
 		infoPrinter:     choosePrinter(format, w),
 	}
@@ -287,7 +295,7 @@ func Init(pathToFile string) (err error) {
 // for migrations to apply.
 type migrationFinder struct {
 	direction       internal.Direction
-	directoryPath   string
+	dirFS           fs.FS
 	finishAtVersion string
 	infoPrinter     internal.InfoPrinter
 }
@@ -299,7 +307,7 @@ func (m *migrationFinder) query(driver Driver) (out []*internal.Migration, err e
 		return
 	}
 
-	applied, err := scanAppliedVersions(driver, m.directoryPath)
+	applied, err := scanAppliedVersions(driver, m.dirFS)
 	if err == ErrSchemaMigrationsDoesNotExist {
 		// The next invocation of CreateSchemaMigrationsTable should fix this.
 		// We can continue with zero value for now.
@@ -356,31 +364,24 @@ func (m *migrationFinder) query(driver Driver) (out []*internal.Migration, err e
 
 // available returns a list of Migration values in a specified direction.
 func (m *migrationFinder) available() (out []*internal.Migration, err error) {
-	var fileDir *os.File
-	var filenames []string
-	if fileDir, err = os.Open(m.directoryPath); err != nil {
-		if _, ok := err.(*os.PathError); ok {
-			err = fmt.Errorf("path to migration files %q %w", m.directoryPath, internal.ErrNotFound)
-		}
+	dirEntries, err := fs.ReadDir(m.dirFS, ".")
+	if err != nil {
+		err = fmt.Errorf("reading directory entries: %w", err)
 		return
 	}
-	defer func() {
-		if ierr := fileDir.Close(); ierr != nil {
-			slog.Warn("closing fileDir after looking for available migrations", slog.String("filedir", fileDir.Name()), slog.String("error", ierr.Error()))
+	if m.direction != internal.DirForward {
+		slices.Reverse(dirEntries)
+	}
+	for _, dirEntry := range dirEntries {
+		name := dirEntry.Name()
+		if dirEntry.IsDir() {
+			slog.Info("searching for available migrations and found directory, skipping", slog.String("path", name))
+			continue
 		}
-	}()
-	if filenames, err = fileDir.Readdirnames(0); err != nil {
-		return
-	}
-	if m.direction == internal.DirForward {
-		sort.Strings(filenames)
-	} else {
-		sort.Sort(sort.Reverse(sort.StringSlice(filenames)))
-	}
-	for _, fn := range filenames {
-		mig, ierr := internal.ParseMigration(internal.Filename(fn))
+
+		mig, ierr := internal.ParseMigration(internal.Filename(name))
 		if errors.Is(ierr, internal.ErrDataInvalid) {
-			slog.Warn("parsing migration filename, skipping over this one", slog.String("filename", fn), slog.String("error", ierr.Error()))
+			slog.Warn("parsing migration filename, skipping over this one", slog.String("filename", name), slog.String("error", ierr.Error()))
 			continue
 		} else if ierr != nil {
 			err = ierr
@@ -395,7 +396,7 @@ func (m *migrationFinder) available() (out []*internal.Migration, err error) {
 	return
 }
 
-func scanAppliedVersions(driver Driver, directoryPath string) (out []*internal.Migration, err error) {
+func scanAppliedVersions(driver Driver, dirFS fs.FS) (out []*internal.Migration, err error) {
 	var rows AppliedVersions
 	if rows, err = driver.AppliedVersions(); err != nil {
 		return
@@ -411,7 +412,7 @@ func scanAppliedVersions(driver Driver, directoryPath string) (out []*internal.M
 		if err = rows.Scan(&version); err != nil {
 			return
 		}
-		basename, err = figureOutBasename(directoryPath, internal.DirForward, version)
+		basename, err = figureOutBasename(dirFS, internal.DirForward, version)
 		if errors.Is(err, internal.ErrNotFound) {
 			err = nil // swallow error and continue
 		} else if err != nil {

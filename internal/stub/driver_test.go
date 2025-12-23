@@ -10,5 +10,5 @@ import (
 
 func Test(t *testing.T) {
 	t.Setenv(internal.DSNKey, "stub_dsn")
-	test.RunDriverTests(t, stub.NewDriver(), test.DefaultQueries)
+	test.RunDriverTests(t, stub.NewDriver())
 }

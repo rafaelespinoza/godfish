@@ -8,5 +8,5 @@ import (
 )
 
 func Test(t *testing.T) {
-	test.RunDriverTests(t, postgres.NewDriver(), test.DefaultQueries)
+	test.RunDriverTests(t, postgres.NewDriver())
 }

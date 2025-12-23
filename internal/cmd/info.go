@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"io/fs"
 	"os"
 	"strings"
 
@@ -62,7 +63,8 @@ func makeInfo(name string) alf.Directive {
 			return flags
 		},
 		Run: func(_ context.Context) error {
-			return godfish.Info(theDriver, commonArgs.Files, forward(direction), version, os.Stdout, format)
+			dirFS := os.DirFS(commonArgs.Files)
+			return godfish.Info(theDriver, dirFS.(fs.ReadDirFS), forward(direction), version, os.Stdout, format)
 		},
 	}
 }

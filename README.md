@@ -12,6 +12,7 @@
 
 `godfish` is a database migration manager, similar to the very good
 [`dogfish`](https://github.com/dwb/dogfish), but written in golang.
+It is a CLI and a library.
 
 ## goals
 
@@ -76,6 +77,14 @@ table is inserted. A migration that has not yet been applied will be a file in
 the directory, but without a corresponding entry in the DB table.
 
 ## usage
+
+Not only is this tool a CLI, it's also a database migration library. Most of the
+time, you'll probably want to use it as a CLI.
+
+### command line usage
+
+This section describes basic usage of a CLI binary. For details on getting a CLI
+binary, see the [releases](#releases) section. Golang is not required here.
 
 ```
 godfish help
@@ -151,6 +160,24 @@ godfish remigrate
 godfish version
 godfish version -json
 ```
+
+### library usage
+
+Though most of the time you'll probably want to use one of the pre-built
+binaries, you could also use this as a golang library.
+
+```
+go get github.com/rafaelespinoza/godfish
+```
+
+#### embed migrations
+
+An issue that may arise with deployments is that the migration files must be
+deployed alongside the godfish binary. Migrations data and the behavior provided
+by the `godfish` library can be combined into a single self-contained binary by
+using the [`embed`](https://pkg.go.dev/embed) package.
+See the [go doc](https://pkg.go.dev/github.com/rafaelespinoza/godfish?tab=doc)
+page for an example.
 
 ## other minutiae
 

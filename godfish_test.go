@@ -53,7 +53,8 @@ func TestMigrate(t *testing.T) {
 	t.Run("missing DB_DSN", func(t *testing.T) {
 		t.Setenv(internal.DSNKey, "")
 
-		err := godfish.Migrate(stub.NewDriver(), t.TempDir(), false, "")
+		dirFS := os.DirFS(t.TempDir())
+		err := godfish.Migrate(stub.NewDriver(), dirFS, false, "")
 		if err == nil {
 			t.Fatalf("expected an error, got %v", err)
 		}
@@ -68,7 +69,8 @@ func TestApplyMigration(t *testing.T) {
 	t.Run("missing DB_DSN", func(t *testing.T) {
 		t.Setenv(internal.DSNKey, "")
 
-		err := godfish.ApplyMigration(stub.NewDriver(), t.TempDir(), false, "")
+		dirFS := os.DirFS(t.TempDir())
+		err := godfish.ApplyMigration(stub.NewDriver(), dirFS, false, "")
 		if err == nil {
 			t.Fatalf("expected an error, got %v", err)
 		}
@@ -83,7 +85,8 @@ func TestInfo(t *testing.T) {
 	t.Run("missing DB_DSN", func(t *testing.T) {
 		t.Setenv(internal.DSNKey, "")
 
-		err := godfish.Info(stub.NewDriver(), t.TempDir(), false, "", os.Stderr, "")
+		dirFS := os.DirFS(t.TempDir())
+		err := godfish.Info(stub.NewDriver(), dirFS, false, "", os.Stderr, "")
 		if err == nil {
 			t.Fatalf("expected an error, got %v", err)
 		}
@@ -96,7 +99,8 @@ func TestInfo(t *testing.T) {
 	t.Run("unknown format does not error out", func(t *testing.T) {
 		t.Setenv(internal.DSNKey, "test")
 
-		err := godfish.Info(stub.NewDriver(), t.TempDir(), false, "", os.Stderr, "tea_ess_vee")
+		dirFS := os.DirFS(t.TempDir())
+		err := godfish.Info(stub.NewDriver(), dirFS, false, "", os.Stderr, "tea_ess_vee")
 		if err != nil {
 			t.Fatalf("unexpected error, %v", err)
 		}
@@ -165,5 +169,5 @@ func TestDriver(t *testing.T) {
 	// These tests also run in the stub package. They are duplicated here to
 	// make test coverage tool consider the tests in godfish.go as covered.
 	t.Setenv(internal.DSNKey, "stub_dsn")
-	test.RunDriverTests(t, stub.NewDriver(), test.DefaultQueries)
+	test.RunDriverTests(t, stub.NewDriver())
 }

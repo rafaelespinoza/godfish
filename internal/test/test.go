@@ -1,10 +1,13 @@
+// Package test is a test suite for a godfish.Driver.
 package test
 
 import (
 	"fmt"
+	"io/fs"
 	"log/slog"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"testing"
 
@@ -13,46 +16,87 @@ import (
 	"github.com/rafaelespinoza/godfish/internal/stub"
 )
 
-// RunDriverTests tests an implementation of the godfish.Driver interface.
-// Callers should supply a set of valid queries q; most DBs can just use the
-// DefaultQueries.
-func RunDriverTests(t *testing.T, d godfish.Driver, q Queries) {
-	for _, query := range []MigrationContent{q.CreateFoos, q.CreateBars, q.AlterFoos} {
-		if query.Forward == "" || query.Reverse == "" {
-			// Should also be valid queries, but the database will decide that.
-			t.Fatalf("all %T fields should be non-empty", query)
-		}
-	}
+// RunDriverTests tests an implementation of the [godfish.Driver] interface.
+func RunDriverTests(t *testing.T, d godfish.Driver) {
+	var q testdataQueries
+	q.populateContents(t, d)
 
 	t.Run("Migrate", func(t *testing.T) { testMigrate(t, d, q) })
 	t.Run("Info", func(t *testing.T) { testInfo(t, d, q) })
 	t.Run("ApplyMigration", func(t *testing.T) { testApplyMigration(t, d, q) })
 }
 
-// Queries are named DB queries to use in the tests.
-type Queries struct {
-	CreateFoos MigrationContent
-	CreateBars MigrationContent
-	AlterFoos  MigrationContent
+// testdataQueries are named DB testdataQueries to use in the tests.
+type testdataQueries struct {
+	CreateFoos migrationContent
+	CreateBars migrationContent
+	AlterFoos  migrationContent
 }
 
-// DefaultQueries should be sufficient to use for most DBs in RunDriverTests.
-var DefaultQueries = Queries{
-	CreateFoos: MigrationContent{
-		Forward: "CREATE TABLE foos (id int);",
-		Reverse: "DROP TABLE foos;",
-	},
-	CreateBars: MigrationContent{
-		Forward: "CREATE TABLE bars (id int);  ",
-		Reverse: "DROP TABLE bars;",
-	},
-	AlterFoos: MigrationContent{
-		Forward: "ALTER TABLE foos ADD COLUMN a varchar(255) ;",
-		Reverse: "ALTER TABLE foos DROP COLUMN a;",
-	},
+// populateContents prepares the test suite by looking up testdata for a
+// driver and hydrating q.
+func (q *testdataQueries) populateContents(t *testing.T, d godfish.Driver) {
+	t.Helper()
+
+	// Calculate the absolute path to this file. Needed because this test suite
+	// is called from multiple locations in the project, some at different
+	// distances relative to the testdata directory.
+	_, thisFile, _, _ := runtime.Caller(0)
+
+	testdataSubdir := filepath.Join(filepath.Dir(thisFile), "..", "..", "testdata", getTestdataSubdir(d))
+	testdataRoot, err := os.OpenRoot(testdataSubdir)
+	if err != nil {
+		t.Fatalf("opening root at path %s: %s", testdataSubdir, err)
+	}
+	defer func() { _ = testdataRoot.Close() }()
+	testdataFS := testdataRoot.FS()
+
+	entries, err := fs.ReadDir(testdataFS, ".")
+	if err != nil {
+		t.Fatalf("reading directory entries at %s: %s", testdataSubdir, err)
+	}
+	const minEntriesExpected = 6
+	if len(entries) != minEntriesExpected {
+		t.Fatalf("too few entries; got %d, expected %d", len(entries), minEntriesExpected)
+	}
+
+	for _, entry := range entries {
+		name := entry.Name()
+		if filepath.Ext(name) != ".sql" {
+			continue
+		}
+		rawContents, err := fs.ReadFile(testdataFS, name)
+		if err != nil {
+			t.Fatalf("reading file contents of %s: %s", name, err)
+		}
+		contents := string(rawContents)
+		switch name {
+		case "forward-1234-alpha.sql":
+			q.CreateFoos.Forward = contents
+		case "forward-2345-bravo.sql":
+			q.CreateBars.Forward = contents
+		case "forward-3456-charlie.sql":
+			q.AlterFoos.Forward = contents
+		case "reverse-1234-alpha.sql":
+			q.CreateFoos.Reverse = contents
+		case "reverse-2345-bravo.sql":
+			q.CreateBars.Reverse = contents
+		case "reverse-3456-charlie.sql":
+			q.AlterFoos.Reverse = contents
+		default:
+			t.Fatalf("unexpected migration filename %q", name)
+		}
+	}
+
+	for _, query := range []migrationContent{q.CreateFoos, q.CreateBars, q.AlterFoos} {
+		if query.Forward == "" || query.Reverse == "" {
+			// Should also be valid queries, but the database will decide that.
+			t.Fatalf("all %T fields should be non-empty", query)
+		}
+	}
 }
 
-type MigrationContent struct{ Forward, Reverse string }
+type migrationContent struct{ Forward, Reverse string }
 
 func mustDSN() string {
 	dsn := os.Getenv(internal.DSNKey)
@@ -76,7 +120,7 @@ func setup(t *testing.T, driver godfish.Driver, stubs []testDriverStub, migrateT
 	generateMigrationFiles(t, path, stubs)
 
 	if migrateTo != skipMigration {
-		err := godfish.Migrate(driver, path, true, migrateTo)
+		err := godfish.Migrate(driver, os.DirFS(path), true, migrateTo)
 		if err != nil {
 			t.Fatalf("Migrate failed during setup: %v", err)
 		}
@@ -129,9 +173,18 @@ func formattedTime(v string) internal.Version {
 
 // testDriverStub encompasses some data to use with interface tests.
 type testDriverStub struct {
-	content      MigrationContent
+	content      migrationContent
 	indirectives struct{ forward, reverse internal.Indirection }
 	version      internal.Version
+}
+
+func getTestdataSubdir(driver godfish.Driver) string {
+	switch name := driver.Name(); name {
+	case "cassandra", "sqlserver":
+		return name
+	default:
+		return "default"
+	}
 }
 
 func generateMigrationFiles(t *testing.T, pathToTestDir string, stubs []testDriverStub) {

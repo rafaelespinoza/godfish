@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"os"
 
 	"github.com/rafaelespinoza/alf"
 	"github.com/rafaelespinoza/godfish"
@@ -42,9 +43,10 @@ func makeMigrate(name string) alf.Directive {
 			return flags
 		},
 		Run: func(_ context.Context) error {
+			dirFS := os.DirFS(commonArgs.Files)
 			err := godfish.Migrate(
 				theDriver,
-				commonArgs.Files,
+				dirFS,
 				true,
 				version,
 			)
@@ -74,11 +76,12 @@ func makeRemigrate(name string) alf.Directive {
 			return flags
 		},
 		Run: func(_ context.Context) error {
-			err := godfish.ApplyMigration(theDriver, commonArgs.Files, false, "")
+			dirFS := os.DirFS(commonArgs.Files)
+			err := godfish.ApplyMigration(theDriver, dirFS, false, "")
 			if err != nil {
 				return err
 			}
-			return godfish.ApplyMigration(theDriver, commonArgs.Files, true, "")
+			return godfish.ApplyMigration(theDriver, dirFS, true, "")
 		},
 	}
 }
@@ -115,17 +118,19 @@ func makeRollback(name string) alf.Directive {
 		},
 		Run: func(_ context.Context) error {
 			var err error
+			dirFS := os.DirFS(commonArgs.Files)
+
 			if version == "" {
 				err = godfish.ApplyMigration(
 					theDriver,
-					commonArgs.Files,
+					dirFS,
 					false,
 					version,
 				)
 			} else {
 				err = godfish.Migrate(
 					theDriver,
-					commonArgs.Files,
+					dirFS,
 					false,
 					version,
 				)

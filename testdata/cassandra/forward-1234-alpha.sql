@@ -1,0 +1,1 @@
+CREATE TABLE foos (id int PRIMARY KEY);
