@@ -7,6 +7,7 @@ require (
 	github.com/gocql/gocql v1.7.0
 	github.com/lib/pq v1.12.3
 	github.com/microsoft/go-mssqldb v1.9.5
+	github.com/rafaelespinoza/slogtesting v0.1.1
 	github.com/romantomjak/devslog v1.1.0
 	github.com/urfave/cli-altsrc/v3 v3.1.0
 	github.com/urfave/cli/v3 v3.10.1
