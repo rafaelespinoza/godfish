@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io/fs"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -18,6 +19,8 @@ import (
 	"github.com/rafaelespinoza/godfish/internal/stub"
 	"github.com/rafaelespinoza/godfish/internal/test"
 	"github.com/rafaelespinoza/godfish/testdata"
+
+	st "github.com/rafaelespinoza/slogtesting"
 )
 
 func TestCreateMigrationFiles(t *testing.T) {
@@ -128,6 +131,33 @@ func TestApplyMigration(t *testing.T) {
 		t.Log(err)
 		if !errors.Is(err, internal.ErrNotFound) {
 			t.Errorf("expected for error (%v) to be %v", err, internal.ErrNotFound)
+		}
+	})
+
+	t.Run("outputs some logs", func(t *testing.T) {
+		t.Setenv(internal.DSNKey, t.Name())
+
+		run := func(h slog.Handler) error {
+			originalDefaults := slog.Default()
+			t.Cleanup(func() { slog.SetDefault(originalDefaults) })
+			slog.SetDefault(slog.New(h))
+
+			testFS := fstest.MapFS{"forward-0000-a.sql": &fstest.MapFile{}}
+
+			return godfish.ApplyMigration(t.Context(), stub.NewDriver(), testFS, true, "0000", "")
+		}
+		logRecords, err := st.CaptureRecords(nil, run)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(logRecords) != 2 {
+			t.Fatalf("wrong number of logging records; got %d, expected %d", len(logRecords), 2)
+		}
+
+		attrs := st.GetRecordAttrs(logRecords[1])
+		check := st.HasKey("duration_ms")
+		if err := check(attrs); err != nil {
+			t.Error(err)
 		}
 	})
 }

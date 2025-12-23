@@ -3,12 +3,15 @@ package internal_test
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"sort"
 	"testing"
 
 	"github.com/rafaelespinoza/godfish/internal"
+
+	st "github.com/rafaelespinoza/slogtesting"
 )
 
 func TestParseMigration(t *testing.T) {
@@ -207,6 +210,7 @@ func TestMigrationParams(t *testing.T) {
 		fwdLabel, revLabel string
 		expectedDirections []string
 		expectError        bool
+		expectedRecords    []slog.Record
 	}
 
 	runTest := func(t *testing.T, test testCase) {
@@ -246,7 +250,14 @@ func TestMigrationParams(t *testing.T) {
 		}
 
 		// generate files and test effects.
-		err = migParams.GenerateFiles()
+		runTest := func(h slog.Handler) error {
+			originalDefaults := slog.Default()
+			t.Cleanup(func() { slog.SetDefault(originalDefaults) })
+			slog.SetDefault(slog.New(h))
+			return migParams.GenerateFiles()
+		}
+
+		gotRecords, err := st.CaptureRecords(nil, runTest)
 		if err != nil && !test.expectError {
 			t.Fatal(err)
 		} else if err == nil && test.expectError {
@@ -284,6 +295,14 @@ func TestMigrationParams(t *testing.T) {
 					"test [%d]; expected filename %q to match pattern %q",
 					i, name, patt,
 				)
+			}
+		}
+
+		t.Logf("got %d records", len(gotRecords))
+		for i, gotRecord := range gotRecords {
+			attrs := st.GetRecordAttrs(gotRecord)
+			for j, attr := range attrs {
+				t.Logf("[%d][%d] level=%q msg=%q attr_key=%q attr_val=%v", i, j, gotRecord.Level, gotRecord.Message, attr.Key, attr.Value)
 			}
 		}
 	}
