@@ -1,8 +1,6 @@
 module github.com/rafaelespinoza/godfish
 
-go 1.24.1
-
-toolchain go1.24.2
+go 1.25
 
 require (
 	github.com/go-sql-driver/mysql v1.9.3
@@ -10,6 +8,7 @@ require (
 	github.com/lib/pq v1.10.9
 	github.com/microsoft/go-mssqldb v1.9.5
 	github.com/rafaelespinoza/alf v0.2.0
+	github.com/rafaelespinoza/slogtesting v0.1.1
 	github.com/romantomjak/devslog v1.1.0
 	modernc.org/sqlite v1.40.1
 )
