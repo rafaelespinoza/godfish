@@ -8,9 +8,10 @@ import (
 
 // Config is for various runtime settings.
 type Config struct {
-	PathToFiles  string `json:"path_to_files"`
-	ForwardLabel string `json:"forward_label"`
-	ReverseLabel string `json:"reverse_label"`
+	PathToFiles     string `json:"path_to_files"`
+	ForwardLabel    string `json:"forward_label"`
+	ReverseLabel    string `json:"reverse_label"`
+	MigrationsTable string `json:"migrations_table"`
 }
 
 // LogValue lets this type implement the [slog.LogValuer] interface.
@@ -19,6 +20,7 @@ func (c Config) LogValue() slog.Value {
 		slog.String("path_to_files", c.PathToFiles),
 		slog.String("forward_label", c.ForwardLabel),
 		slog.String("reverse_label", c.ReverseLabel),
+		slog.String("migrations_table", c.MigrationsTable),
 	)
 }
 
@@ -28,5 +30,11 @@ var (
 	ErrDataInvalid = errors.New("data invalid")
 )
 
-// DSNKey is the name of the environment variable for connecting to the DB.
-const DSNKey = "DB_DSN"
+const (
+	// DSNKey is the name of the environment variable for connecting to the DB.
+	DSNKey = "DB_DSN"
+
+	// DefaultMigrationsTableName is the default name of the database table for
+	// storing database migration state.
+	DefaultMigrationsTableName = "schema_migrations"
+)

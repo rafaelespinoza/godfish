@@ -1,3 +1,4 @@
+// Package sqlserver provides a [godfish.Driver] for sqlserver databases.
 package sqlserver
 
 import (
@@ -49,40 +50,40 @@ func (d *driver) Execute(query string, args ...any) (err error) {
 	return
 }
 
-func (d *driver) CreateSchemaMigrationsTable() (err error) {
+func (d *driver) CreateSchemaMigrationsTable(migrationsTable string) (err error) {
 	_, err = d.connection.Exec(`
 		IF NOT EXISTS (
-			SELECT 1 FROM information_schema.tables WHERE table_schema = (SELECT schema_name()) AND table_name = 'schema_migrations'
+			SELECT 1 FROM information_schema.tables WHERE table_schema = (SELECT schema_name()) AND table_name = @p1
 		)
-		CREATE TABLE schema_migrations (migration_id VARCHAR(128) PRIMARY KEY NOT NULL)
-	`)
+		CREATE TABLE `+migrationsTable+` (migration_id VARCHAR(128) PRIMARY KEY NOT NULL)
+	`, migrationsTable)
 	return
 }
 
-func (d *driver) AppliedVersions() (out godfish.AppliedVersions, err error) {
-	rows, err := d.connection.Query(`SELECT migration_id FROM schema_migrations ORDER BY migration_id ASC`)
+func (d *driver) AppliedVersions(migrationsTable string) (out godfish.AppliedVersions, err error) {
+	rows, err := d.connection.Query(`SELECT migration_id FROM ` + migrationsTable + ` ORDER BY migration_id ASC`)
 
 	var ierr mssql.Error
 	// https://docs.microsoft.com/en-us/sql/relational-databases/errors-events/database-engine-events-and-errors
-	// Invalid object name 'schema_migrations'
-	if errors.As(err, &ierr) && ierr.SQLErrorNumber() == 208 && strings.Contains(ierr.Error(), "schema_migrations") {
+	// Invalid object name '${migrationsTable}'
+	if errors.As(err, &ierr) && ierr.SQLErrorNumber() == 208 && strings.Contains(ierr.Error(), migrationsTable) {
 		err = godfish.ErrSchemaMigrationsDoesNotExist
 	}
 	out = godfish.AppliedVersions(rows)
 	return
 }
 
-func (d *driver) UpdateSchemaMigrations(forward bool, version string) (err error) {
+func (d *driver) UpdateSchemaMigrations(migrationsTable string, forward bool, version string) (err error) {
 	conn := d.connection
 	if forward {
 		_, err = conn.Exec(`
-			INSERT INTO schema_migrations (migration_id)
+			INSERT INTO `+migrationsTable+` (migration_id)
 			VALUES (@p1)`,
 			version,
 		)
 	} else {
 		_, err = conn.Exec(`
-			DELETE FROM schema_migrations
+			DELETE FROM `+migrationsTable+`
 			WHERE migration_id = @p1`,
 			version,
 		)

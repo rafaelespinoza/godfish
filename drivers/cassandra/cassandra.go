@@ -1,3 +1,4 @@
+// Package cassandra provides a [godfish.Driver] for cassandra databases.
 package cassandra
 
 import (
@@ -63,16 +64,16 @@ func (d *driver) Execute(query string, args ...any) (err error) {
 	return nil
 }
 
-func (d *driver) CreateSchemaMigrationsTable() (err error) {
+func (d *driver) CreateSchemaMigrationsTable(migrationsTable string) (err error) {
 	err = d.connection.Query(
-		`CREATE TABLE IF NOT EXISTS schema_migrations (migration_id TEXT PRIMARY KEY)`,
+		`CREATE TABLE IF NOT EXISTS ` + migrationsTable + ` (migration_id TEXT PRIMARY KEY)`,
 	).Exec()
 	return
 }
 
-func (d *driver) AppliedVersions() (out godfish.AppliedVersions, err error) {
+func (d *driver) AppliedVersions(migrationsTable string) (out godfish.AppliedVersions, err error) {
 	query := d.connection.Query(
-		`SELECT migration_id FROM schema_migrations`,
+		`SELECT migration_id FROM ` + migrationsTable,
 	)
 
 	av := execAllAscending(query)
@@ -101,17 +102,17 @@ func (d *driver) AppliedVersions() (out godfish.AppliedVersions, err error) {
 	return
 }
 
-func (d *driver) UpdateSchemaMigrations(forward bool, version string) (err error) {
+func (d *driver) UpdateSchemaMigrations(migrationsTable string, forward bool, version string) (err error) {
 	conn := d.connection
 	if forward {
 		err = conn.Query(`
-			INSERT INTO schema_migrations (migration_id)
+			INSERT INTO `+migrationsTable+` (migration_id)
 			VALUES (?)`,
 			version,
 		).Exec()
 	} else {
 		err = conn.Query(`
-			DELETE FROM schema_migrations
+			DELETE FROM `+migrationsTable+`
 			WHERE migration_id = ?`,
 			version,
 		).Exec()

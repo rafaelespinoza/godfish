@@ -64,7 +64,8 @@ func makeInfo(name string) alf.Directive {
 		},
 		Run: func(_ context.Context) error {
 			dirFS := os.DirFS(commonArgs.Files)
-			return godfish.Info(theDriver, dirFS.(fs.ReadDirFS), forward(direction), version, os.Stdout, format)
+			migrationsTable := commonArgs.MigrationsTable
+			return godfish.Info(theDriver, dirFS.(fs.ReadDirFS), forward(direction), version, os.Stdout, format, migrationsTable)
 		},
 	}
 }

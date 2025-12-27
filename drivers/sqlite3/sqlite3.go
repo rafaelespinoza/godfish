@@ -1,3 +1,4 @@
+// Package sqlite3 provides a [godfish.Driver] for sqlite3 databases.
 package sqlite3
 
 import (
@@ -45,17 +46,17 @@ func (d *driver) Execute(query string, args ...any) (err error) {
 	return
 }
 
-func (d *driver) CreateSchemaMigrationsTable() (err error) {
+func (d *driver) CreateSchemaMigrationsTable(migrationsTable string) (err error) {
 	_, err = d.connection.Exec(
-		`CREATE TABLE IF NOT EXISTS schema_migrations (
+		`CREATE TABLE IF NOT EXISTS ` + migrationsTable + ` (
 			migration_id VARCHAR(128) PRIMARY KEY NOT NULL
 		)`)
 	return
 }
 
-func (d *driver) AppliedVersions() (out godfish.AppliedVersions, err error) {
+func (d *driver) AppliedVersions(migrationsTable string) (out godfish.AppliedVersions, err error) {
 	rows, err := d.connection.Query(
-		`SELECT migration_id FROM schema_migrations ORDER BY migration_id ASC`,
+		`SELECT migration_id FROM ` + migrationsTable + ` ORDER BY migration_id ASC`,
 	)
 
 	var ierr *sqlib.Error
@@ -67,18 +68,16 @@ func (d *driver) AppliedVersions() (out godfish.AppliedVersions, err error) {
 	return
 }
 
-func (d *driver) UpdateSchemaMigrations(forward bool, version string) (err error) {
+func (d *driver) UpdateSchemaMigrations(migrationsTable string, forward bool, version string) (err error) {
 	conn := d.connection
 	if forward {
-		_, err = conn.Exec(`
-			INSERT INTO schema_migrations (migration_id)
-			VALUES ($1)`,
+		_, err = conn.Exec(
+			`INSERT INTO `+migrationsTable+` (migration_id) VALUES ($1)`,
 			version,
 		)
 	} else {
-		_, err = conn.Exec(`
-			DELETE FROM schema_migrations
-			WHERE migration_id = $1`,
+		_, err = conn.Exec(
+			`DELETE FROM `+migrationsTable+` WHERE migration_id = $1`,
 			version,
 		)
 	}
