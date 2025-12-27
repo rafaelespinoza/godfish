@@ -62,7 +62,7 @@ func testMigrate(t *testing.T, driver godfish.Driver, queries testdataQueries) {
 		// Migrating all the way in reverse should also remove these tables
 		// teardown. In case it doesn't, teardown tables anyways so it's less likely
 		// to affect other tests.
-		defer teardown(t, driver, path, "foos", "bars")
+		t.Cleanup(func() { teardown(t, driver, path, "foos", "bars") })
 
 		expectedVersions := []string{"12340102030405", "23450102030405", "34560102030405"}
 		runTest(t, driver, os.DirFS(path), expectedVersions)

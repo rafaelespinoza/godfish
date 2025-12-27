@@ -28,7 +28,7 @@ func testInfo(t *testing.T, driver godfish.Driver, queries testdataQueries) {
 			},
 		}
 		path := setup(t, driver, stubs, "34560102030405")
-		defer teardown(t, driver, path, "foos", "bars")
+		t.Cleanup(func() { teardown(t, driver, path, "foos", "bars") })
 
 		t.Run("forward", func(t *testing.T) {
 			dirFS := os.DirFS(path)
