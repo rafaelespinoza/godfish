@@ -12,6 +12,15 @@ import (
 )
 
 func testInfo(t *testing.T, driver godfish.Driver, queries testdataQueries) {
+	migrationsTableTestCases := []struct {
+		name            string
+		migrationsTable string
+	}{
+		{name: "empty", migrationsTable: ""},
+		{name: internal.DefaultMigrationsTableName, migrationsTable: internal.DefaultMigrationsTableName},
+		{name: "custom", migrationsTable: "custom"},
+	}
+
 	t.Run("migrations on filesystem", func(t *testing.T) {
 		stubs := []testDriverStub{
 			{
@@ -27,48 +36,57 @@ func testInfo(t *testing.T, driver godfish.Driver, queries testdataQueries) {
 				version: formattedTime("34560102030405"),
 			},
 		}
-		path := setup(t, driver, stubs, "34560102030405")
-		t.Cleanup(func() { teardown(t, driver, path, "foos", "bars") })
 
-		t.Run("forward", func(t *testing.T) {
-			dirFS := os.DirFS(path)
-			err := godfish.Info(driver, dirFS, true, "", os.Stderr, "tsv")
-			if err != nil {
-				t.Errorf(
-					"could not output info in %s Direction; %v",
-					internal.DirForward, err,
-				)
-			}
-		})
+		for _, test := range migrationsTableTestCases {
+			t.Run(test.name, func(t *testing.T) {
+				path := setup(t, driver, stubs, "34560102030405", test.migrationsTable)
+				t.Cleanup(func() { teardown(t, driver, path, test.migrationsTable, "foos", "bars") })
 
-		t.Run("reverse", func(t *testing.T) {
-			dirFS := os.DirFS(path)
-			err := godfish.Info(driver, dirFS, false, "", os.Stderr, "json")
-			if err != nil {
-				t.Errorf(
-					"could not output info in %s Direction; %v",
-					internal.DirReverse, err,
-				)
-			}
-		})
+				t.Run("forward", func(t *testing.T) {
+					dirFS := os.DirFS(path)
+					err := godfish.Info(driver, dirFS, true, "", os.Stderr, "tsv", test.migrationsTable)
+					if err != nil {
+						t.Errorf(
+							"could not output info in %s Direction; %v",
+							internal.DirForward, err,
+						)
+					}
+				})
+
+				t.Run("reverse", func(t *testing.T) {
+					dirFS := os.DirFS(path)
+					err := godfish.Info(driver, dirFS, false, "", os.Stderr, "json", test.migrationsTable)
+					if err != nil {
+						t.Errorf(
+							"could not output info in %s Direction; %v",
+							internal.DirReverse, err,
+						)
+					}
+				})
+			})
+		}
 	})
 
 	t.Run("embedded", func(t *testing.T) {
-		subdir := getTestdataSubdir(driver)
-		dirFS, err := fs.Sub(testdata.Migrations, subdir)
-		if err != nil {
-			t.Fatal(err)
-		}
+		for _, test := range migrationsTableTestCases {
+			t.Run(test.name, func(t *testing.T) {
+				subdir := getTestdataSubdir(driver)
+				dirFS, err := fs.Sub(testdata.Migrations, subdir)
+				if err != nil {
+					t.Fatal(err)
+				}
 
-		var buf bytes.Buffer
-		if err = godfish.Info(driver, dirFS, true, "", &buf, "json"); err != nil {
-			t.Fatal(err)
-		}
-		t.Log(buf.String())
+				var buf bytes.Buffer
+				if err = godfish.Info(driver, dirFS, true, "", &buf, "json", test.migrationsTable); err != nil {
+					t.Fatal(err)
+				}
+				t.Log(buf.String())
 
-		if err = godfish.Info(driver, dirFS, false, "", &buf, "json"); err != nil {
-			t.Fatal(err)
+				if err = godfish.Info(driver, dirFS, false, "", &buf, "json", test.migrationsTable); err != nil {
+					t.Fatal(err)
+				}
+				t.Log(buf.String())
+			})
 		}
-		t.Log(buf.String())
 	})
 }

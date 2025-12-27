@@ -11,21 +11,30 @@ import (
 )
 
 func testMigrate(t *testing.T, driver godfish.Driver, queries testdataQueries) {
-	runTest := func(t *testing.T, driver godfish.Driver, dirFS fs.FS, expectedVersions []string) {
-		err := godfish.Migrate(driver, dirFS, true, "")
+	migrationsTableTestCases := []struct {
+		name            string
+		migrationsTable string
+	}{
+		{name: "empty", migrationsTable: ""},
+		{name: internal.DefaultMigrationsTableName, migrationsTable: internal.DefaultMigrationsTableName},
+		{name: "custom", migrationsTable: "custom"},
+	}
+
+	runTest := func(t *testing.T, driver godfish.Driver, dirFS fs.FS, migrationsTable string, expectedVersions []string) {
+		err := godfish.Migrate(driver, dirFS, true, "", migrationsTable)
 		if err != nil {
 			t.Fatalf("could not Migrate in %s Direction; %v", internal.DirForward, err)
 		}
 
-		appliedVersions := collectAppliedVersions(t, driver)
+		appliedVersions := collectAppliedVersions(t, driver, migrationsTable)
 		testAppliedVersions(t, appliedVersions, expectedVersions)
 
-		err = godfish.Migrate(driver, dirFS, false, expectedVersions[0])
+		err = godfish.Migrate(driver, dirFS, false, expectedVersions[0], migrationsTable)
 		if err != nil {
 			t.Fatalf("could not Migrate in %s Direction; %v", internal.DirReverse, err)
 		}
 
-		appliedVersions = collectAppliedVersions(t, driver)
+		appliedVersions = collectAppliedVersions(t, driver, migrationsTable)
 		expectedVersions = []string{}
 		testAppliedVersions(t, appliedVersions, expectedVersions)
 	}
@@ -46,22 +55,30 @@ func testMigrate(t *testing.T, driver godfish.Driver, queries testdataQueries) {
 			},
 		}
 
-		path := setup(t, driver, stubs, skipMigration)
-		// Migrating all the way in reverse should also remove these tables
-		// teardown. In case it doesn't, teardown tables anyways so it's less likely
-		// to affect other tests.
-		t.Cleanup(func() { teardown(t, driver, path, "foos", "bars") })
+		for _, test := range migrationsTableTestCases {
+			t.Run(test.name, func(t *testing.T) {
+				path := setup(t, driver, stubs, skipMigration, test.migrationsTable)
+				// Migrating all the way in reverse should also remove these tables. In case
+				// it doesn't, teardown tables anyways to make this test less likely to
+				// affect other tests.
+				t.Cleanup(func() { teardown(t, driver, path, test.migrationsTable, "foos", "bars") })
 
-		expectedVersions := []string{"12340102030405", "23450102030405", "34560102030405"}
-		runTest(t, driver, os.DirFS(path), expectedVersions)
+				expectedVersions := []string{"12340102030405", "23450102030405", "34560102030405"}
+				runTest(t, driver, os.DirFS(path), test.migrationsTable, expectedVersions)
+			})
+		}
 	})
 
 	t.Run("embedded migrations", func(t *testing.T) {
-		subdir := getTestdataSubdir(driver)
-		dirFS, err := fs.Sub(testdata.Migrations, subdir)
-		if err != nil {
-			t.Fatal(err)
+		for _, test := range migrationsTableTestCases {
+			t.Run(test.name, func(t *testing.T) {
+				subdir := getTestdataSubdir(driver)
+				dirFS, err := fs.Sub(testdata.Migrations, subdir)
+				if err != nil {
+					t.Fatal(err)
+				}
+				runTest(t, driver, dirFS, test.migrationsTable, []string{"1234", "2345", "3456"})
+			})
 		}
-		runTest(t, driver, dirFS, []string{"1234", "2345", "3456"})
 	})
 }

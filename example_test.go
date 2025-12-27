@@ -47,15 +47,19 @@ func Example_embed() {
 		return
 	}
 
+	// migrationsTable may be used to specify the table for recording DB migration state.
+	// If empty, then the library will set it to a default value, "schema_migrations".
+	var migrationsTable string
+
 	// Apply the "forward" migrations through version "3456".
 	forward := true
-	if err = godfish.Migrate(driver, migrationsDir, forward, "3456"); err != nil {
+	if err = godfish.Migrate(driver, migrationsDir, forward, "3456", migrationsTable); err != nil {
 		fmt.Println("migrating DB", err)
 		return
 	}
 
 	// Show the state of the DB migrations as TSV (default).
-	if err = godfish.Info(driver, migrationsDir, forward, "", os.Stdout, "tsv"); err != nil {
+	if err = godfish.Info(driver, migrationsDir, forward, "", os.Stdout, "tsv", migrationsTable); err != nil {
 		fmt.Println("getting, showing info", err)
 		return
 	}

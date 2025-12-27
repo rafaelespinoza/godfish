@@ -16,6 +16,8 @@ func testApplyMigration(t *testing.T, driver godfish.Driver, queries testdataQue
 		migrateTo string
 		// stubs is a list of stubbed migration data to populate the DB.
 		stubs []testDriverStub
+		// migrationsTable names the DB table for storing DB migration state.
+		migrationsTable string
 	}
 
 	// testInput is passed to ApplyMigration.
@@ -47,10 +49,10 @@ func testApplyMigration(t *testing.T, driver godfish.Driver, queries testdataQue
 
 		setupState, input, expected := test.setupState, test.input, test.expected
 
-		pathToFiles := setup(t, driver, setupState.stubs, setupState.migrateTo)
-		t.Cleanup(func() { teardown(t, driver, pathToFiles, "foos", "bars") })
+		pathToFiles := setup(t, driver, setupState.stubs, setupState.migrateTo, setupState.migrationsTable)
+		t.Cleanup(func() { teardown(t, driver, pathToFiles, setupState.migrationsTable, "foos", "bars") })
 
-		err := godfish.ApplyMigration(driver, os.DirFS(pathToFiles), input.direction == internal.DirForward, input.version)
+		err := godfish.ApplyMigration(driver, os.DirFS(pathToFiles), input.direction == internal.DirForward, input.version, setupState.migrationsTable)
 		if err != nil && !expected.err {
 			t.Errorf("could not apply migration; %v", err)
 			return
@@ -59,7 +61,7 @@ func testApplyMigration(t *testing.T, driver godfish.Driver, queries testdataQue
 			return
 		}
 
-		actualVersions := collectAppliedVersions(t, driver)
+		actualVersions := collectAppliedVersions(t, driver, setupState.migrationsTable)
 		testAppliedVersions(t, actualVersions, expected.appliedVersions)
 	}
 
@@ -473,5 +475,20 @@ func testApplyMigration(t *testing.T, driver godfish.Driver, queries testdataQue
 		for _, test := range tests {
 			t.Run(test.name, func(t *testing.T) { runTest(t, test) })
 		}
+	})
+
+	t.Run("migration table", func(t *testing.T) {
+		runTest(t, testCase{
+			name: "custom",
+			setupState: testSetupState{
+				migrateTo:       "23450102030405",
+				stubs:           defaultStubs,
+				migrationsTable: "custom_schema_migrations",
+			},
+			input: testInput{direction: internal.DirForward, version: "34560102030405"},
+			expected: expectedOutput{
+				appliedVersions: []string{"12340102030405", "23450102030405", "34560102030405"},
+			},
+		})
 	})
 }

@@ -19,7 +19,7 @@ func (d *driver) Name() string             { return "stub" }
 func (d *driver) Connect(dsn string) error { return nil }
 func (d *driver) Close() error             { return nil }
 
-func (d *driver) CreateSchemaMigrationsTable() error {
+func (d *driver) CreateSchemaMigrationsTable(migrationsTable string) error {
 	if d.appliedVersions == nil {
 		d.appliedVersions = NewAppliedVersions()
 	}
@@ -33,9 +33,9 @@ func (d *driver) Execute(q string, a ...any) error {
 	return nil
 }
 
-func (d *driver) UpdateSchemaMigrations(forward bool, version string) error {
+func (d *driver) UpdateSchemaMigrations(migrationsTable string, forward bool, version string) error {
 	var stubbedAV *appliedVersions
-	av, err := d.AppliedVersions()
+	av, err := d.AppliedVersions(migrationsTable)
 	if err != nil {
 		return err
 	}
@@ -65,7 +65,7 @@ func (d *driver) UpdateSchemaMigrations(forward bool, version string) error {
 	return nil
 }
 
-func (d *driver) AppliedVersions() (godfish.AppliedVersions, error) {
+func (d *driver) AppliedVersions(migrationsTable string) (godfish.AppliedVersions, error) {
 	if d.appliedVersions == nil {
 		return nil, godfish.ErrSchemaMigrationsDoesNotExist
 	}
