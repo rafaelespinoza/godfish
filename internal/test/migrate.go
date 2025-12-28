@@ -14,32 +14,20 @@ func testMigrate(t *testing.T, driver godfish.Driver, queries testdataQueries) {
 	runTest := func(t *testing.T, driver godfish.Driver, dirFS fs.FS, expectedVersions []string) {
 		err := godfish.Migrate(driver, dirFS, true, "")
 		if err != nil {
-			t.Errorf("could not Migrate in %s Direction; %v", internal.DirForward, err)
+			t.Fatalf("could not Migrate in %s Direction; %v", internal.DirForward, err)
 		}
 
-		appliedVersions, err := collectAppliedVersions(driver)
-		if err != nil {
-			t.Fatal(err)
-		}
-		err = testAppliedVersions(appliedVersions, expectedVersions)
-		if err != nil {
-			t.Error(err)
-		}
+		appliedVersions := collectAppliedVersions(t, driver)
+		testAppliedVersions(t, appliedVersions, expectedVersions)
 
 		err = godfish.Migrate(driver, dirFS, false, expectedVersions[0])
 		if err != nil {
-			t.Errorf("could not Migrate in %s Direction; %v", internal.DirReverse, err)
+			t.Fatalf("could not Migrate in %s Direction; %v", internal.DirReverse, err)
 		}
 
-		appliedVersions, err = collectAppliedVersions(driver)
-		if err != nil {
-			t.Fatal(err)
-		}
+		appliedVersions = collectAppliedVersions(t, driver)
 		expectedVersions = []string{}
-		err = testAppliedVersions(appliedVersions, expectedVersions)
-		if err != nil {
-			t.Error(err)
-		}
+		testAppliedVersions(t, appliedVersions, expectedVersions)
 	}
 
 	t.Run("migrations on filesystem", func(t *testing.T) {
