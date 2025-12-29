@@ -253,11 +253,19 @@ func newMigrationStub(mig internal.Migration, version internal.Version, ind inte
 // collectAppliedVersions uses the Driver's AppliedVersions method to retrieve
 // and scan migration version. It opens a new connection in case the connection
 // isn't already on the Driver, but it does close it afterwards.
-func collectAppliedVersions(driver godfish.Driver) (out []string, err error) {
+//
+// It uses defer rather than (*testing.T).Cleanup to ensure that any teardown
+// functionality within may be called as soon as this function returns, rather
+// than when the caller test is complete. This approach helps ensure fewer
+// bugs in test support code, especially when it's called multiple times from
+// the same test.
+func collectAppliedVersions(t *testing.T, driver godfish.Driver) (out []string) {
+	t.Helper()
+
 	// Collect output of AppliedVersions.
 	// Reconnect here because ApplyMigration closes the connection.
-	if err = driver.Connect(mustDSN()); err != nil {
-		return
+	if err := driver.Connect(mustDSN()); err != nil {
+		t.Fatalf("connecting to DB from collectAppliedVersions: %s", err)
 	}
 	defer func() {
 		if cerr := driver.Close(); cerr != nil {
@@ -267,9 +275,9 @@ func collectAppliedVersions(driver godfish.Driver) (out []string, err error) {
 
 	appliedVersions, err := driver.AppliedVersions()
 	if err != nil {
-		err = fmt.Errorf("could not retrieve applied versions; %v", err)
-		return
+		t.Fatalf("could not retrieve applied versions; %v", err)
 	}
+
 	defer func() {
 		if cerr := appliedVersions.Close(); cerr != nil {
 			slog.Warn("closing appliedVersions from func collectAppliedVersions", slog.Any("error", cerr))
@@ -279,8 +287,7 @@ func collectAppliedVersions(driver godfish.Driver) (out []string, err error) {
 	for appliedVersions.Next() {
 		var version string
 		if err = appliedVersions.Scan(&version); err != nil {
-			err = fmt.Errorf("could not scan applied versions; %v", err)
-			return
+			t.Fatalf("could not scan applied versions; %v", err)
 		}
 		out = append(out, version)
 	}
@@ -288,20 +295,21 @@ func collectAppliedVersions(driver godfish.Driver) (out []string, err error) {
 	return
 }
 
-func testAppliedVersions(actual, expected []string) error {
+func testAppliedVersions(t *testing.T, actual, expected []string) {
+	t.Helper()
+
 	if len(actual) != len(expected) {
-		return fmt.Errorf(
+		t.Fatalf(
 			"wrong output length; got %d, expected %d",
 			len(actual), len(expected),
 		)
 	}
 	for i, version := range actual {
 		if version != expected[i] {
-			return fmt.Errorf(
+			t.Errorf(
 				"index %d; wrong version; got %q, expected %q",
 				i, version, expected[i],
 			)
 		}
 	}
-	return nil
 }

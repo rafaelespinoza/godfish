@@ -14,32 +14,20 @@ func testMigrate(t *testing.T, driver godfish.Driver, queries testdataQueries) {
 	runTest := func(t *testing.T, driver godfish.Driver, dirFS fs.FS, expectedVersions []string) {
 		err := godfish.Migrate(driver, dirFS, true, "")
 		if err != nil {
-			t.Errorf("could not Migrate in %s Direction; %v", internal.DirForward, err)
+			t.Fatalf("could not Migrate in %s Direction; %v", internal.DirForward, err)
 		}
 
-		appliedVersions, err := collectAppliedVersions(driver)
-		if err != nil {
-			t.Fatal(err)
-		}
-		err = testAppliedVersions(appliedVersions, expectedVersions)
-		if err != nil {
-			t.Error(err)
-		}
+		appliedVersions := collectAppliedVersions(t, driver)
+		testAppliedVersions(t, appliedVersions, expectedVersions)
 
 		err = godfish.Migrate(driver, dirFS, false, expectedVersions[0])
 		if err != nil {
-			t.Errorf("could not Migrate in %s Direction; %v", internal.DirReverse, err)
+			t.Fatalf("could not Migrate in %s Direction; %v", internal.DirReverse, err)
 		}
 
-		appliedVersions, err = collectAppliedVersions(driver)
-		if err != nil {
-			t.Fatal(err)
-		}
+		appliedVersions = collectAppliedVersions(t, driver)
 		expectedVersions = []string{}
-		err = testAppliedVersions(appliedVersions, expectedVersions)
-		if err != nil {
-			t.Error(err)
-		}
+		testAppliedVersions(t, appliedVersions, expectedVersions)
 	}
 
 	t.Run("migrations on filesystem", func(t *testing.T) {
@@ -62,7 +50,7 @@ func testMigrate(t *testing.T, driver godfish.Driver, queries testdataQueries) {
 		// Migrating all the way in reverse should also remove these tables
 		// teardown. In case it doesn't, teardown tables anyways so it's less likely
 		// to affect other tests.
-		defer teardown(t, driver, path, "foos", "bars")
+		t.Cleanup(func() { teardown(t, driver, path, "foos", "bars") })
 
 		expectedVersions := []string{"12340102030405", "23450102030405", "34560102030405"}
 		runTest(t, driver, os.DirFS(path), expectedVersions)
