@@ -6,26 +6,19 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/rafaelespinoza/alf"
-	"github.com/rafaelespinoza/logg"
 
 	"github.com/rafaelespinoza/godfish"
 	"github.com/rafaelespinoza/godfish/internal"
 )
 
 var (
-	// commonArgs values are read from a configuration file, if available. The
-	// subcommand code is written so that flag values may take precedence over
-	// values in here.
-	commonArgs struct {
-		Files                            string
-		DataSourceName                   string
-		DefaultFwdLabel, DefaultRevLabel string
-	}
+	commonArgs commonArguments
 	// bin is the name of the binary.
 	bin = os.Args[0]
 	// theDriver is passed in from a Driver's package main.
@@ -130,7 +123,9 @@ Examples:
 		Delegator: del,
 		PrePerform: func(_ context.Context) error {
 			handler := newLogHandler(os.Stderr, loggingOff, logLevel, logFormat)
-			logg.SetDefaults(handler, nil)
+			slog.SetDefault(slog.New(handler))
+
+			slog.Debug("cmd: before loading config file", slog.String("path_to_config", pathToConfig), slog.Any("common_args", commonArgs))
 
 			// Look for config file and if present, merge those values with
 			// input flag values.
@@ -148,6 +143,8 @@ Examples:
 			commonArgs.DefaultFwdLabel = conf.ForwardLabel
 			commonArgs.DefaultRevLabel = conf.ReverseLabel
 
+			slog.Debug("cmd: after loading config file", slog.Any("conf", conf))
+
 			if val := strings.TrimSpace(commonArgs.DataSourceName); val != "" {
 				err := os.Setenv(internal.DSNKey, val)
 				if err != nil {
@@ -155,9 +152,29 @@ Examples:
 				}
 			}
 
+			slog.Debug("cmd: after resolving config values", slog.Any("common_args", commonArgs))
 			return nil
 		},
 	}
+}
+
+// commonArguments are read from a configuration file, if available. The
+// subcommand code is written so that flag values may take precedence over
+// values in here.
+type commonArguments struct {
+	Files                            string
+	DataSourceName                   string
+	DefaultFwdLabel, DefaultRevLabel string
+}
+
+// LogValue lets this type implement the [slog.LogValuer] interface.
+func (c commonArguments) LogValue() slog.Value {
+	return slog.GroupValue(
+		slog.String("files", c.Files),
+		slog.String("data_source_name", c.DataSourceName),
+		slog.String("default_fwd_label", c.DefaultFwdLabel),
+		slog.String("default_rev_label", c.DefaultRevLabel),
+	)
 }
 
 func newFlagSet(name string) (out *flag.FlagSet) {

@@ -6,7 +6,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/lmittmann/tint"
+	"github.com/romantomjak/devslog"
 )
 
 const defaultLogFmt, jsonLogFmt, textLogFmt = "COLORS", "JSON", "TEXT"
@@ -21,7 +21,7 @@ var (
 
 func newLogHandler(w io.Writer, loggingOff bool, logLevel, logFormat string) slog.Handler {
 	if loggingOff {
-		return slog.NewTextHandler(io.Discard, nil)
+		return slog.DiscardHandler
 	}
 
 	var lvl slog.Level
@@ -48,9 +48,9 @@ func newLogHandler(w io.Writer, loggingOff bool, logLevel, logFormat string) slo
 	case textLogFmt:
 		handler = slog.NewTextHandler(w, &opts)
 	case defaultLogFmt:
-		handler = newTintHandler(w, lvl)
+		handler = newDevslogHandler(w, lvl)
 	default:
-		handler = newTintHandler(w, lvl)
+		handler = newDevslogHandler(w, lvl)
 		slog.Warn("invalid log format, using default",
 			slog.String("input_log_format", logFormat),
 			slog.String("default_log_format", defaultLogFmt),
@@ -60,20 +60,6 @@ func newLogHandler(w io.Writer, loggingOff bool, logLevel, logFormat string) slo
 	return handler
 }
 
-const brightRedANSI = 9
-
-func newTintHandler(w io.Writer, lvl slog.Level) slog.Handler {
-	opts := tint.Options{
-		Level:      lvl,
-		TimeFormat: "2006-01-02T15:04:05.000",
-		ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
-			if a.Value.Kind() == slog.KindAny {
-				if _, ok := a.Value.Any().(error); ok {
-					return tint.Attr(brightRedANSI, a)
-				}
-			}
-			return a
-		},
-	}
-	return tint.NewHandler(w, &opts)
+func newDevslogHandler(w io.Writer, lvl slog.Level) slog.Handler {
+	return devslog.NewHandler(w, &slog.HandlerOptions{Level: lvl})
 }

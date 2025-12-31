@@ -17,7 +17,6 @@ import (
 	"time"
 
 	"github.com/rafaelespinoza/godfish/internal"
-	"github.com/rafaelespinoza/logg"
 )
 
 // CreateMigrationFiles takes care of setting up a new DB migration by
@@ -194,7 +193,7 @@ func runMigration(driver Driver, dir fs.FS, pathToFile string, mig *internal.Mig
 		gerund = "rolling back"
 	}
 
-	lgr := logg.New("", slog.String("path_to_file", pathToFile), slog.String("version", mig.Version.String()))
+	lgr := slog.With(slog.String("path_to_file", pathToFile), slog.String("version", mig.Version.String()))
 	lgr.Info(gerund + " ...")
 	startTime := time.Now()
 
@@ -302,11 +301,16 @@ type migrationFinder struct {
 
 // query returns a list of Migrations to apply.
 func (m *migrationFinder) query(driver Driver) (out []*internal.Migration, err error) {
+	lgr := slog.With(slog.String("func", "(*migrationFinder).query"))
+
 	available, err := m.available()
 	if err != nil {
 		return
 	}
-
+	lgr.Debug("found available migrations",
+		slog.Int("count", len(available)),
+		slog.Any("available", internal.Migrations(available)),
+	)
 	applied, err := scanAppliedVersions(driver, m.dirFS)
 	if err == ErrSchemaMigrationsDoesNotExist {
 		// The next invocation of CreateSchemaMigrationsTable should fix this.
@@ -315,16 +319,29 @@ func (m *migrationFinder) query(driver Driver) (out []*internal.Migration, err e
 	} else if err != nil {
 		return
 	}
+	lgr.Debug("scanned applied migrations",
+		slog.Int("count", len(applied)),
+		slog.Any("applied", internal.Migrations(applied)),
+	)
 	if m.infoPrinter != nil {
 		if err = printMigrations(m.infoPrinter, "up", applied); err != nil {
 			return
 		}
 	}
+	lgr.Debug("about to filter migrations", slog.Group("migration_finder",
+		slog.String("direction", m.direction.String()),
+		slog.String("finish_at_version", m.finishAtVersion),
+	))
 
 	toApply, err := m.filter(applied, available)
 	if err != nil {
 		return
 	}
+	lgr.Debug("filtered migrations toApply", slog.Group("to_apply",
+		slog.Int("count", len(toApply)),
+		slog.Any("vals", internal.Migrations(toApply)),
+	))
+
 	var useDefaultRollbackVersion bool
 	if m.finishAtVersion == "" && m.direction == internal.DirForward {
 		m.finishAtVersion = internal.MaxVersion
@@ -339,8 +356,16 @@ func (m *migrationFinder) query(driver Driver) (out []*internal.Migration, err e
 	if finish, err = internal.ParseVersion(m.finishAtVersion); err != nil {
 		return
 	}
-	for _, mig := range toApply {
+	lgr.Debug("about to collect migrations to apply in a loop",
+		slog.String("finish_at_version", finish.String()),
+		slog.String("direction", m.direction.String()),
+		slog.Bool("use_default_rollback_version", useDefaultRollbackVersion),
+		slog.Int("num_to_apply", len(toApply)),
+	)
+
+	for i, mig := range toApply {
 		version := mig.Version
+		lgr.Debug("considering migration to apply", slog.Int("i", i), slog.String("version", version.String()))
 		if m.direction == internal.DirForward && finish.Before(version) {
 			break
 		}
@@ -352,6 +377,7 @@ func (m *migrationFinder) query(driver Driver) (out []*internal.Migration, err e
 				break
 			}
 		}
+		lgr.Debug("collected migration to apply", slog.Int("i", i), slog.String("version", version.String()))
 		out = append(out, mig)
 	}
 	if m.infoPrinter != nil {
@@ -403,7 +429,7 @@ func scanAppliedVersions(driver Driver, dirFS fs.FS) (out []*internal.Migration,
 	}
 	defer func() {
 		if cerr := rows.Close(); cerr != nil {
-			slog.Warn("closing rows from func scanscanAppliedVersions", slog.Any("error", cerr))
+			slog.Warn("closing rows from func scanAppliedVersions", slog.Any("error", cerr))
 		}
 	}()
 	for rows.Next() {
@@ -413,18 +439,22 @@ func scanAppliedVersions(driver Driver, dirFS fs.FS) (out []*internal.Migration,
 			return
 		}
 		basename, err = figureOutBasename(dirFS, internal.DirForward, version)
+		lgr := slog.With(slog.String("version", version), slog.String("basename", basename))
 		if errors.Is(err, internal.ErrNotFound) {
+			lgr.Warn("scanning applied versions and figuring out basename, swallowing error and continuing", slog.Any("error", err))
 			err = nil // swallow error and continue
 		} else if err != nil {
 			return
 		}
 		mig, err = internal.ParseMigration(internal.Filename(basename))
 		if errors.Is(err, internal.ErrDataInvalid) {
+			lgr.Warn("scanning applied versions and parsing migration basename, swallowing error and continuing", slog.Any("error", err))
 			err = nil // swallow error and continue
 		} else if mig != nil {
 			out = append(out, mig)
 		}
 	}
+
 	return
 }
 

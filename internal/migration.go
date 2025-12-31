@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -63,6 +64,30 @@ func (m *Migration) ToFilename() Filename {
 		m.Indirection,
 		m.Label,
 	)
+}
+
+// LogValue lets *Migration implement the [log/slog.Valuer] interface.
+func (m *Migration) LogValue() slog.Value {
+	ind := m.Indirection
+	ver := m.Version
+
+	return slog.GroupValue(
+		slog.Group("indirection", slog.String("direction", ind.Value.String()), slog.String("label", ind.Label)),
+		slog.String("label", m.Label),
+		slog.Group("version", slog.String("string", ver.String()), slog.Int64("value", ver.Value())),
+	)
+}
+
+// Migrations is a list of *Migrations.
+type Migrations []*Migration
+
+// LogValue lets the list of *Migrations implement the [log/slog.Valuer] interface.
+func (m Migrations) LogValue() slog.Value {
+	vals := make([]slog.Attr, len(m))
+	for i, val := range m {
+		vals[i] = slog.Any(strconv.Itoa(i), val.LogValue())
+	}
+	return slog.GroupValue(vals...)
 }
 
 // MigrationParams collects inputs needed to generate migration files. Setting
