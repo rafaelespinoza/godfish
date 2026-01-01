@@ -1,8 +1,10 @@
 package test
 
 import (
+	"errors"
 	"io/fs"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/rafaelespinoza/godfish"
@@ -11,15 +13,6 @@ import (
 )
 
 func testMigrate(t *testing.T, driver godfish.Driver, queries testdataQueries) {
-	migrationsTableTestCases := []struct {
-		name            string
-		migrationsTable string
-	}{
-		{name: "empty", migrationsTable: ""},
-		{name: internal.DefaultMigrationsTableName, migrationsTable: internal.DefaultMigrationsTableName},
-		{name: "custom", migrationsTable: "custom"},
-	}
-
 	runTest := func(t *testing.T, driver godfish.Driver, dirFS fs.FS, migrationsTable string, expectedVersions []string) {
 		err := godfish.Migrate(driver, dirFS, true, "", migrationsTable)
 		if err != nil {
@@ -55,7 +48,7 @@ func testMigrate(t *testing.T, driver godfish.Driver, queries testdataQueries) {
 			},
 		}
 
-		for _, test := range migrationsTableTestCases {
+		for _, test := range okMigrationsTableTestCases {
 			t.Run(test.name, func(t *testing.T) {
 				path := setup(t, driver, stubs, skipMigration, test.migrationsTable)
 				// Migrating all the way in reverse should also remove these tables. In case
@@ -70,14 +63,43 @@ func testMigrate(t *testing.T, driver godfish.Driver, queries testdataQueries) {
 	})
 
 	t.Run("embedded migrations", func(t *testing.T) {
-		for _, test := range migrationsTableTestCases {
+		subdir := getTestdataSubdir(driver)
+		dirFS, err := fs.Sub(testdata.Migrations, subdir)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		for _, test := range okMigrationsTableTestCases {
 			t.Run(test.name, func(t *testing.T) {
-				subdir := getTestdataSubdir(driver)
-				dirFS, err := fs.Sub(testdata.Migrations, subdir)
-				if err != nil {
-					t.Fatal(err)
-				}
 				runTest(t, driver, dirFS, test.migrationsTable, []string{"1234", "2345", "3456"})
+			})
+		}
+	})
+
+	t.Run("invalid migrations table", func(t *testing.T) {
+		subdir := getTestdataSubdir(driver)
+		dirFS, err := fs.Sub(testdata.Migrations, subdir)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		for _, test := range invalidMigrationsTableTestCases {
+			t.Run(test.name, func(t *testing.T) {
+				// Check that there's a clean slate.
+				appliedVersions := collectAppliedVersions(t, driver, internal.DefaultMigrationsTableName)
+				testAppliedVersions(t, appliedVersions, []string{})
+
+				err := godfish.Migrate(driver, dirFS, true, "", test.migrationsTable)
+				if !errors.Is(err, internal.ErrDataInvalid) {
+					t.Fatalf("expected error (%v) to match %v", err, internal.ErrDataInvalid)
+				}
+				if msg := err.Error(); !strings.Contains(msg, "identifier") {
+					t.Errorf("expected for error message (%q) to mention %q", msg, "identifier")
+				}
+
+				// Check that it didn't try to do something silly, like update another table instead.
+				appliedVersions = collectAppliedVersions(t, driver, internal.DefaultMigrationsTableName)
+				testAppliedVersions(t, appliedVersions, []string{})
 			})
 		}
 	})

@@ -9,6 +9,7 @@ import (
 
 	my "github.com/go-sql-driver/mysql"
 	"github.com/rafaelespinoza/godfish"
+	"github.com/rafaelespinoza/godfish/internal"
 )
 
 // NewDriver creates a new mysql driver.
@@ -72,17 +73,25 @@ func (d *driver) Execute(query string, args ...any) (err error) {
 }
 
 func (d *driver) CreateSchemaMigrationsTable(migrationsTable string) (err error) {
-	_, err = d.connection.Exec(
-		`CREATE TABLE IF NOT EXISTS ` + migrationsTable + ` (
-			migration_id VARCHAR(128) PRIMARY KEY NOT NULL
-		)`)
+	cleanedTableName, err := cleanIdentifier(migrationsTable)
+	if err != nil {
+		return
+	}
+
+	q := `CREATE TABLE IF NOT EXISTS ` + cleanedTableName + ` (migration_id VARCHAR(128) PRIMARY KEY NOT NULL)`
+	_, err = d.connection.Exec(q)
 	return
 }
 
 func (d *driver) AppliedVersions(migrationsTable string) (out godfish.AppliedVersions, err error) {
-	rows, err := d.connection.Query(
-		`SELECT migration_id FROM ` + migrationsTable + ` ORDER BY migration_id ASC`,
-	)
+	cleanedTableName, err := cleanIdentifier(migrationsTable)
+	if err != nil {
+		return
+	}
+
+	// #nosec G202 -- table name was sanitized
+	q := `SELECT migration_id FROM ` + cleanedTableName + ` ORDER BY migration_id ASC`
+	rows, err := d.connection.Query(q)
 	if ierr, ok := err.(*my.MySQLError); ok {
 		// https://dev.mysql.com/doc/refman/8.0/en/server-error-reference.html#error_er_no_such_table
 		if ierr.Number == 1146 {
@@ -94,19 +103,27 @@ func (d *driver) AppliedVersions(migrationsTable string) (out godfish.AppliedVer
 }
 
 func (d *driver) UpdateSchemaMigrations(migrationsTable string, forward bool, version string) (err error) {
+	cleanedTableName, err := cleanIdentifier(migrationsTable)
+	if err != nil {
+		return
+	}
+
 	conn := d.connection
+	var q string
 	if forward {
-		_, err = conn.Exec(`
-			INSERT INTO `+migrationsTable+` (migration_id)
-			VALUES (?)`,
-			version,
-		)
+		// #nosec G202 -- table name was sanitized
+		q = `INSERT INTO ` + cleanedTableName + ` (migration_id) VALUES (?)`
+		_, err = conn.Exec(q, version)
 	} else {
-		_, err = conn.Exec(`
-			DELETE FROM `+migrationsTable+`
-			WHERE migration_id = ?`,
-			version,
-		)
+		// #nosec G202 -- table name was sanitized
+		q = `DELETE FROM ` + cleanedTableName + ` WHERE migration_id = ?`
+		_, err = conn.Exec(q, version)
 	}
 	return
+}
+
+func quotePart(part string) string { return "`" + part + "`" }
+
+func cleanIdentifier(input string) (string, error) {
+	return internal.CleanNamespacedIdentifier(input, quotePart)
 }

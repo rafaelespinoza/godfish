@@ -7,6 +7,7 @@ import (
 
 	"github.com/gocql/gocql"
 	"github.com/rafaelespinoza/godfish"
+	"github.com/rafaelespinoza/godfish/internal"
 )
 
 // NewDriver creates a new cassandra driver.
@@ -65,16 +66,24 @@ func (d *driver) Execute(query string, args ...any) (err error) {
 }
 
 func (d *driver) CreateSchemaMigrationsTable(migrationsTable string) (err error) {
-	err = d.connection.Query(
-		`CREATE TABLE IF NOT EXISTS ` + migrationsTable + ` (migration_id TEXT PRIMARY KEY)`,
-	).Exec()
+	cleanedTableName, err := cleanIdentifier(migrationsTable)
+	if err != nil {
+		return
+	}
+
+	q := `CREATE TABLE IF NOT EXISTS ` + cleanedTableName + ` (migration_id TEXT PRIMARY KEY)`
+	err = d.connection.Query(q).Exec()
 	return
 }
 
 func (d *driver) AppliedVersions(migrationsTable string) (out godfish.AppliedVersions, err error) {
-	query := d.connection.Query(
-		`SELECT migration_id FROM ` + migrationsTable,
-	)
+	cleanedTableName, err := cleanIdentifier(migrationsTable)
+	if err != nil {
+		return
+	}
+
+	q := `SELECT migration_id FROM ` + cleanedTableName
+	query := d.connection.Query(q)
 
 	av := execAllAscending(query)
 
@@ -103,19 +112,25 @@ func (d *driver) AppliedVersions(migrationsTable string) (out godfish.AppliedVer
 }
 
 func (d *driver) UpdateSchemaMigrations(migrationsTable string, forward bool, version string) (err error) {
+	cleanedTableName, err := cleanIdentifier(migrationsTable)
+	if err != nil {
+		return
+	}
+
 	conn := d.connection
+	var q string
 	if forward {
-		err = conn.Query(`
-			INSERT INTO `+migrationsTable+` (migration_id)
-			VALUES (?)`,
-			version,
-		).Exec()
+		q = `INSERT INTO ` + cleanedTableName + ` (migration_id) VALUES (?)`
+		err = conn.Query(q, version).Exec()
 	} else {
-		err = conn.Query(`
-			DELETE FROM `+migrationsTable+`
-			WHERE migration_id = ?`,
-			version,
-		).Exec()
+		q = `DELETE FROM ` + cleanedTableName + ` WHERE migration_id = ?`
+		err = conn.Query(q, version).Exec()
 	}
 	return
+}
+
+func quotePart(part string) string { return `"` + part + `"` }
+
+func cleanIdentifier(input string) (string, error) {
+	return internal.CleanNamespacedIdentifier(input, quotePart)
 }

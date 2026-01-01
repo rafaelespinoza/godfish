@@ -26,15 +26,22 @@ func testApplyMigration(t *testing.T, driver godfish.Driver, queries testdataQue
 		direction internal.Direction
 		// version is where to go when calling ApplyMigration.
 		version string
+		// migrationsTable stores migration state. It could be different from
+		// the migrations table field for test setup in case you want to test
+		// customization.
+		migrationsTable string
 	}
 
 	type expectedOutput struct {
 		// appliedVersions is where you should be after calling
 		// ApplyMigration.
 		appliedVersions []string
+		// migrationsTable names the DB table to check for migration state.
+		migrationsTable string
 		// err says that we expect some error to happen, and the code should
 		// handle it.
-		err bool
+		err            error
+		errMsgContains string
 	}
 
 	type testCase struct {
@@ -52,16 +59,18 @@ func testApplyMigration(t *testing.T, driver godfish.Driver, queries testdataQue
 		pathToFiles := setup(t, driver, setupState.stubs, setupState.migrateTo, setupState.migrationsTable)
 		t.Cleanup(func() { teardown(t, driver, pathToFiles, setupState.migrationsTable, "foos", "bars") })
 
-		err := godfish.ApplyMigration(driver, os.DirFS(pathToFiles), input.direction == internal.DirForward, input.version, setupState.migrationsTable)
-		if err != nil && !expected.err {
-			t.Errorf("could not apply migration; %v", err)
-			return
-		} else if err == nil && expected.err {
-			t.Error("expected error but got none")
-			return
+		err := godfish.ApplyMigration(driver, os.DirFS(pathToFiles), input.direction == internal.DirForward, input.version, input.migrationsTable)
+		if expected.err == nil && err != nil {
+			t.Errorf("unexpected error %v", err)
+		} else if expected.err != nil && err == nil {
+			t.Error("expected an error but got nil")
+		} else if expected.err != nil && err != nil {
+			if msg := err.Error(); !strings.Contains(msg, test.expected.errMsgContains) {
+				t.Errorf("expected error message (%v) to contain %q", msg, test.expected.errMsgContains)
+			}
 		}
 
-		actualVersions := collectAppliedVersions(t, driver, setupState.migrationsTable)
+		actualVersions := collectAppliedVersions(t, driver, expected.migrationsTable)
 		testAppliedVersions(t, actualVersions, expected.appliedVersions)
 	}
 
@@ -88,7 +97,8 @@ func testApplyMigration(t *testing.T, driver godfish.Driver, queries testdataQue
 				input:      testInput{direction: internal.DirForward, version: ""},
 				expected: expectedOutput{
 					appliedVersions: []string{},
-					err:             true, // no version found
+					err:             internal.ErrNotFound, // no version found
+					errMsgContains:  "version",
 				},
 			},
 			{
@@ -97,7 +107,8 @@ func testApplyMigration(t *testing.T, driver godfish.Driver, queries testdataQue
 				input:      testInput{direction: internal.DirReverse, version: ""},
 				expected: expectedOutput{
 					appliedVersions: []string{},
-					err:             true, // no version found
+					err:             internal.ErrNotFound, // no version found
+					errMsgContains:  "version",
 				},
 			},
 		}
@@ -121,7 +132,8 @@ func testApplyMigration(t *testing.T, driver godfish.Driver, queries testdataQue
 				input:      testInput{direction: internal.DirReverse, version: ""},
 				expected: expectedOutput{
 					appliedVersions: []string{},
-					err:             true, // no version found
+					err:             internal.ErrNotFound, // no version found
+					errMsgContains:  "version",
 				},
 			},
 		}
@@ -156,7 +168,8 @@ func testApplyMigration(t *testing.T, driver godfish.Driver, queries testdataQue
 					input:      testInput{direction: internal.DirForward, version: ""},
 					expected: expectedOutput{
 						appliedVersions: []string{"12340102030405", "23450102030405", "34560102030405"},
-						err:             true, // no version found
+						err:             internal.ErrNotFound, // no version found
+						errMsgContains:  "version",
 					},
 				},
 			}
@@ -212,7 +225,8 @@ func testApplyMigration(t *testing.T, driver godfish.Driver, queries testdataQue
 					},
 					expected: expectedOutput{
 						appliedVersions: []string{"12340102030405"},
-						err:             true, // no version found
+						err:             internal.ErrNotFound, // no version found
+						errMsgContains:  "version",
 					},
 				},
 				{
@@ -276,7 +290,8 @@ func testApplyMigration(t *testing.T, driver godfish.Driver, queries testdataQue
 				input:      testInput{direction: internal.DirForward, version: "43210102030405"},
 				expected: expectedOutput{
 					appliedVersions: []string{"12340102030405", "23450102030405", "34560102030405"},
-					err:             true, // no files found
+					err:             internal.ErrNotFound, // no files found
+					errMsgContains:  "file",
 				},
 			},
 			{
@@ -285,7 +300,8 @@ func testApplyMigration(t *testing.T, driver godfish.Driver, queries testdataQue
 				input:      testInput{direction: internal.DirReverse, version: "43210102030405"},
 				expected: expectedOutput{
 					appliedVersions: []string{"12340102030405", "23450102030405", "34560102030405"},
-					err:             true, // no files found
+					err:             internal.ErrNotFound, // no files found
+					errMsgContains:  "file",
 				},
 			},
 			{
@@ -294,7 +310,8 @@ func testApplyMigration(t *testing.T, driver godfish.Driver, queries testdataQue
 				input:      testInput{direction: internal.DirReverse, version: "34560102030405"},
 				expected: expectedOutput{
 					appliedVersions: []string{"12340102030405", "23450102030405", "34560102030405"},
-					err:             true, // no files found
+					err:             internal.ErrNotFound, // no files found
+					errMsgContains:  "file",
 				},
 			},
 			{
@@ -303,7 +320,8 @@ func testApplyMigration(t *testing.T, driver godfish.Driver, queries testdataQue
 				input:      testInput{direction: internal.DirReverse, version: "12340102030405"},
 				expected: expectedOutput{
 					appliedVersions: []string{"12340102030405", "23450102030405", "34560102030405"},
-					err:             true, // no files found
+					err:             internal.ErrNotFound, // no files found
+					errMsgContains:  "file",
 				},
 			},
 		}
@@ -333,7 +351,8 @@ func testApplyMigration(t *testing.T, driver godfish.Driver, queries testdataQue
 			},
 			expected: expectedOutput{
 				appliedVersions: []string{"12340102030405", "23450102030405", "34560102030405"},
-				err:             true, // error executing SQL
+				err:             internal.ErrExecutingMigration, // error executing SQL
+				errMsgContains:  "path_to_file",
 			},
 		})
 	})
@@ -408,7 +427,8 @@ func testApplyMigration(t *testing.T, driver godfish.Driver, queries testdataQue
 				input: testInput{direction: internal.DirForward, version: "12340102030405"},
 				expected: expectedOutput{
 					appliedVersions: []string{},
-					err:             true,
+					err:             internal.ErrExecutingMigration, // error executing SQL
+					errMsgContains:  "path_to_file",
 				},
 			},
 		}
@@ -477,18 +497,56 @@ func testApplyMigration(t *testing.T, driver godfish.Driver, queries testdataQue
 		}
 	})
 
-	t.Run("migration table", func(t *testing.T) {
+	t.Run("ok migrations table", func(t *testing.T) {
+		const table = "custom_schema_migrations"
 		runTest(t, testCase{
 			name: "custom",
 			setupState: testSetupState{
 				migrateTo:       "23450102030405",
 				stubs:           defaultStubs,
-				migrationsTable: "custom_schema_migrations",
+				migrationsTable: table,
 			},
-			input: testInput{direction: internal.DirForward, version: "34560102030405"},
+			input: testInput{direction: internal.DirForward, version: "34560102030405", migrationsTable: table},
 			expected: expectedOutput{
 				appliedVersions: []string{"12340102030405", "23450102030405", "34560102030405"},
+				migrationsTable: table,
 			},
 		})
+	})
+
+	t.Run("invalid migrations table", func(t *testing.T) {
+		// okTable is a valid DB table name and is checked for unintended side effects.
+		const okTable = internal.DefaultMigrationsTableName
+
+		for _, test := range invalidMigrationsTableTestCases {
+			t.Run(test.name, func(t *testing.T) {
+				// Check that there's a clean slate.
+				appliedVersions := collectAppliedVersions(t, driver, okTable)
+				testAppliedVersions(t, appliedVersions, []string{})
+
+				// // Check that it didn't try to do something silly, like update another table instead.
+				// appliedVersions = collectAppliedVersions(t, driver, internal.DefaultMigrationsTableName)
+				// testAppliedVersions(t, appliedVersions, []string{})
+				runTest(t, testCase{
+					setupState: testSetupState{
+						migrateTo:       skipMigration,
+						stubs:           defaultStubs,
+						migrationsTable: okTable,
+					},
+					input: testInput{
+						direction:       internal.DirForward,
+						version:         "12340102030405",
+						migrationsTable: test.migrationsTable,
+					},
+					expected: expectedOutput{
+						appliedVersions: []string{},
+						// Check that it didn't try to do something silly, like update another table instead
+						migrationsTable: okTable,
+						err:             internal.ErrDataInvalid,
+						errMsgContains:  "identifier",
+					},
+				})
+			})
+		}
 	})
 }

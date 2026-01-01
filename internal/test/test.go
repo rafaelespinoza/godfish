@@ -25,6 +25,7 @@ func RunDriverTests(t *testing.T, d godfish.Driver) {
 	t.Run("Migrate", func(t *testing.T) { testMigrate(t, d, q) })
 	t.Run("Info", func(t *testing.T) { testInfo(t, d, q) })
 	t.Run("ApplyMigration", func(t *testing.T) { testApplyMigration(t, d, q) })
+	t.Run("UpdateSchemaMigrations", func(t *testing.T) { testUpdateSchemaMigrations(t, d) })
 }
 
 // testdataQueries are named DB testdataQueries to use in the tests.
@@ -318,3 +319,21 @@ func testAppliedVersions(t *testing.T, actual, expected []string) {
 		}
 	}
 }
+
+type migrationsTableTestCase struct{ name, migrationsTable string }
+
+var (
+	okMigrationsTableTestCases = []migrationsTableTestCase{
+		{name: "empty", migrationsTable: ""},
+		{name: internal.DefaultMigrationsTableName, migrationsTable: internal.DefaultMigrationsTableName},
+		{name: "custom", migrationsTable: "custom"},
+	}
+
+	invalidMigrationsTableTestCases = []migrationsTableTestCase{
+		{name: "too many dots", migrationsTable: `too.many.dots`},
+		{name: "injection - comment", migrationsTable: `foobars; --`},
+		{name: "injection - query", migrationsTable: `foobars' OR '1'='1`},
+		{name: "starts with number", migrationsTable: `123bad`},
+		{name: "invalid characters", migrationsTable: "foo\x00_bar"},
+	}
+)

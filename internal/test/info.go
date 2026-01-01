@@ -2,8 +2,10 @@ package test
 
 import (
 	"bytes"
+	"errors"
 	"io/fs"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/rafaelespinoza/godfish"
@@ -12,15 +14,6 @@ import (
 )
 
 func testInfo(t *testing.T, driver godfish.Driver, queries testdataQueries) {
-	migrationsTableTestCases := []struct {
-		name            string
-		migrationsTable string
-	}{
-		{name: "empty", migrationsTable: ""},
-		{name: internal.DefaultMigrationsTableName, migrationsTable: internal.DefaultMigrationsTableName},
-		{name: "custom", migrationsTable: "custom"},
-	}
-
 	t.Run("migrations on filesystem", func(t *testing.T) {
 		stubs := []testDriverStub{
 			{
@@ -37,7 +30,7 @@ func testInfo(t *testing.T, driver godfish.Driver, queries testdataQueries) {
 			},
 		}
 
-		for _, test := range migrationsTableTestCases {
+		for _, test := range okMigrationsTableTestCases {
 			t.Run(test.name, func(t *testing.T) {
 				path := setup(t, driver, stubs, "34560102030405", test.migrationsTable)
 				t.Cleanup(func() { teardown(t, driver, path, test.migrationsTable, "foos", "bars") })
@@ -68,14 +61,14 @@ func testInfo(t *testing.T, driver godfish.Driver, queries testdataQueries) {
 	})
 
 	t.Run("embedded", func(t *testing.T) {
-		for _, test := range migrationsTableTestCases {
-			t.Run(test.name, func(t *testing.T) {
-				subdir := getTestdataSubdir(driver)
-				dirFS, err := fs.Sub(testdata.Migrations, subdir)
-				if err != nil {
-					t.Fatal(err)
-				}
+		subdir := getTestdataSubdir(driver)
+		dirFS, err := fs.Sub(testdata.Migrations, subdir)
+		if err != nil {
+			t.Fatal(err)
+		}
 
+		for _, test := range okMigrationsTableTestCases {
+			t.Run(test.name, func(t *testing.T) {
 				var buf bytes.Buffer
 				if err = godfish.Info(driver, dirFS, true, "", &buf, "json", test.migrationsTable); err != nil {
 					t.Fatal(err)
@@ -86,6 +79,26 @@ func testInfo(t *testing.T, driver godfish.Driver, queries testdataQueries) {
 					t.Fatal(err)
 				}
 				t.Log(buf.String())
+			})
+		}
+	})
+
+	t.Run("invalid migrations table", func(t *testing.T) {
+		subdir := getTestdataSubdir(driver)
+		dirFS, err := fs.Sub(testdata.Migrations, subdir)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		for _, test := range invalidMigrationsTableTestCases {
+			t.Run(test.name, func(t *testing.T) {
+				err = godfish.Info(driver, dirFS, true, "", nil, "json", test.migrationsTable)
+				if !errors.Is(err, internal.ErrDataInvalid) {
+					t.Fatalf("expected error (%v) to match %v", err, internal.ErrDataInvalid)
+				}
+				if msg := err.Error(); !strings.Contains(msg, "identifier") {
+					t.Errorf("expected for error message (%q) to mention %q", msg, "identifier")
+				}
 			})
 		}
 	})

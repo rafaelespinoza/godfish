@@ -211,7 +211,7 @@ func runMigration(driver Driver, dir fs.FS, pathToFile string, mig *internal.Mig
 	startTime := time.Now()
 
 	if err = driver.Execute(string(data)); err != nil {
-		err = fmt.Errorf("%w, path_to_file: %q", err, pathToFile)
+		err = fmt.Errorf("%w; path_to_file: %s; %w", internal.ErrExecutingMigration, pathToFile, err)
 		lgr.Error("executing migration", slog.Any("error", err), makeDurationMSAttr(startTime))
 		return
 	}
