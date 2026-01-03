@@ -57,10 +57,7 @@ func (d *driver) CreateSchemaMigrationsTable(migrationsTable string) (err error)
 		return
 	}
 
-	// #nosec G202 -- table name was sanitized
-	q := `IF NOT EXISTS (
-		SELECT 1 FROM information_schema.tables WHERE table_schema = (SELECT schema_name()) AND table_name = @p1
-	)
+	q := `IF OBJECT_ID(@p1, 'U') IS NULL
 	CREATE TABLE ` + cleanedTableName + ` (migration_id VARCHAR(128) PRIMARY KEY NOT NULL)`
 
 	_, err = d.connection.Exec(q, cleanedTableName)
