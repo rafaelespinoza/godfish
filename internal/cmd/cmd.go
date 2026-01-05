@@ -2,10 +2,13 @@
 package cmd
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
+	"io/fs"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -125,23 +128,17 @@ Examples:
 			handler := newLogHandler(os.Stderr, loggingOff, logLevel, logFormat)
 			slog.SetDefault(slog.New(handler))
 
+			pathToConfig = filepath.Clean(pathToConfig)
 			slog.Debug("cmd: before loading config file", slog.String("path_to_config", pathToConfig), slog.Any("common_args", commonArgs))
 
 			// Look for config file and if present, merge those values with
 			// input flag values.
-			var conf internal.Config
-			if data, ierr := os.ReadFile(filepath.Clean(pathToConfig)); ierr != nil {
-				// probably no config file present, rely on arguments instead.
-			} else if ierr = json.Unmarshal(data, &conf); ierr != nil {
-				return ierr
+			dir := filepath.Dir(pathToConfig)
+			conf, err := loadConfig(os.DirFS(dir), filepath.Base(pathToConfig))
+			if err != nil {
+				return err
 			}
-			if commonArgs.Files == "" && conf.PathToFiles != "" {
-				commonArgs.Files = conf.PathToFiles
-			}
-
-			// Subcommands may override these with their own flags.
-			commonArgs.DefaultFwdLabel = conf.ForwardLabel
-			commonArgs.DefaultRevLabel = conf.ReverseLabel
+			commonArgs = resolveConfig(rootFlags, commonArgs, conf)
 
 			slog.Debug("cmd: after loading config file", slog.Any("conf", conf))
 
@@ -188,4 +185,61 @@ func newFlagSet(name string) (out *flag.FlagSet) {
 func printFlagDefaults(f *flag.FlagSet) {
 	_, _ = fmt.Fprintf(f.Output(), "\n%s flags:\n\n", f.Name())
 	f.PrintDefaults()
+}
+
+var errReadConfig = errors.New("reading config file")
+
+// loadConfig reads a configuration file and parses its contents. If the file is
+// not found, then it returns a zero value configuration without any error.
+func loadConfig(fsys fs.FS, basename string) (conf internal.Config, err error) {
+	var data []byte
+	if data, err = fs.ReadFile(fsys, basename); errors.Is(err, fs.ErrNotExist) {
+		// Probably no config file present. That's ok.
+		slog.Debug("cmd: attempted to read config file, relying on arguments instead", slog.Any("error", err), slog.String("filename", basename))
+		err = nil // Zero everything out and have the caller continue on.
+		return
+	} else if err != nil {
+		err = fmt.Errorf("%w %s: %w", errReadConfig, basename, err)
+		return
+	}
+
+	if err = json.Unmarshal(data, &conf); err != nil {
+		err = fmt.Errorf("%w, parsing config data from file %q: %w", internal.ErrDataInvalid, basename, err)
+	}
+	return
+}
+
+// resolveConfig reconciles configuration values, preferring values passed by
+// CLI flag over values set in the configuration file.
+func resolveConfig(flags *flag.FlagSet, curr commonArguments, conf internal.Config) (next commonArguments) {
+	next = curr
+
+	next.Files = resolveConfigVal(flags, "files", conf.PathToFiles, curr.Files)
+
+	// Subcommands may override these with their own flags.
+	next.DefaultFwdLabel = cmp.Or(next.DefaultFwdLabel, conf.ForwardLabel)
+	next.DefaultRevLabel = cmp.Or(next.DefaultRevLabel, conf.ReverseLabel)
+	return
+}
+
+// resolveConfigVal sets a configuration value with this priority (lowest to highest):
+//
+//  1. defaultVal (lowest priority)
+//  2. valFromConf
+//  3. value from flag (highest priority)
+func resolveConfigVal(flags *flag.FlagSet, targetFlagName, valFromConf, defaultVal string) string {
+	out := defaultVal
+
+	if valFromConf != "" {
+		out = valFromConf
+	}
+
+	// Was this flag set? If so, use the corresponding value.
+	flags.Visit(func(f *flag.Flag) {
+		if f.Name == targetFlagName {
+			out = f.Value.String()
+		}
+	})
+
+	return out
 }

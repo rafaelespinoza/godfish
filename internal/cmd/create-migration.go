@@ -15,6 +15,8 @@ func makeCreateMigration(subcmdName string) alf.Directive {
 	const fwdlabelFlagname, revlabelFlagname = "fwdlabel", "revlabel"
 	var migrationName, fwdlabelValue, revlabelValue string
 	var reversible bool
+	defaultFwdlabelVal := internal.ForwardDirections[0]
+	defaultRevlabelVal := internal.ReverseDirections[0]
 
 	// Other subcommands scope the flagset within the Setup func. However, this
 	// one is scoped up here to check if some flags were specified at runtime.
@@ -38,13 +40,13 @@ func makeCreateMigration(subcmdName string) alf.Directive {
 			flags.StringVar(
 				&fwdlabelValue,
 				fwdlabelFlagname,
-				internal.ForwardDirections[0],
+				defaultFwdlabelVal,
 				"customize the directional part of the filename for forward migration",
 			)
 			flags.StringVar(
 				&revlabelValue,
 				revlabelFlagname,
-				internal.ReverseDirections[0],
+				defaultRevlabelVal,
 				"customize the directional part of the filename for reverse migration",
 			)
 			flags.Usage = func() {
@@ -62,7 +64,8 @@ func makeCreateMigration(subcmdName string) alf.Directive {
 `,
 					bin, subcmdName, subcmdName, internal.TimeFormat,
 					fwdlabelFlagname, revlabelFlagname,
-					strings.Join(internal.ForwardDirections, ", "), strings.Join(internal.ReverseDirections, ", "),
+					strings.Join(internal.ForwardDirections, ", "),
+					strings.Join(internal.ReverseDirections, ", "),
 				)
 				printFlagDefaults(&p)
 				printFlagDefaults(flags)
@@ -70,26 +73,9 @@ func makeCreateMigration(subcmdName string) alf.Directive {
 			return flags
 		},
 		Run: func(_ context.Context) error {
-			// Allow this subcommand's flags to override names for directional
-			// part of the filename. But allow for the configuration file to
-			// have a say if the flag wasn't passed in at runtime.
-			var passedFwd, passedRev bool
-			flags.Visit(func(f *flag.Flag) {
-				switch f.Name {
-				case fwdlabelFlagname:
-					passedFwd = true
-				case revlabelFlagname:
-					passedRev = true
-				default:
-					break
-				}
-			})
-			if !passedFwd && commonArgs.DefaultFwdLabel != "" {
-				fwdlabelValue = commonArgs.DefaultFwdLabel
-			}
-			if !passedRev && commonArgs.DefaultRevLabel != "" {
-				revlabelValue = commonArgs.DefaultRevLabel
-			}
+			fwdlabelFromConfig, revlabelFromConfig := commonArgs.DefaultFwdLabel, commonArgs.DefaultRevLabel
+			fwdlabelValue = resolveConfigVal(flags, fwdlabelFlagname, fwdlabelFromConfig, defaultFwdlabelVal)
+			revlabelValue = resolveConfigVal(flags, revlabelFlagname, revlabelFromConfig, defaultRevlabelVal)
 
 			return godfish.CreateMigrationFiles(migrationName, reversible, commonArgs.Files, fwdlabelValue, revlabelValue)
 		},
