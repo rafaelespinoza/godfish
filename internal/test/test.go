@@ -2,6 +2,7 @@
 package test
 
 import (
+	"cmp"
 	"fmt"
 	"io/fs"
 	"log/slog"
@@ -24,6 +25,7 @@ func RunDriverTests(t *testing.T, d godfish.Driver) {
 	t.Run("Migrate", func(t *testing.T) { testMigrate(t, d, q) })
 	t.Run("Info", func(t *testing.T) { testInfo(t, d, q) })
 	t.Run("ApplyMigration", func(t *testing.T) { testApplyMigration(t, d, q) })
+	t.Run("UpdateSchemaMigrations", func(t *testing.T) { testUpdateSchemaMigrations(t, d) })
 }
 
 // testdataQueries are named DB testdataQueries to use in the tests.
@@ -112,7 +114,7 @@ const (
 )
 
 // setup prepares state before running a test.
-func setup(t *testing.T, driver godfish.Driver, stubs []testDriverStub, migrateTo string) (path string) {
+func setup(t *testing.T, driver godfish.Driver, stubs []testDriverStub, migrateTo string, migrationsTable string) (path string) {
 	t.Helper()
 
 	path = t.TempDir()
@@ -120,7 +122,7 @@ func setup(t *testing.T, driver godfish.Driver, stubs []testDriverStub, migrateT
 	generateMigrationFiles(t, path, stubs)
 
 	if migrateTo != skipMigration {
-		err := godfish.Migrate(driver, os.DirFS(path), true, migrateTo)
+		err := godfish.Migrate(driver, os.DirFS(path), true, migrateTo, migrationsTable)
 		if err != nil {
 			t.Fatalf("Migrate failed during setup: %v", err)
 		}
@@ -130,8 +132,10 @@ func setup(t *testing.T, driver godfish.Driver, stubs []testDriverStub, migrateT
 }
 
 // teardown clears state after running a test.
-func teardown(t *testing.T, driver godfish.Driver, path string, tablesToDrop ...string) {
+func teardown(t *testing.T, driver godfish.Driver, path string, migrationsTable string, tablesToDrop ...string) {
 	t.Helper()
+
+	migrationsTable = cmp.Or(migrationsTable, internal.DefaultMigrationsTableName)
 
 	var err error
 	if err = driver.Connect(mustDSN()); err != nil {
@@ -148,11 +152,11 @@ func teardown(t *testing.T, driver godfish.Driver, path string, tablesToDrop ...
 	switch driver.Name() {
 	case "stub":
 		stub.Teardown(driver)
-		truncate = `TRUNCATE TABLE schema_migrations`
+		truncate = `TRUNCATE TABLE ` + migrationsTable
 	case "sqlite", "sqlite3":
-		truncate = `DELETE FROM schema_migrations`
+		truncate = `DELETE FROM ` + migrationsTable
 	default:
-		truncate = `TRUNCATE TABLE schema_migrations`
+		truncate = `TRUNCATE TABLE ` + migrationsTable
 	}
 	if err = driver.Execute(truncate); err != nil {
 		t.Fatalf("error executing query (%q) in teardown: %v", truncate, err)
@@ -259,8 +263,10 @@ func newMigrationStub(mig internal.Migration, version internal.Version, ind inte
 // than when the caller test is complete. This approach helps ensure fewer
 // bugs in test support code, especially when it's called multiple times from
 // the same test.
-func collectAppliedVersions(t *testing.T, driver godfish.Driver) (out []string) {
+func collectAppliedVersions(t *testing.T, driver godfish.Driver, migrationsTable string) (out []string) {
 	t.Helper()
+
+	migrationsTable = cmp.Or(migrationsTable, internal.DefaultMigrationsTableName)
 
 	// Collect output of AppliedVersions.
 	// Reconnect here because ApplyMigration closes the connection.
@@ -273,7 +279,7 @@ func collectAppliedVersions(t *testing.T, driver godfish.Driver) (out []string) 
 		}
 	}()
 
-	appliedVersions, err := driver.AppliedVersions()
+	appliedVersions, err := driver.AppliedVersions(migrationsTable)
 	if err != nil {
 		t.Fatalf("could not retrieve applied versions; %v", err)
 	}
@@ -313,3 +319,21 @@ func testAppliedVersions(t *testing.T, actual, expected []string) {
 		}
 	}
 }
+
+type migrationsTableTestCase struct{ name, migrationsTable string }
+
+var (
+	okMigrationsTableTestCases = []migrationsTableTestCase{
+		{name: "empty", migrationsTable: ""},
+		{name: internal.DefaultMigrationsTableName, migrationsTable: internal.DefaultMigrationsTableName},
+		{name: "custom", migrationsTable: "custom"},
+	}
+
+	invalidMigrationsTableTestCases = []migrationsTableTestCase{
+		{name: "too many dots", migrationsTable: `too.many.dots`},
+		{name: "injection - comment", migrationsTable: `foobars; --`},
+		{name: "injection - query", migrationsTable: `foobars' OR '1'='1`},
+		{name: "starts with number", migrationsTable: `123bad`},
+		{name: "invalid characters", migrationsTable: "foo\x00_bar"},
+	}
+)

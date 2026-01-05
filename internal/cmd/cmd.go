@@ -59,11 +59,11 @@ func New(driver godfish.Driver, sampleDSN string) Root {
 Description:
 
 	godfish is a database migration manager. It tracks the status of migrations
-	by recording a timestamp in a table called "schema_migrations" in the
-	"migration_id" column. Those timestamps correspond to SQL migration files
-	that you write and store somewhere on the filesystem. You need to configure
-	the path to the SQL migration files as well as the name of the driver to use
-	(ie: postgres, mysql, potato, potato).
+	by recording a timestamp in a table, by default called %q,
+	in the "migration_id" column. Those timestamps correspond to SQL migration
+	files that you write and store somewhere on the filesystem. You need to
+	configure the path to the SQL migration files as well as the name of the driver
+	to use (ie: postgres, mysql, potato, potato).
 
 	Configuration options are set with flags or with a configuration file. Options
 	specified via flags will take precedence over the config file.
@@ -77,7 +77,7 @@ Description:
 
 	The following flags should go before the command.
 `,
-			bin, internal.DSNKey, sampleDSN)
+			bin, internal.DefaultMigrationsTableName, internal.DSNKey, sampleDSN)
 		printFlagDefaults(rootFlags)
 		_, _ = fmt.Fprintf(
 			rootFlags.Output(), `
@@ -116,6 +116,12 @@ Examples:
 		"dsn",
 		"",
 		fmt.Sprintf("database DSN, if empty then fallback to environment variable %s", internal.DSNKey),
+	)
+	rootFlags.StringVar(
+		&commonArgs.MigrationsTable,
+		"migrations-table",
+		internal.DefaultMigrationsTableName,
+		"name of DB table for storing migration state",
 	)
 	rootFlags.BoolVar(&loggingOff, "q", false, "if true, then all logging is effectively off")
 	rootFlags.StringVar(&logLevel, "loglevel", defaultLoggingLevel.String(), fmt.Sprintf("minimum severity for which to log events, should be one of %q", validLoggingLevels))
@@ -162,6 +168,7 @@ type commonArguments struct {
 	Files                            string
 	DataSourceName                   string
 	DefaultFwdLabel, DefaultRevLabel string
+	MigrationsTable                  string
 }
 
 // LogValue lets this type implement the [slog.LogValuer] interface.
@@ -171,6 +178,7 @@ func (c commonArguments) LogValue() slog.Value {
 		slog.String("data_source_name", c.DataSourceName),
 		slog.String("default_fwd_label", c.DefaultFwdLabel),
 		slog.String("default_rev_label", c.DefaultRevLabel),
+		slog.String("migrations_table", c.MigrationsTable),
 	)
 }
 
@@ -215,6 +223,7 @@ func resolveConfig(flags *flag.FlagSet, curr commonArguments, conf internal.Conf
 	next = curr
 
 	next.Files = resolveConfigVal(flags, "files", conf.PathToFiles, curr.Files)
+	next.MigrationsTable = resolveConfigVal(flags, "migrations-table", conf.MigrationsTable, internal.DefaultMigrationsTableName)
 
 	// Subcommands may override these with their own flags.
 	next.DefaultFwdLabel = cmp.Or(next.DefaultFwdLabel, conf.ForwardLabel)

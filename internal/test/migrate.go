@@ -1,8 +1,10 @@
 package test
 
 import (
+	"errors"
 	"io/fs"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/rafaelespinoza/godfish"
@@ -11,21 +13,21 @@ import (
 )
 
 func testMigrate(t *testing.T, driver godfish.Driver, queries testdataQueries) {
-	runTest := func(t *testing.T, driver godfish.Driver, dirFS fs.FS, expectedVersions []string) {
-		err := godfish.Migrate(driver, dirFS, true, "")
+	runTest := func(t *testing.T, driver godfish.Driver, dirFS fs.FS, migrationsTable string, expectedVersions []string) {
+		err := godfish.Migrate(driver, dirFS, true, "", migrationsTable)
 		if err != nil {
 			t.Fatalf("could not Migrate in %s Direction; %v", internal.DirForward, err)
 		}
 
-		appliedVersions := collectAppliedVersions(t, driver)
+		appliedVersions := collectAppliedVersions(t, driver, migrationsTable)
 		testAppliedVersions(t, appliedVersions, expectedVersions)
 
-		err = godfish.Migrate(driver, dirFS, false, expectedVersions[0])
+		err = godfish.Migrate(driver, dirFS, false, expectedVersions[0], migrationsTable)
 		if err != nil {
 			t.Fatalf("could not Migrate in %s Direction; %v", internal.DirReverse, err)
 		}
 
-		appliedVersions = collectAppliedVersions(t, driver)
+		appliedVersions = collectAppliedVersions(t, driver, migrationsTable)
 		expectedVersions = []string{}
 		testAppliedVersions(t, appliedVersions, expectedVersions)
 	}
@@ -46,14 +48,18 @@ func testMigrate(t *testing.T, driver godfish.Driver, queries testdataQueries) {
 			},
 		}
 
-		path := setup(t, driver, stubs, skipMigration)
-		// Migrating all the way in reverse should also remove these tables
-		// teardown. In case it doesn't, teardown tables anyways so it's less likely
-		// to affect other tests.
-		t.Cleanup(func() { teardown(t, driver, path, "foos", "bars") })
+		for _, test := range okMigrationsTableTestCases {
+			t.Run(test.name, func(t *testing.T) {
+				path := setup(t, driver, stubs, skipMigration, test.migrationsTable)
+				// Migrating all the way in reverse should also remove these tables. In case
+				// it doesn't, teardown tables anyways to make this test less likely to
+				// affect other tests.
+				t.Cleanup(func() { teardown(t, driver, path, test.migrationsTable, "foos", "bars") })
 
-		expectedVersions := []string{"12340102030405", "23450102030405", "34560102030405"}
-		runTest(t, driver, os.DirFS(path), expectedVersions)
+				expectedVersions := []string{"12340102030405", "23450102030405", "34560102030405"}
+				runTest(t, driver, os.DirFS(path), test.migrationsTable, expectedVersions)
+			})
+		}
 	})
 
 	t.Run("embedded migrations", func(t *testing.T) {
@@ -62,6 +68,39 @@ func testMigrate(t *testing.T, driver godfish.Driver, queries testdataQueries) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		runTest(t, driver, dirFS, []string{"1234", "2345", "3456"})
+
+		for _, test := range okMigrationsTableTestCases {
+			t.Run(test.name, func(t *testing.T) {
+				runTest(t, driver, dirFS, test.migrationsTable, []string{"1234", "2345", "3456"})
+			})
+		}
+	})
+
+	t.Run("invalid migrations table", func(t *testing.T) {
+		subdir := getTestdataSubdir(driver)
+		dirFS, err := fs.Sub(testdata.Migrations, subdir)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		for _, test := range invalidMigrationsTableTestCases {
+			t.Run(test.name, func(t *testing.T) {
+				// Check that there's a clean slate.
+				appliedVersions := collectAppliedVersions(t, driver, internal.DefaultMigrationsTableName)
+				testAppliedVersions(t, appliedVersions, []string{})
+
+				err := godfish.Migrate(driver, dirFS, true, "", test.migrationsTable)
+				if !errors.Is(err, internal.ErrDataInvalid) {
+					t.Fatalf("expected error (%v) to match %v", err, internal.ErrDataInvalid)
+				}
+				if msg := err.Error(); !strings.Contains(msg, "identifier") {
+					t.Errorf("expected for error message (%q) to mention %q", msg, "identifier")
+				}
+
+				// Check that it didn't try to do something silly, like update another table instead.
+				appliedVersions = collectAppliedVersions(t, driver, internal.DefaultMigrationsTableName)
+				testAppliedVersions(t, appliedVersions, []string{})
+			})
+		}
 	})
 }

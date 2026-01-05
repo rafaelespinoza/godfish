@@ -14,11 +14,11 @@ type Driver interface {
 	// versions that have been executed against the database. If the schema
 	// migrations table does not exist, the returned error should be
 	// ErrSchemaMigrationsDoesNotExist.
-	AppliedVersions() (AppliedVersions, error)
+	AppliedVersions(migrationsTable string) (AppliedVersions, error)
 	// CreateSchemaMigrationsTable should create a table to record migration
 	// versions once they've been applied. The version should be a timestamp as
 	// a string, formatted as the TimeFormat variable in this package.
-	CreateSchemaMigrationsTable() error
+	CreateSchemaMigrationsTable(migrationsTable string) error
 	// Execute runs the schema change and commits it to the database. The query
 	// parameter is a SQL string and may contain placeholders for the values in
 	// args. Input should be passed to conn so it could be sanitized, escaped.
@@ -26,7 +26,7 @@ type Driver interface {
 	// UpdateSchemaMigrations records a timestamped version of a migration that
 	// has been successfully applied by adding a new row to the schema
 	// migrations table.
-	UpdateSchemaMigrations(forward bool, version string) error
+	UpdateSchemaMigrations(migrationsTable string, forward bool, version string) error
 }
 
 // AppliedVersions represents an iterative list of migrations that have been run

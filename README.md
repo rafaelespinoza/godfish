@@ -72,9 +72,10 @@ ${direction}-${version}-${name}.sql
 
 There is an implicit ordering to migrations, denoted by the "version", where
 subsequent migrations may build upon the shape created by preceding migrations.
-When a migration is successfully applied, a new row in the `schema_migrations`
-table is inserted. A migration that has not yet been applied will be a file in
-the directory, but without a corresponding entry in the DB table.
+When a migration is successfully applied, a new row is inserted into the schema
+migrations table. By default its name is `schema_migrations`. A migration
+that has not yet been applied will be a file in the directory, but without a
+corresponding entry in the DB table.
 
 ## usage
 

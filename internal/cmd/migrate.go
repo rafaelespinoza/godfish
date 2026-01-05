@@ -49,6 +49,7 @@ func makeMigrate(name string) alf.Directive {
 				dirFS,
 				true,
 				version,
+				commonArgs.MigrationsTable,
 			)
 			return err
 		},
@@ -77,11 +78,12 @@ func makeRemigrate(name string) alf.Directive {
 		},
 		Run: func(_ context.Context) error {
 			dirFS := os.DirFS(commonArgs.Files)
-			err := godfish.ApplyMigration(theDriver, dirFS, false, "")
+			migrationsTable := commonArgs.MigrationsTable
+			err := godfish.ApplyMigration(theDriver, dirFS, false, "", migrationsTable)
 			if err != nil {
 				return err
 			}
-			return godfish.ApplyMigration(theDriver, dirFS, true, "")
+			return godfish.ApplyMigration(theDriver, dirFS, true, "", migrationsTable)
 		},
 	}
 }
@@ -119,6 +121,7 @@ func makeRollback(name string) alf.Directive {
 		Run: func(_ context.Context) error {
 			var err error
 			dirFS := os.DirFS(commonArgs.Files)
+			migrationsTable := commonArgs.MigrationsTable
 
 			if version == "" {
 				err = godfish.ApplyMigration(
@@ -126,6 +129,7 @@ func makeRollback(name string) alf.Directive {
 					dirFS,
 					false,
 					version,
+					migrationsTable,
 				)
 			} else {
 				err = godfish.Migrate(
@@ -133,6 +137,7 @@ func makeRollback(name string) alf.Directive {
 					dirFS,
 					false,
 					version,
+					migrationsTable,
 				)
 			}
 			return err

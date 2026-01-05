@@ -1,3 +1,4 @@
+// Package sqlserver provides a [godfish.Driver] for sqlserver databases.
 package sqlserver
 
 import (
@@ -7,6 +8,7 @@ import (
 
 	mssql "github.com/microsoft/go-mssqldb"
 	"github.com/rafaelespinoza/godfish"
+	"github.com/rafaelespinoza/godfish/internal"
 )
 
 // NewDriver creates a new Microsoft SQL Server driver.
@@ -49,43 +51,61 @@ func (d *driver) Execute(query string, args ...any) (err error) {
 	return
 }
 
-func (d *driver) CreateSchemaMigrationsTable() (err error) {
-	_, err = d.connection.Exec(`
-		IF NOT EXISTS (
-			SELECT 1 FROM information_schema.tables WHERE table_schema = (SELECT schema_name()) AND table_name = 'schema_migrations'
-		)
-		CREATE TABLE schema_migrations (migration_id VARCHAR(128) PRIMARY KEY NOT NULL)
-	`)
+func (d *driver) CreateSchemaMigrationsTable(migrationsTable string) (err error) {
+	cleanedTableName, err := cleanIdentifier(migrationsTable)
+	if err != nil {
+		return
+	}
+
+	q := `IF OBJECT_ID(@p1, 'U') IS NULL
+	CREATE TABLE ` + cleanedTableName + ` (migration_id VARCHAR(128) PRIMARY KEY NOT NULL)`
+
+	_, err = d.connection.Exec(q, cleanedTableName)
 	return
 }
 
-func (d *driver) AppliedVersions() (out godfish.AppliedVersions, err error) {
-	rows, err := d.connection.Query(`SELECT migration_id FROM schema_migrations ORDER BY migration_id ASC`)
+func (d *driver) AppliedVersions(migrationsTable string) (out godfish.AppliedVersions, err error) {
+	cleanedTableName, err := cleanIdentifier(migrationsTable)
+	if err != nil {
+		return
+	}
+
+	// #nosec G202 -- table name was sanitized
+	q := `SELECT migration_id FROM ` + cleanedTableName + ` ORDER BY migration_id ASC`
+	rows, err := d.connection.Query(q)
 
 	var ierr mssql.Error
 	// https://docs.microsoft.com/en-us/sql/relational-databases/errors-events/database-engine-events-and-errors
-	// Invalid object name 'schema_migrations'
-	if errors.As(err, &ierr) && ierr.SQLErrorNumber() == 208 && strings.Contains(ierr.Error(), "schema_migrations") {
+	// Invalid object name '${migrationsTable}'
+	if errors.As(err, &ierr) && ierr.SQLErrorNumber() == 208 && strings.Contains(ierr.Error(), migrationsTable) {
 		err = godfish.ErrSchemaMigrationsDoesNotExist
 	}
 	out = godfish.AppliedVersions(rows)
 	return
 }
 
-func (d *driver) UpdateSchemaMigrations(forward bool, version string) (err error) {
+func (d *driver) UpdateSchemaMigrations(migrationsTable string, forward bool, version string) (err error) {
+	cleanedTableName, err := cleanIdentifier(migrationsTable)
+	if err != nil {
+		return
+	}
+
 	conn := d.connection
+	var q string
 	if forward {
-		_, err = conn.Exec(`
-			INSERT INTO schema_migrations (migration_id)
-			VALUES (@p1)`,
-			version,
-		)
+		// #nosec G202 -- table name was sanitized
+		q = `INSERT INTO ` + cleanedTableName + ` (migration_id) VALUES (@p1)`
+		_, err = conn.Exec(q, version)
 	} else {
-		_, err = conn.Exec(`
-			DELETE FROM schema_migrations
-			WHERE migration_id = @p1`,
-			version,
-		)
+		// #nosec G202 -- table name was sanitized
+		q = `DELETE FROM ` + cleanedTableName + ` WHERE migration_id = @p1`
+		_, err = conn.Exec(q, version)
 	}
 	return
+}
+
+func quotePart(part string) string { return `[` + part + `]` }
+
+func cleanIdentifier(input string) (string, error) {
+	return internal.CleanNamespacedIdentifier(input, quotePart)
 }

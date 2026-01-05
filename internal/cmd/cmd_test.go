@@ -127,11 +127,12 @@ func TestDBDSN(t *testing.T) {
 
 func TestConfiguration(t *testing.T) {
 	type testCase struct {
-		name           string
-		conf           *internal.Config
-		args           []string
-		expPathToFiles string
-		expError       error
+		name               string
+		conf               *internal.Config
+		args               []string
+		expPathToFiles     string
+		expMigrationsTable string
+		expError           error
 	}
 
 	runTest := func(t *testing.T, test testCase) {
@@ -174,6 +175,10 @@ func TestConfiguration(t *testing.T) {
 		if commonArgs.Files != test.expPathToFiles {
 			t.Errorf("wrong Files; got %q, expected %q", commonArgs.Files, test.expPathToFiles)
 		}
+
+		if commonArgs.MigrationsTable != test.expMigrationsTable {
+			t.Errorf("wrong MigrationsTable; got %q, expected %q", commonArgs.MigrationsTable, test.expMigrationsTable)
+		}
 	}
 
 	t.Run("files", func(t *testing.T) {
@@ -211,6 +216,48 @@ func TestConfiguration(t *testing.T) {
 		}
 
 		for _, test := range tests {
+			test.expMigrationsTable = internal.DefaultMigrationsTableName
+			t.Run(test.name, func(t *testing.T) { runTest(t, test) })
+		}
+	})
+
+	t.Run("migrations-table", func(t *testing.T) {
+		tests := []testCase{
+			{
+				name:               "config unspecified, flag unspecified",
+				conf:               nil,
+				args:               []string{},
+				expMigrationsTable: internal.DefaultMigrationsTableName,
+			},
+			{
+				name:               "config unspecified, flag specified",
+				conf:               nil,
+				args:               []string{"-migrations-table", "flag-val"},
+				expMigrationsTable: "flag-val",
+			},
+			{
+				name:               "config specified, flag unspecified",
+				conf:               &internal.Config{MigrationsTable: "config-file-val"},
+				args:               []string{},
+				expMigrationsTable: "config-file-val",
+			},
+			{
+				name:               "config specified, flag specified",
+				conf:               &internal.Config{MigrationsTable: "config=file-val"},
+				args:               []string{"-migrations-table", "flag-val"},
+				expMigrationsTable: "flag-val",
+			},
+			{
+				name:               "config specified, flag specified but empty",
+				conf:               &internal.Config{MigrationsTable: "config=file-val"},
+				args:               []string{"-migrations-table", ""},
+				expMigrationsTable: "",
+			},
+		}
+
+		for _, test := range tests {
+			test.args = append([]string{"-files", os.TempDir()}, test.args...)
+			test.expPathToFiles = os.TempDir()
 			t.Run(test.name, func(t *testing.T) { runTest(t, test) })
 		}
 	})
