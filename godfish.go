@@ -4,6 +4,7 @@ package godfish
 
 import (
 	"cmp"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -45,7 +46,7 @@ func CreateMigrationFiles(migrationName string, reversible bool, dirpath, fwdlab
 // migration state. If empty, then it's set to a default value of
 // "schema_migrations". The named DB table will be automatically created unless
 // it already exists.
-func Migrate(driver Driver, dirFS fs.FS, forward bool, finishAtVersion string, migrationsTable string) (err error) {
+func Migrate(ctx context.Context, driver Driver, dirFS fs.FS, forward bool, finishAtVersion string, migrationsTable string) (err error) {
 	migrationsTable = cmp.Or(migrationsTable, internal.DefaultMigrationsTableName)
 	var (
 		dsn        string
@@ -79,13 +80,13 @@ func Migrate(driver Driver, dirFS fs.FS, forward bool, finishAtVersion string, m
 		dirFS:           dirFS,
 		finishAtVersion: finishAtVersion,
 	}
-	if migrations, err = finder.query(driver, migrationsTable); err != nil {
+	if migrations, err = finder.query(ctx, driver, migrationsTable); err != nil {
 		return
 	}
 
 	for _, mig := range migrations {
 		pathToFile := string(mig.ToFilename())
-		if err = runMigration(driver, dirFS, pathToFile, mig, migrationsTable); err != nil {
+		if err = runMigration(ctx, driver, dirFS, pathToFile, mig, migrationsTable); err != nil {
 			return
 		}
 	}
@@ -105,7 +106,7 @@ var ErrSchemaMigrationsDoesNotExist = errors.New("schema migrations table does n
 // migration state. If empty, then it's set to a default value of
 // "schema_migrations". The named DB table will be automatically created unless
 // it already exists.
-func ApplyMigration(driver Driver, dirFS fs.FS, forward bool, version, migrationsTable string) (err error) {
+func ApplyMigration(ctx context.Context, driver Driver, dirFS fs.FS, forward bool, version, migrationsTable string) (err error) {
 	migrationsTable = cmp.Or(migrationsTable, internal.DefaultMigrationsTableName)
 	var (
 		dsn        string
@@ -141,7 +142,7 @@ func ApplyMigration(driver Driver, dirFS fs.FS, forward bool, version, migration
 			dirFS:           dirFS,
 			finishAtVersion: limit,
 		}
-		if toApply, ierr := finder.query(driver, migrationsTable); ierr != nil {
+		if toApply, ierr := finder.query(ctx, driver, migrationsTable); ierr != nil {
 			err = fmt.Errorf("specified no version; error attempting to find one; %v", ierr)
 			return
 		} else if len(toApply) < 1 {
@@ -159,7 +160,7 @@ func ApplyMigration(driver Driver, dirFS fs.FS, forward bool, version, migration
 	if mig, err = internal.ParseMigration(fn); err != nil {
 		return
 	}
-	err = runMigration(driver, dirFS, pathToFile, mig, migrationsTable)
+	err = runMigration(ctx, driver, dirFS, pathToFile, mig, migrationsTable)
 	return
 }
 
@@ -196,7 +197,7 @@ func figureOutBasename(dirFS fs.FS, direction internal.Direction, version string
 
 // runMigration executes a migration against the database. The input, pathToFile
 // should be relative to the current working directory.
-func runMigration(driver Driver, dir fs.FS, pathToFile string, mig *internal.Migration, migrationsTable string) (err error) {
+func runMigration(ctx context.Context, driver Driver, dir fs.FS, pathToFile string, mig *internal.Migration, migrationsTable string) (err error) {
 	var data []byte
 	if data, err = fs.ReadFile(dir, filepath.Clean(pathToFile)); err != nil {
 		return
@@ -210,16 +211,17 @@ func runMigration(driver Driver, dir fs.FS, pathToFile string, mig *internal.Mig
 	lgr.Info(gerund + " ...")
 	startTime := time.Now()
 
-	if err = driver.Execute(string(data)); err != nil {
+	if err = driver.Execute(ctx, string(data)); err != nil {
 		err = fmt.Errorf("%w; path_to_file: %s; %w", internal.ErrExecutingMigration, pathToFile, err)
 		lgr.Error("executing migration", slog.Any("error", err), makeDurationMSAttr(startTime))
 		return
 	}
-	if err = driver.CreateSchemaMigrationsTable(migrationsTable); err != nil {
+	if err = driver.CreateSchemaMigrationsTable(ctx, migrationsTable); err != nil {
 		lgr.Error("creating schema migrations table", slog.Any("error", err), makeDurationMSAttr(startTime))
 		return
 	}
 	err = driver.UpdateSchemaMigrations(
+		ctx,
 		migrationsTable,
 		mig.Indirection.Value == internal.DirForward,
 		mig.Version.String(),
@@ -246,7 +248,7 @@ func makeDurationMSAttr(startedAt time.Time) slog.Attr {
 // "schema_migrations". Unlike other functions that use the DB table to check
 // the migration state, this function does not create a new table, nor does it
 // have the need to.
-func Info(driver Driver, directory fs.FS, forward bool, finishAtVersion string, w io.Writer, format string, migrationsTable string) (err error) {
+func Info(ctx context.Context, driver Driver, directory fs.FS, forward bool, finishAtVersion string, w io.Writer, format string, migrationsTable string) (err error) {
 	migrationsTable = cmp.Or(migrationsTable, internal.DefaultMigrationsTableName)
 	var dsn string
 	if dsn, err = getDSN(); err != nil {
@@ -272,7 +274,7 @@ func Info(driver Driver, directory fs.FS, forward bool, finishAtVersion string, 
 		finishAtVersion: finishAtVersion,
 		infoPrinter:     choosePrinter(format, w),
 	}
-	_, err = finder.query(driver, migrationsTable)
+	_, err = finder.query(ctx, driver, migrationsTable)
 	return
 }
 
@@ -321,7 +323,7 @@ type migrationFinder struct {
 }
 
 // query returns a list of Migrations to apply.
-func (m *migrationFinder) query(driver Driver, migrationsTable string) (out []*internal.Migration, err error) {
+func (m *migrationFinder) query(ctx context.Context, driver Driver, migrationsTable string) (out []*internal.Migration, err error) {
 	lgr := slog.With(slog.String("func", "(*migrationFinder).query"))
 
 	available, err := m.available()
@@ -332,7 +334,7 @@ func (m *migrationFinder) query(driver Driver, migrationsTable string) (out []*i
 		slog.Int("count", len(available)),
 		slog.Any("available", internal.Migrations(available)),
 	)
-	applied, err := scanAppliedVersions(driver, m.dirFS, migrationsTable)
+	applied, err := scanAppliedVersions(ctx, driver, m.dirFS, migrationsTable)
 	if errors.Is(err, ErrSchemaMigrationsDoesNotExist) {
 		// The next invocation of CreateSchemaMigrationsTable should fix this.
 		// We can continue with zero value for now.
@@ -446,9 +448,9 @@ func (m *migrationFinder) available() (out []*internal.Migration, err error) {
 	return
 }
 
-func scanAppliedVersions(driver Driver, dirFS fs.FS, migrationsTable string) (out []*internal.Migration, err error) {
+func scanAppliedVersions(ctx context.Context, driver Driver, dirFS fs.FS, migrationsTable string) (out []*internal.Migration, err error) {
 	var rows AppliedVersions
-	if rows, err = driver.AppliedVersions(migrationsTable); err != nil {
+	if rows, err = driver.AppliedVersions(ctx, migrationsTable); err != nil {
 		return
 	}
 	defer func() {

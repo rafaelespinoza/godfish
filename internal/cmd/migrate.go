@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/rafaelespinoza/alf"
 	"github.com/rafaelespinoza/godfish"
@@ -13,6 +14,7 @@ import (
 
 func makeMigrate(name string) alf.Directive {
 	var version string
+	var timeout time.Duration
 
 	return &alf.Command{
 		Description: "execute migration(s) in the forward direction",
@@ -23,6 +25,12 @@ func makeMigrate(name string) alf.Directive {
 				"version",
 				"",
 				fmt.Sprintf("timestamp of migration, format: %s", internal.TimeFormat),
+			)
+			flags.DurationVar(
+				&timeout,
+				"timeout",
+				0,
+				fmt.Sprintf("max allowed duration for all migrations to run, ignored if non-positive, example vals %q", exampleDurationVals),
 			)
 			flags.Usage = func() {
 				_, _ = fmt.Fprintf(flags.Output(), `Usage: %s [godfish-flags] %s [%s-flags]
@@ -42,9 +50,16 @@ func makeMigrate(name string) alf.Directive {
 
 			return flags
 		},
-		Run: func(_ context.Context) error {
+		Run: func(ctx context.Context) error {
+			var cancel func()
+			if timeout > 0 {
+				ctx, cancel = context.WithTimeout(ctx, timeout)
+				defer cancel()
+			}
+
 			dirFS := os.DirFS(commonArgs.Files)
 			err := godfish.Migrate(
+				ctx,
 				theDriver,
 				dirFS,
 				true,
@@ -57,10 +72,18 @@ func makeMigrate(name string) alf.Directive {
 }
 
 func makeRemigrate(name string) alf.Directive {
+	flags := newFlagSet(name)
+	var timeout time.Duration
+
 	return &alf.Command{
 		Description: "rollback and then re-apply the last migration",
 		Setup: func(p flag.FlagSet) *flag.FlagSet {
-			flags := newFlagSet(name)
+			flags.DurationVar(
+				&timeout,
+				"timeout",
+				0,
+				fmt.Sprintf("max allowed duration for all migrations to run, ignored if non-positive, example vals %q", exampleDurationVals),
+			)
 			flags.Usage = func() {
 				_, _ = fmt.Fprintf(flags.Output(), `Usage: %s [godfish-flags] %s [%s-flags]
 
@@ -76,20 +99,27 @@ func makeRemigrate(name string) alf.Directive {
 
 			return flags
 		},
-		Run: func(_ context.Context) error {
+		Run: func(ctx context.Context) error {
+			var cancel func()
+			if timeout > 0 {
+				ctx, cancel = context.WithTimeout(ctx, timeout)
+				defer cancel()
+			}
+
 			dirFS := os.DirFS(commonArgs.Files)
 			migrationsTable := commonArgs.MigrationsTable
-			err := godfish.ApplyMigration(theDriver, dirFS, false, "", migrationsTable)
+			err := godfish.ApplyMigration(ctx, theDriver, dirFS, false, "", migrationsTable)
 			if err != nil {
 				return err
 			}
-			return godfish.ApplyMigration(theDriver, dirFS, true, "", migrationsTable)
+			return godfish.ApplyMigration(ctx, theDriver, dirFS, true, "", migrationsTable)
 		},
 	}
 }
 
 func makeRollback(name string) alf.Directive {
 	var version string
+	var timeout time.Duration
 
 	return &alf.Command{
 		Description: "execute migration(s) in the reverse direction",
@@ -100,6 +130,12 @@ func makeRollback(name string) alf.Directive {
 				"version",
 				"",
 				fmt.Sprintf("timestamp of migration, format: %s", internal.TimeFormat),
+			)
+			flags.DurationVar(
+				&timeout,
+				"timeout",
+				10*time.Minute,
+				fmt.Sprintf("max allowed duration for all migrations to run, ignored if non-positive, example vals %q", exampleDurationVals),
 			)
 			flags.Usage = func() {
 				_, _ = fmt.Fprintf(flags.Output(), `Usage: %s [godfish-flags] %s [%s-flags]
@@ -118,13 +154,20 @@ func makeRollback(name string) alf.Directive {
 			}
 			return flags
 		},
-		Run: func(_ context.Context) error {
+		Run: func(ctx context.Context) error {
+			var cancel func()
+			if timeout > 0 {
+				ctx, cancel = context.WithTimeout(ctx, timeout)
+				defer cancel()
+			}
+
 			var err error
 			dirFS := os.DirFS(commonArgs.Files)
 			migrationsTable := commonArgs.MigrationsTable
 
 			if version == "" {
 				err = godfish.ApplyMigration(
+					ctx,
 					theDriver,
 					dirFS,
 					false,
@@ -133,6 +176,7 @@ func makeRollback(name string) alf.Directive {
 				)
 			} else {
 				err = godfish.Migrate(
+					ctx,
 					theDriver,
 					dirFS,
 					false,

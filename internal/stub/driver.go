@@ -2,6 +2,7 @@
 package stub
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strings"
@@ -20,7 +21,10 @@ func (d *driver) Name() string             { return "stub" }
 func (d *driver) Connect(dsn string) error { return nil }
 func (d *driver) Close() error             { return nil }
 
-func (d *driver) CreateSchemaMigrationsTable(migrationsTable string) error {
+func (d *driver) CreateSchemaMigrationsTable(ctx context.Context, migrationsTable string) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	if _, err := cleanIdentifier(migrationsTable); err != nil {
 		return err
 	}
@@ -31,20 +35,26 @@ func (d *driver) CreateSchemaMigrationsTable(migrationsTable string) error {
 	return nil
 }
 
-func (d *driver) Execute(q string, a ...any) error {
+func (d *driver) Execute(ctx context.Context, q string, a ...any) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	if strings.Contains(q, "invalid SQL") {
 		return errors.New(q)
 	}
 	return nil
 }
 
-func (d *driver) UpdateSchemaMigrations(migrationsTable string, forward bool, version string) error {
+func (d *driver) UpdateSchemaMigrations(ctx context.Context, migrationsTable string, forward bool, version string) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	if _, err := cleanIdentifier(migrationsTable); err != nil {
 		return err
 	}
 
 	var stubbedAV *appliedVersions
-	av, err := d.AppliedVersions(migrationsTable)
+	av, err := d.AppliedVersions(ctx, migrationsTable)
 	if err != nil {
 		return err
 	}
@@ -74,7 +84,10 @@ func (d *driver) UpdateSchemaMigrations(migrationsTable string, forward bool, ve
 	return nil
 }
 
-func (d *driver) AppliedVersions(migrationsTable string) (godfish.AppliedVersions, error) {
+func (d *driver) AppliedVersions(ctx context.Context, migrationsTable string) (godfish.AppliedVersions, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	if _, err := cleanIdentifier(migrationsTable); err != nil {
 		return nil, err
 	}

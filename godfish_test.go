@@ -54,7 +54,7 @@ func TestMigrate(t *testing.T) {
 		t.Setenv(internal.DSNKey, "")
 
 		dirFS := os.DirFS(t.TempDir())
-		err := godfish.Migrate(stub.NewDriver(), dirFS, false, "", "")
+		err := godfish.Migrate(t.Context(), stub.NewDriver(), dirFS, false, "", "")
 		if err == nil {
 			t.Fatalf("expected an error, got %v", err)
 		}
@@ -70,7 +70,7 @@ func TestApplyMigration(t *testing.T) {
 		t.Setenv(internal.DSNKey, "")
 
 		dirFS := os.DirFS(t.TempDir())
-		err := godfish.ApplyMigration(stub.NewDriver(), dirFS, false, "", "")
+		err := godfish.ApplyMigration(t.Context(), stub.NewDriver(), dirFS, false, "", "")
 		if err == nil {
 			t.Fatalf("expected an error, got %v", err)
 		}
@@ -86,7 +86,7 @@ func TestInfo(t *testing.T) {
 		t.Setenv(internal.DSNKey, "")
 
 		dirFS := os.DirFS(t.TempDir())
-		err := godfish.Info(stub.NewDriver(), dirFS, false, "", os.Stderr, "", "")
+		err := godfish.Info(t.Context(), stub.NewDriver(), dirFS, false, "", os.Stderr, "", "")
 		if err == nil {
 			t.Fatalf("expected an error, got %v", err)
 		}
@@ -100,7 +100,7 @@ func TestInfo(t *testing.T) {
 		t.Setenv(internal.DSNKey, "test")
 
 		dirFS := os.DirFS(t.TempDir())
-		err := godfish.Info(stub.NewDriver(), dirFS, false, "", os.Stderr, "tea_ess_vee", "")
+		err := godfish.Info(t.Context(), stub.NewDriver(), dirFS, false, "", os.Stderr, "tea_ess_vee", "")
 		if err != nil {
 			t.Fatalf("unexpected error, %v", err)
 		}

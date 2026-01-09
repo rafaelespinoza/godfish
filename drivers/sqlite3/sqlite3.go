@@ -2,6 +2,7 @@
 package sqlite3
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"strings"
@@ -42,23 +43,23 @@ func (d *driver) Close() (err error) {
 	return
 }
 
-func (d *driver) Execute(query string, args ...any) (err error) {
-	_, err = d.connection.Exec(query)
+func (d *driver) Execute(ctx context.Context, query string, args ...any) (err error) {
+	_, err = d.connection.ExecContext(ctx, query)
 	return
 }
 
-func (d *driver) CreateSchemaMigrationsTable(migrationsTable string) (err error) {
+func (d *driver) CreateSchemaMigrationsTable(ctx context.Context, migrationsTable string) (err error) {
 	cleanedTableName, err := cleanIdentifier(migrationsTable)
 	if err != nil {
 		return
 	}
 
 	q := `CREATE TABLE IF NOT EXISTS ` + cleanedTableName + ` (migration_id VARCHAR(128) PRIMARY KEY NOT NULL)`
-	_, err = d.connection.Exec(q)
+	_, err = d.connection.ExecContext(ctx, q)
 	return
 }
 
-func (d *driver) AppliedVersions(migrationsTable string) (out godfish.AppliedVersions, err error) {
+func (d *driver) AppliedVersions(ctx context.Context, migrationsTable string) (out godfish.AppliedVersions, err error) {
 	cleanedTableName, err := cleanIdentifier(migrationsTable)
 	if err != nil {
 		return
@@ -66,7 +67,7 @@ func (d *driver) AppliedVersions(migrationsTable string) (out godfish.AppliedVer
 
 	// #nosec G202 -- table name was sanitized
 	q := `SELECT migration_id FROM ` + cleanedTableName + ` ORDER BY migration_id ASC`
-	rows, err := d.connection.Query(q)
+	rows, err := d.connection.QueryContext(ctx, q)
 
 	var ierr *sqlib.Error
 	if errors.As(err, &ierr) && ierr.Code() == 1 && strings.Contains(ierr.Error(), "no such table") {
@@ -77,7 +78,7 @@ func (d *driver) AppliedVersions(migrationsTable string) (out godfish.AppliedVer
 	return
 }
 
-func (d *driver) UpdateSchemaMigrations(migrationsTable string, forward bool, version string) (err error) {
+func (d *driver) UpdateSchemaMigrations(ctx context.Context, migrationsTable string, forward bool, version string) (err error) {
 	cleanedTableName, err := cleanIdentifier(migrationsTable)
 	if err != nil {
 		return
@@ -88,11 +89,11 @@ func (d *driver) UpdateSchemaMigrations(migrationsTable string, forward bool, ve
 	if forward {
 		// #nosec G202 -- table name was sanitized
 		q = `INSERT INTO ` + cleanedTableName + ` (migration_id) VALUES ($1)`
-		_, err = conn.Exec(q, version)
+		_, err = conn.ExecContext(ctx, q, version)
 	} else {
 		// #nosec G202 -- table name was sanitized
 		q = `DELETE FROM ` + cleanedTableName + ` WHERE migration_id = $1`
-		_, err = conn.Exec(q, version)
+		_, err = conn.ExecContext(ctx, q, version)
 	}
 	return
 }

@@ -2,6 +2,7 @@
 package mysql
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"regexp"
@@ -45,7 +46,7 @@ func (d *driver) Close() (err error) {
 
 var statementDelimiter = regexp.MustCompile(`;\s*\n`)
 
-func (d *driver) Execute(query string, args ...any) (err error) {
+func (d *driver) Execute(ctx context.Context, query string, args ...any) (err error) {
 	// Attempt to support migrations with 1 or more statements. AFAIK, the
 	// standard library does not support executing multiple statements at once.
 	// As a workaround, break them up and apply them.
@@ -61,7 +62,7 @@ func (d *driver) Execute(query string, args ...any) (err error) {
 		if len(strings.TrimSpace(q)) < 1 {
 			continue
 		}
-		_, err = tx.Exec(q)
+		_, err = tx.ExecContext(ctx, q)
 		if err != nil {
 			if rerr := tx.Rollback(); rerr != nil {
 				return fmt.Errorf("%w; %v", err, rerr)
@@ -72,18 +73,18 @@ func (d *driver) Execute(query string, args ...any) (err error) {
 	return tx.Commit()
 }
 
-func (d *driver) CreateSchemaMigrationsTable(migrationsTable string) (err error) {
+func (d *driver) CreateSchemaMigrationsTable(ctx context.Context, migrationsTable string) (err error) {
 	cleanedTableName, err := cleanIdentifier(migrationsTable)
 	if err != nil {
 		return
 	}
 
 	q := `CREATE TABLE IF NOT EXISTS ` + cleanedTableName + ` (migration_id VARCHAR(128) PRIMARY KEY NOT NULL)`
-	_, err = d.connection.Exec(q)
+	_, err = d.connection.ExecContext(ctx, q)
 	return
 }
 
-func (d *driver) AppliedVersions(migrationsTable string) (out godfish.AppliedVersions, err error) {
+func (d *driver) AppliedVersions(ctx context.Context, migrationsTable string) (out godfish.AppliedVersions, err error) {
 	cleanedTableName, err := cleanIdentifier(migrationsTable)
 	if err != nil {
 		return
@@ -91,7 +92,7 @@ func (d *driver) AppliedVersions(migrationsTable string) (out godfish.AppliedVer
 
 	// #nosec G202 -- table name was sanitized
 	q := `SELECT migration_id FROM ` + cleanedTableName + ` ORDER BY migration_id ASC`
-	rows, err := d.connection.Query(q)
+	rows, err := d.connection.QueryContext(ctx, q)
 	if ierr, ok := err.(*my.MySQLError); ok {
 		// https://dev.mysql.com/doc/refman/8.0/en/server-error-reference.html#error_er_no_such_table
 		if ierr.Number == 1146 {
@@ -102,7 +103,7 @@ func (d *driver) AppliedVersions(migrationsTable string) (out godfish.AppliedVer
 	return
 }
 
-func (d *driver) UpdateSchemaMigrations(migrationsTable string, forward bool, version string) (err error) {
+func (d *driver) UpdateSchemaMigrations(ctx context.Context, migrationsTable string, forward bool, version string) (err error) {
 	cleanedTableName, err := cleanIdentifier(migrationsTable)
 	if err != nil {
 		return
@@ -113,11 +114,11 @@ func (d *driver) UpdateSchemaMigrations(migrationsTable string, forward bool, ve
 	if forward {
 		// #nosec G202 -- table name was sanitized
 		q = `INSERT INTO ` + cleanedTableName + ` (migration_id) VALUES (?)`
-		_, err = conn.Exec(q, version)
+		_, err = conn.ExecContext(ctx, q, version)
 	} else {
 		// #nosec G202 -- table name was sanitized
 		q = `DELETE FROM ` + cleanedTableName + ` WHERE migration_id = ?`
-		_, err = conn.Exec(q, version)
+		_, err = conn.ExecContext(ctx, q, version)
 	}
 	return
 }

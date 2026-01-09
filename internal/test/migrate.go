@@ -14,7 +14,7 @@ import (
 
 func testMigrate(t *testing.T, driver godfish.Driver, queries testdataQueries) {
 	runTest := func(t *testing.T, driver godfish.Driver, dirFS fs.FS, migrationsTable string, expectedVersions []string) {
-		err := godfish.Migrate(driver, dirFS, true, "", migrationsTable)
+		err := godfish.Migrate(t.Context(), driver, dirFS, true, "", migrationsTable)
 		if err != nil {
 			t.Fatalf("could not Migrate in %s Direction; %v", internal.DirForward, err)
 		}
@@ -22,7 +22,7 @@ func testMigrate(t *testing.T, driver godfish.Driver, queries testdataQueries) {
 		appliedVersions := collectAppliedVersions(t, driver, migrationsTable)
 		testAppliedVersions(t, appliedVersions, expectedVersions)
 
-		err = godfish.Migrate(driver, dirFS, false, expectedVersions[0], migrationsTable)
+		err = godfish.Migrate(t.Context(), driver, dirFS, false, expectedVersions[0], migrationsTable)
 		if err != nil {
 			t.Fatalf("could not Migrate in %s Direction; %v", internal.DirReverse, err)
 		}
@@ -89,7 +89,7 @@ func testMigrate(t *testing.T, driver godfish.Driver, queries testdataQueries) {
 				appliedVersions := collectAppliedVersions(t, driver, internal.DefaultMigrationsTableName)
 				testAppliedVersions(t, appliedVersions, []string{})
 
-				err := godfish.Migrate(driver, dirFS, true, "", test.migrationsTable)
+				err := godfish.Migrate(t.Context(), driver, dirFS, true, "", test.migrationsTable)
 				if !errors.Is(err, internal.ErrDataInvalid) {
 					t.Fatalf("expected error (%v) to match %v", err, internal.ErrDataInvalid)
 				}

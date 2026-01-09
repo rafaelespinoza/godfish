@@ -252,3 +252,5 @@ func resolveConfigVal(flags *flag.FlagSet, targetFlagName, valFromConf, defaultV
 
 	return out
 }
+
+var exampleDurationVals = []string{"30s", "5m", "1h2m3s"}

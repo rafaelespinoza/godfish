@@ -2,6 +2,7 @@
 package cassandra
 
 import (
+	"context"
 	"regexp"
 	"strings"
 
@@ -48,7 +49,7 @@ func (d *driver) Close() (err error) {
 
 var statementDelimiter = regexp.MustCompile(`;\s*\n`)
 
-func (d *driver) Execute(query string, args ...any) (err error) {
+func (d *driver) Execute(ctx context.Context, query string, args ...any) (err error) {
 	statements := statementDelimiter.Split(query, -1)
 	if len(statements) < 1 {
 		return
@@ -57,7 +58,7 @@ func (d *driver) Execute(query string, args ...any) (err error) {
 		if len(strings.TrimSpace(q)) < 1 {
 			continue
 		}
-		err = d.connection.Query(q).Exec()
+		err = d.connection.Query(q).WithContext(ctx).Exec()
 		if err != nil {
 			return
 		}
@@ -65,25 +66,25 @@ func (d *driver) Execute(query string, args ...any) (err error) {
 	return nil
 }
 
-func (d *driver) CreateSchemaMigrationsTable(migrationsTable string) (err error) {
+func (d *driver) CreateSchemaMigrationsTable(ctx context.Context, migrationsTable string) (err error) {
 	cleanedTableName, err := cleanIdentifier(migrationsTable)
 	if err != nil {
 		return
 	}
 
 	q := `CREATE TABLE IF NOT EXISTS ` + cleanedTableName + ` (migration_id TEXT PRIMARY KEY)`
-	err = d.connection.Query(q).Exec()
+	err = d.connection.Query(q).WithContext(ctx).Exec()
 	return
 }
 
-func (d *driver) AppliedVersions(migrationsTable string) (out godfish.AppliedVersions, err error) {
+func (d *driver) AppliedVersions(ctx context.Context, migrationsTable string) (out godfish.AppliedVersions, err error) {
 	cleanedTableName, err := cleanIdentifier(migrationsTable)
 	if err != nil {
 		return
 	}
 
 	q := `SELECT migration_id FROM ` + cleanedTableName
-	query := d.connection.Query(q)
+	query := d.connection.Query(q).WithContext(ctx)
 
 	av := execAllAscending(query)
 
@@ -111,7 +112,7 @@ func (d *driver) AppliedVersions(migrationsTable string) (out godfish.AppliedVer
 	return
 }
 
-func (d *driver) UpdateSchemaMigrations(migrationsTable string, forward bool, version string) (err error) {
+func (d *driver) UpdateSchemaMigrations(ctx context.Context, migrationsTable string, forward bool, version string) (err error) {
 	cleanedTableName, err := cleanIdentifier(migrationsTable)
 	if err != nil {
 		return
@@ -121,11 +122,10 @@ func (d *driver) UpdateSchemaMigrations(migrationsTable string, forward bool, ve
 	var q string
 	if forward {
 		q = `INSERT INTO ` + cleanedTableName + ` (migration_id) VALUES (?)`
-		err = conn.Query(q, version).Exec()
 	} else {
 		q = `DELETE FROM ` + cleanedTableName + ` WHERE migration_id = ?`
-		err = conn.Query(q, version).Exec()
 	}
+	err = conn.Query(q, version).WithContext(ctx).Exec()
 	return
 }
 

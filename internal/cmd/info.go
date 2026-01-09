@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/rafaelespinoza/alf"
 	"github.com/rafaelespinoza/godfish"
@@ -15,6 +16,7 @@ import (
 
 func makeInfo(name string) alf.Directive {
 	var direction, format, version string
+	var timeout time.Duration
 
 	return &alf.Command{
 		Description: "output applied migrations, migrations to apply",
@@ -37,6 +39,12 @@ func makeInfo(name string) alf.Directive {
 				"version",
 				"",
 				fmt.Sprintf("timestamp of migration, format: %s", internal.TimeFormat),
+			)
+			flags.DurationVar(
+				&timeout,
+				"timeout",
+				0,
+				fmt.Sprintf("max duration to run, ignored if non-positive, example vals %q", exampleDurationVals),
 			)
 			flags.Usage = func() {
 				_, _ = fmt.Fprintf(flags.Output(), `Usage: %s [godfish-flags] %s [%s-flags]
@@ -62,10 +70,16 @@ func makeInfo(name string) alf.Directive {
 			}
 			return flags
 		},
-		Run: func(_ context.Context) error {
+		Run: func(ctx context.Context) error {
+			var cancel func()
+			if timeout > 0 {
+				ctx, cancel = context.WithTimeout(ctx, timeout)
+				defer cancel()
+			}
+
 			dirFS := os.DirFS(commonArgs.Files)
 			migrationsTable := commonArgs.MigrationsTable
-			return godfish.Info(theDriver, dirFS.(fs.ReadDirFS), forward(direction), version, os.Stdout, format, migrationsTable)
+			return godfish.Info(ctx, theDriver, dirFS.(fs.ReadDirFS), forward(direction), version, os.Stdout, format, migrationsTable)
 		},
 	}
 }

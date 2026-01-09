@@ -59,7 +59,7 @@ func testApplyMigration(t *testing.T, driver godfish.Driver, queries testdataQue
 		pathToFiles := setup(t, driver, setupState.stubs, setupState.migrateTo, setupState.migrationsTable)
 		t.Cleanup(func() { teardown(t, driver, pathToFiles, setupState.migrationsTable, "foos", "bars") })
 
-		err := godfish.ApplyMigration(driver, os.DirFS(pathToFiles), input.direction == internal.DirForward, input.version, input.migrationsTable)
+		err := godfish.ApplyMigration(t.Context(), driver, os.DirFS(pathToFiles), input.direction == internal.DirForward, input.version, input.migrationsTable)
 		if expected.err == nil && err != nil {
 			t.Errorf("unexpected error %v", err)
 		} else if expected.err != nil && err == nil {

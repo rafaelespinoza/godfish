@@ -12,7 +12,7 @@ import (
 func main() {
 	const dsnSample = `username:password@tcp(server_host)/db_name?param1=value&paramN=valueN`
 	root := cmd.New(mysql.NewDriver(), dsnSample)
-	if err := root.Run(context.TODO(), os.Args[1:]); err != nil {
+	if err := root.Run(context.Background(), os.Args[1:]); err != nil {
 		log.Println(err)
 		os.Exit(1)
 	}

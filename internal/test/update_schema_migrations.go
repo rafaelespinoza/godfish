@@ -17,7 +17,7 @@ func testUpdateSchemaMigrations(t *testing.T, driver godfish.Driver) {
 				appliedVersions := collectAppliedVersions(t, driver, internal.DefaultMigrationsTableName)
 				testAppliedVersions(t, appliedVersions, []string{})
 
-				err := driver.UpdateSchemaMigrations(test.migrationsTable, true, "1234")
+				err := driver.UpdateSchemaMigrations(t.Context(), test.migrationsTable, true, "1234")
 				if !errors.Is(err, internal.ErrDataInvalid) {
 					t.Fatalf("expected error (%v) to match %v", err, internal.ErrDataInvalid)
 				}

@@ -1,6 +1,7 @@
 package godfish_test
 
 import (
+	"context"
 	"embed"
 	"fmt"
 	"io/fs"
@@ -28,6 +29,7 @@ var migrationsFS embed.FS
 //	reverse-2345-bravo.sql
 //	reverse-3456-charlie.sql
 func Example_embed() {
+	ctx := context.Background()
 	var (
 		err           error
 		migrationsDir fs.FS
@@ -53,13 +55,13 @@ func Example_embed() {
 
 	// Apply the "forward" migrations through version "3456".
 	forward := true
-	if err = godfish.Migrate(driver, migrationsDir, forward, "3456", migrationsTable); err != nil {
+	if err = godfish.Migrate(ctx, driver, migrationsDir, forward, "3456", migrationsTable); err != nil {
 		fmt.Println("migrating DB", err)
 		return
 	}
 
 	// Show the state of the DB migrations as TSV (default).
-	if err = godfish.Info(driver, migrationsDir, forward, "", os.Stdout, "tsv", migrationsTable); err != nil {
+	if err = godfish.Info(ctx, driver, migrationsDir, forward, "", os.Stdout, "tsv", migrationsTable); err != nil {
 		fmt.Println("getting, showing info", err)
 		return
 	}

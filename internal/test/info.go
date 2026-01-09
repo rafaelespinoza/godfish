@@ -37,7 +37,7 @@ func testInfo(t *testing.T, driver godfish.Driver, queries testdataQueries) {
 
 				t.Run("forward", func(t *testing.T) {
 					dirFS := os.DirFS(path)
-					err := godfish.Info(driver, dirFS, true, "", os.Stderr, "tsv", test.migrationsTable)
+					err := godfish.Info(t.Context(), driver, dirFS, true, "", os.Stderr, "tsv", test.migrationsTable)
 					if err != nil {
 						t.Errorf(
 							"could not output info in %s Direction; %v",
@@ -48,7 +48,7 @@ func testInfo(t *testing.T, driver godfish.Driver, queries testdataQueries) {
 
 				t.Run("reverse", func(t *testing.T) {
 					dirFS := os.DirFS(path)
-					err := godfish.Info(driver, dirFS, false, "", os.Stderr, "json", test.migrationsTable)
+					err := godfish.Info(t.Context(), driver, dirFS, false, "", os.Stderr, "json", test.migrationsTable)
 					if err != nil {
 						t.Errorf(
 							"could not output info in %s Direction; %v",
@@ -70,12 +70,12 @@ func testInfo(t *testing.T, driver godfish.Driver, queries testdataQueries) {
 		for _, test := range okMigrationsTableTestCases {
 			t.Run(test.name, func(t *testing.T) {
 				var buf bytes.Buffer
-				if err = godfish.Info(driver, dirFS, true, "", &buf, "json", test.migrationsTable); err != nil {
+				if err = godfish.Info(t.Context(), driver, dirFS, true, "", &buf, "json", test.migrationsTable); err != nil {
 					t.Fatal(err)
 				}
 				t.Log(buf.String())
 
-				if err = godfish.Info(driver, dirFS, false, "", &buf, "json", test.migrationsTable); err != nil {
+				if err = godfish.Info(t.Context(), driver, dirFS, false, "", &buf, "json", test.migrationsTable); err != nil {
 					t.Fatal(err)
 				}
 				t.Log(buf.String())
@@ -92,7 +92,7 @@ func testInfo(t *testing.T, driver godfish.Driver, queries testdataQueries) {
 
 		for _, test := range invalidMigrationsTableTestCases {
 			t.Run(test.name, func(t *testing.T) {
-				err = godfish.Info(driver, dirFS, true, "", nil, "json", test.migrationsTable)
+				err = godfish.Info(t.Context(), driver, dirFS, true, "", nil, "json", test.migrationsTable)
 				if !errors.Is(err, internal.ErrDataInvalid) {
 					t.Fatalf("expected error (%v) to match %v", err, internal.ErrDataInvalid)
 				}

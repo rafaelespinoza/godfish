@@ -3,6 +3,7 @@ package test
 
 import (
 	"cmp"
+	"context"
 	"fmt"
 	"io/fs"
 	"log/slog"
@@ -11,6 +12,7 @@ import (
 	"runtime"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/rafaelespinoza/godfish"
 	"github.com/rafaelespinoza/godfish/internal"
@@ -26,6 +28,7 @@ func RunDriverTests(t *testing.T, d godfish.Driver) {
 	t.Run("Info", func(t *testing.T) { testInfo(t, d, q) })
 	t.Run("ApplyMigration", func(t *testing.T) { testApplyMigration(t, d, q) })
 	t.Run("UpdateSchemaMigrations", func(t *testing.T) { testUpdateSchemaMigrations(t, d) })
+	t.Run("Context", func(t *testing.T) { testContext(t, d) })
 }
 
 // testdataQueries are named DB testdataQueries to use in the tests.
@@ -122,7 +125,7 @@ func setup(t *testing.T, driver godfish.Driver, stubs []testDriverStub, migrateT
 	generateMigrationFiles(t, path, stubs)
 
 	if migrateTo != skipMigration {
-		err := godfish.Migrate(driver, os.DirFS(path), true, migrateTo, migrationsTable)
+		err := godfish.Migrate(t.Context(), driver, os.DirFS(path), true, migrateTo, migrationsTable)
 		if err != nil {
 			t.Fatalf("Migrate failed during setup: %v", err)
 		}
@@ -142,8 +145,14 @@ func teardown(t *testing.T, driver godfish.Driver, path string, migrationsTable 
 		t.Fatalf("error connecting to DB in teardown: %v", err)
 	}
 
+	// Use a context with its own timeout, rather than directly use the test's
+	// context to ensure that the caller's test cleanup does not prevent
+	// this function from completing.
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	t.Cleanup(cancel)
+
 	for _, table := range tablesToDrop {
-		if err = driver.Execute("DROP TABLE IF EXISTS " + table); err != nil {
+		if err = driver.Execute(ctx, "DROP TABLE IF EXISTS "+table); err != nil {
 			t.Fatalf("error dropping table in teardown: %v", err)
 		}
 	}
@@ -158,7 +167,7 @@ func teardown(t *testing.T, driver godfish.Driver, path string, migrationsTable 
 	default:
 		truncate = `TRUNCATE TABLE ` + migrationsTable
 	}
-	if err = driver.Execute(truncate); err != nil {
+	if err = driver.Execute(ctx, truncate); err != nil {
 		t.Fatalf("error executing query (%q) in teardown: %v", truncate, err)
 	}
 	_ = os.RemoveAll(path)
@@ -279,7 +288,7 @@ func collectAppliedVersions(t *testing.T, driver godfish.Driver, migrationsTable
 		}
 	}()
 
-	appliedVersions, err := driver.AppliedVersions(migrationsTable)
+	appliedVersions, err := driver.AppliedVersions(t.Context(), migrationsTable)
 	if err != nil {
 		t.Fatalf("could not retrieve applied versions; %v", err)
 	}
