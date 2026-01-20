@@ -5,6 +5,8 @@ set -eu
 DB_DRIVER='all'
 DEFAULT_OUTPUT_DIR="${HOME}/bin"
 OUTPUT_DIR="${DEFAULT_OUTPUT_DIR}"
+DEFAULT_RELEASE_TAG_VERSION='latest'
+RELEASE_TAG_VERSION="${DEFAULT_RELEASE_TAG_VERSION}"
 LOG_LEVEL="${LOG_LEVEL:-1}" # could be 1 2 or 3
 
 github_repo_owner=rafaelespinoza
@@ -38,12 +40,14 @@ Flags:
   -h  <bool> Show help.
   -o  <str>  Output directory to install binaries.
       This should be an absolute path. Default ${DEFAULT_OUTPUT_DIR}.
+  -t  <str>  Tagged release (version) to download.
+             Default ${DEFAULT_RELEASE_TAG_VERSION}.
 
 Examples:
   # show help
   $ ${0} -h
 
-  # install mysql driver to default location
+  # install sqlite3 driver to default location
   $ ${0} -d sqlite3
 
   # install all of the drivers to /usr/local/bin
@@ -127,6 +131,8 @@ download() {
 	uri="${1:?missing uri}"
 	output_dest="${2:?missing output_dest}"
 
+	print_debug "download, uri='${uri}'"
+
 	# For one-offs, there shouldn't be a need to include this. But for CI, it's
 	# helpful to send authenticated requests so that rate limiting is less of a
 	# factor in getting the tests to work.
@@ -175,15 +181,24 @@ download_release_assets() {
 	if has_command gh; then
 		# Use the pattern variable as a glob for this usage b/c that's what this
 		# command expects
-		gh -R "${github_repo_owner}/${github_repo_name}" release download -p ${checksums_file} -p "*${pattern}*"
+		if [ "${RELEASE_TAG_VERSION}" = "${DEFAULT_RELEASE_TAG_VERSION}" ]; then
+			gh -R "${github_repo_owner}/${github_repo_name}" release download -p ${checksums_file} -p "*${pattern}*"
+		else
+			gh -R "${github_repo_owner}/${github_repo_name}" release download "${RELEASE_TAG_VERSION}" -p ${checksums_file} -p "*${pattern}*"
+		fi
 		return 0
 	fi
 
 	# No gh? Consider installing it (https://cli.github.com/). Try this for now.
 
 	# Get metadata about the releases.
-	release_info='latest_release.json'
-	remote_release_url="https://api.github.com/repos/${github_repo_owner}/${github_repo_name}/releases/latest"
+	release_info='release.json'
+	remote_release_url="https://api.github.com/repos/${github_repo_owner}/${github_repo_name}/releases"
+	if [ "${RELEASE_TAG_VERSION}" = "${DEFAULT_RELEASE_TAG_VERSION}" ]; then
+		remote_release_url="${remote_release_url}/latest"
+	else
+		remote_release_url="${remote_release_url}/tags/${RELEASE_TAG_VERSION}"
+	fi
 	download "${remote_release_url}" "${release_info}"
 
 	# Figure out what the remote filenames are.
@@ -328,7 +343,7 @@ main() {
 		esac
 	fi
 
-	while getopts "d:ho:" opt; do
+	while getopts "d:ho:t:" opt; do
 		case "${opt}" in
 			d) DB_DRIVER="${OPTARG}" ;;
 			h | \?)
@@ -337,6 +352,9 @@ main() {
 				;;
 			o)
 				OUTPUT_DIR="${OPTARG}"
+				;;
+			t)
+				RELEASE_TAG_VERSION="${OPTARG}"
 				;;
 			*)
 				usage

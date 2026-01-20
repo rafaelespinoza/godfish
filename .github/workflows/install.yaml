@@ -102,3 +102,45 @@ jobs:
 
           echo >&2 "# running install.sh"
           ./scripts/install.sh -d "${DB_DRIVER:?missing DB_DRIVER}" -o "${INSTALL_DIR:?missing INSTALL_DIR}"
+
+      - name: Test using gh with specified tagged release
+        timeout-minutes: 5
+        env:
+          WANT_GH: true
+          WANT_JQ: true # for parsing version
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          INSTALL_DIR: ${{ env.INSTALL_BASE_DIR }}/want_gh_tagged
+        run: |
+          echo >&2 "# running setup_install_test.sh"
+          .github/workflows/setup_install_test.sh
+
+          declare -r tag=v0.13.0
+          echo >&2 "# running install.sh"
+          ./scripts/install.sh -d "${DB_DRIVER:?missing DB_DRIVER}" -o "${INSTALL_DIR:?missing INSTALL_DIR}" -t "${tag}"
+
+          echo >&2 "# now checking version"
+          # Invoke the "version" subcommand upon each binary downloaded, and
+          # require that the output matches.
+          find "${INSTALL_DIR}" -type f -exec {} version -json \; |
+            jq --arg tag "${tag}" --compact-output --exit-status 'select(.Tag == $tag)'
+
+      - name: Test without gh with specified tagged release
+        timeout-minutes: 5
+        env:
+          WANT_GH: false
+          WANT_JQ: true # for parsing version
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          INSTALL_DIR: ${{ env.INSTALL_BASE_DIR }}/no_gh_tagged
+        run: |
+          echo >&2 "# running setup_install_test.sh"
+          .github/workflows/setup_install_test.sh
+
+          declare -r tag=v0.13.0
+          echo >&2 "# running install.sh"
+          ./scripts/install.sh -d "${DB_DRIVER:?missing DB_DRIVER}" -o "${INSTALL_DIR:?missing INSTALL_DIR}" -t "${tag}"
+
+          echo >&2 "# now checking version"
+          # Invoke the "version" subcommand upon each binary downloaded, and
+          # require that the Tag matches.
+          find "${INSTALL_DIR}" -type f -exec {} version -json \; |
+            jq --arg tag "${tag}" --compact-output --exit-status 'select(.Tag == $tag)'
