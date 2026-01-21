@@ -4,7 +4,7 @@ services:
             context: ../..
             dockerfile: .ci/mysql/client.Containerfile
         depends_on:
-          - server
+            - server
         entrypoint: /client.sh server
         env_file: env
         environment:
@@ -16,9 +16,9 @@ services:
         tty: true
         volumes:
             -
-              type: bind
-              source: /tmp/godfish_test/mariadb/.test_coverage
-              target: /tmp
+                type: bind
+                source: /tmp/godfish_test/mariadb/.test_coverage
+                target: /tmp
     server:
         image: docker.io/mariadb:10.6
         env_file: env
@@ -26,9 +26,9 @@ services:
             - 3306
         volumes:
             -
-              type: volume
-              source: server
-              target: /var/lib/mysql
+                type: volume
+                source: server
+                target: /var/lib/mysql
 
 volumes:
     server:

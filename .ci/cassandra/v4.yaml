@@ -12,17 +12,17 @@ services:
         tty: true
         volumes:
             -
-              type: bind
-              source: /tmp/godfish_test/cassandra_v4/.test_coverage
-              target: /tmp
+                type: bind
+                source: /tmp/godfish_test/cassandra_v4/.test_coverage
+                target: /tmp
     server:
         image: docker.io/cassandra:4.1.10
         expose:
             - "9042"
         volumes:
             -
-              type: volume
-              source: server
-              target: /var/lib/cassandra
+                type: volume
+                source: server
+                target: /var/lib/cassandra
 volumes:
     server:

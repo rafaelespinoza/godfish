@@ -5,37 +5,37 @@ jobs:
     name: postgres v14
     runs-on: ubuntu-latest
     steps:
-    - name: Checkout repo
-      uses: actions/checkout@v6
-    - name: Install just
-      uses: extractions/setup-just@v3
-    - name: Build environment and run tests
-      run: just -f ci.Justfile postgres14-up
-    - name: Upload code coverage
-      uses: codecov/codecov-action@v5
-      with:
-        fail_ci_if_error: true
-        files: /tmp/godfish_test/postgres_v14/.test_coverage/cover.out,/tmp/godfish_test/postgres_v14/.test_coverage/cover_driver.out
-        token: ${{ secrets.CODECOV_TOKEN }}
-        verbose: true
-    - name: Teardown
-      run: just -f ci.Justfile postgres14-down
+      - name: Checkout repo
+        uses: actions/checkout@v6
+      - name: Install just
+        uses: extractions/setup-just@v3
+      - name: Build environment and run tests
+        run: just -f ci.Justfile postgres14-up
+      - name: Upload code coverage
+        uses: codecov/codecov-action@v5
+        with:
+          fail_ci_if_error: true
+          files: /tmp/godfish_test/postgres_v14/.test_coverage/cover.out,/tmp/godfish_test/postgres_v14/.test_coverage/cover_driver.out
+          token: ${{ secrets.CODECOV_TOKEN }}
+          verbose: true
+      - name: Teardown
+        run: just -f ci.Justfile postgres14-down
   v15:
     name: postgres v15
     runs-on: ubuntu-latest
     steps:
-    - name: Checkout repo
-      uses: actions/checkout@v6
-    - name: Install just
-      uses: extractions/setup-just@v3
-    - name: Build environment and run tests
-      run: just -f ci.Justfile postgres15-up
-    - name: Upload code coverage
-      uses: codecov/codecov-action@v5
-      with:
-        fail_ci_if_error: true
-        files: /tmp/godfish_test/postgres_v15/.test_coverage/cover.out,/tmp/godfish_test/postgres_v15/.test_coverage/cover_driver.out
-        token: ${{ secrets.CODECOV_TOKEN }}
-        verbose: true
-    - name: Teardown
-      run: just -f ci.Justfile postgres15-down
+      - name: Checkout repo
+        uses: actions/checkout@v6
+      - name: Install just
+        uses: extractions/setup-just@v3
+      - name: Build environment and run tests
+        run: just -f ci.Justfile postgres15-up
+      - name: Upload code coverage
+        uses: codecov/codecov-action@v5
+        with:
+          fail_ci_if_error: true
+          files: /tmp/godfish_test/postgres_v15/.test_coverage/cover.out,/tmp/godfish_test/postgres_v15/.test_coverage/cover_driver.out
+          token: ${{ secrets.CODECOV_TOKEN }}
+          verbose: true
+      - name: Teardown
+        run: just -f ci.Justfile postgres15-down

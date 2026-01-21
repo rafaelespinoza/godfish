@@ -4,18 +4,18 @@ jobs:
   all:
     runs-on: ubuntu-latest
     steps:
-    - name: Checkout repo
-      uses: actions/checkout@v6
-    - name: Install just
-      uses: extractions/setup-just@v3
-    - name: Build environment and run tests
-      run: just -f ci.Justfile sqlserver-up
-    - name: Upload code coverage
-      uses: codecov/codecov-action@v5
-      with:
-        fail_ci_if_error: true
-        files: /tmp/godfish_test/sqlserver/.test_coverage/cover.out,/tmp/godfish_test/sqlserver/.test_coverage/cover_driver.out
-        token: ${{ secrets.CODECOV_TOKEN }}
-        verbose: true
-    - name: Teardown
-      run: just -f ci.Justfile sqlserver-down
+      - name: Checkout repo
+        uses: actions/checkout@v6
+      - name: Install just
+        uses: extractions/setup-just@v3
+      - name: Build environment and run tests
+        run: just -f ci.Justfile sqlserver-up
+      - name: Upload code coverage
+        uses: codecov/codecov-action@v5
+        with:
+          fail_ci_if_error: true
+          files: /tmp/godfish_test/sqlserver/.test_coverage/cover.out,/tmp/godfish_test/sqlserver/.test_coverage/cover_driver.out
+          token: ${{ secrets.CODECOV_TOKEN }}
+          verbose: true
+      - name: Teardown
+        run: just -f ci.Justfile sqlserver-down

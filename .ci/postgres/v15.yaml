@@ -4,7 +4,7 @@ services:
             context: ../..
             dockerfile: .ci/postgres/client.Containerfile
         depends_on:
-          - server
+            - server
         entrypoint: /client.sh server
         env_file:
             - env
@@ -14,9 +14,9 @@ services:
         tty: true
         volumes:
             -
-              type: bind
-              source: /tmp/godfish_test/postgres_v15/.test_coverage
-              target: /tmp
+                type: bind
+                source: /tmp/godfish_test/postgres_v15/.test_coverage
+                target: /tmp
     server:
         build:
             context: ../..
@@ -27,9 +27,9 @@ services:
             - 5432
         volumes:
             -
-              type: volume
-              source: server
-              target: /var/lib/postgresql/data
+                type: volume
+                source: server
+                target: /var/lib/postgresql/data
 
 volumes:
     server:
