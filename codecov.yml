@@ -1,7 +1,7 @@
 coverage:
   status:
-    project: 'off'
-    patch: 'off'
+    project: false
+    patch: false
 
 ignore:
   # This package tests implementations of Driver. Shouldn't be counted in coverage.
