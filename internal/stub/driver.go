@@ -80,6 +80,7 @@ func (d *Driver) UpdateSchemaMigrations(ctx context.Context, migrationsTable str
 			Label:       label,
 			Version:     ver,
 			ExecutedAt:  now,
+			Applied:     true,
 		})
 	} else {
 		for i, v := range stubbedAV.versions {

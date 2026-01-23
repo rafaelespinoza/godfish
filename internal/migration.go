@@ -17,6 +17,7 @@ type Migration struct {
 	Indirection Indirection
 	Label       string
 	Version     Version
+	Applied     bool
 	ExecutedAt  time.Time
 }
 
@@ -72,10 +73,16 @@ func (m *Migration) LogValue() slog.Value {
 	ind := m.Indirection
 	ver := m.Version
 
+	var executedAt string
+	if x := m.ExecutedAt; !x.IsZero() {
+		executedAt = x.UTC().Format(time.RFC3339)
+	}
 	return slog.GroupValue(
 		slog.Group("indirection", slog.String("direction", ind.Value.String()), slog.String("label", ind.Label)),
 		slog.String("label", m.Label),
 		slog.Group("version", slog.String("string", ver.String()), slog.Int64("value", ver.Value())),
+		slog.Bool("applied", m.Applied),
+		slog.String("executed_at", executedAt),
 	)
 }
 

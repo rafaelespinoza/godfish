@@ -310,11 +310,17 @@ func (m *migrationFinder) query(ctx context.Context, driver Driver, migrationsTa
 		slog.Int("count", len(applied)),
 		slog.Any("applied", internal.Migrations(applied)),
 	)
-	if m.infoPrinter != nil {
-		if err = printMigrations(m.infoPrinter, "up", applied); err != nil {
+
+	defer func() {
+		if m.infoPrinter == nil {
 			return
 		}
-	}
+
+		if perr := printMigrations(m.infoPrinter, applied, out); perr != nil {
+			slog.Error("printing migrations", slog.Any("error", perr))
+		}
+	}()
+
 	lgr.Debug("about to filter migrations", slog.Group("migration_finder",
 		slog.String("direction", m.direction.String()),
 		slog.String("finish_at_version", m.finishAtVersion),
@@ -366,11 +372,6 @@ func (m *migrationFinder) query(ctx context.Context, driver Driver, migrationsTa
 		}
 		lgr.Debug("collected migration to apply", slog.Int("i", i), slog.String("version", version.String()))
 		out = append(out, mig)
-	}
-	if m.infoPrinter != nil {
-		if err = printMigrations(m.infoPrinter, "down", out); err != nil {
-			return
-		}
 	}
 	return
 }
@@ -448,6 +449,7 @@ func scanAppliedVersions(ctx context.Context, driver Driver, migrationsTable str
 			Label:       label,
 			Version:     ver,
 			ExecutedAt:  executedAtTime,
+			Applied:     true,
 		}
 
 		// If this data was originally inserted before the label column was present,
@@ -583,14 +585,11 @@ func newMigration(version string, ind internal.Indirection, label string) (out *
 	return
 }
 
-func printMigrations(p internal.InfoPrinter, state string, migrations []*internal.Migration) (err error) {
-	for i, mig := range migrations {
-		if err = p.PrintInfo(state, *mig); err != nil {
-			err = fmt.Errorf("%w; item %d", err, i)
-			return
-		}
-	}
-	return
+func printMigrations(p internal.InfoPrinter, applied, toApply []*internal.Migration) error {
+	toPrint := make([]*internal.Migration, 0, len(applied)+len(toApply))
+	toPrint = append(toPrint, applied...)
+	toPrint = append(toPrint, toApply...)
+	return p.PrintInfo(toPrint)
 }
 
 // ErrSchemaMigrationsMissingColumns means the schema migrations table exists,

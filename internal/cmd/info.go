@@ -56,11 +56,6 @@ func makeInfo(name string) alf.Directive {
 	versions would be applied, in either a forward or reverse direction, before
 	applying them.
 
-	Migrations are categorized as:
-
-	- up: Has been migrated against the DB.
-	- down: Available to migrate, but hasn't yet.
-
 	It also takes a "direction" flag if you want to know what would be applied
 	in a rollback or remigrate operation. The "version" flag can be used to
 	limit or extend the range of migrations to apply.
