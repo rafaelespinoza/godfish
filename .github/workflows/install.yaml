@@ -1,6 +1,14 @@
 ---
 name: install
-on: [push, pull_request]
+on:
+  push:
+    paths: [.github/workflows/setup_install_test.sh, scripts/install.sh]
+  pull_request:
+    paths: [.github/workflows/setup_install_test.sh, scripts/install.sh]
+  release:
+    types: [created, released]
+  workflow_dispatch:
+
 jobs:
   lint:
     runs-on: ubuntu-latest
