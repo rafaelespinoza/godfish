@@ -58,15 +58,17 @@ func makeMigrate(name string) alf.Directive {
 			}
 
 			dirFS := os.DirFS(commonArgs.Files)
-			err := godfish.Migrate(
-				ctx,
-				theDriver,
-				dirFS,
-				true,
-				version,
-				commonArgs.MigrationsTable,
-			)
-			return err
+
+			return withConnection(ctx, "", theDriver, func(ictx context.Context) error {
+				return godfish.Migrate(
+					ictx,
+					theDriver,
+					dirFS,
+					true,
+					version,
+					commonArgs.MigrationsTable,
+				)
+			})
 		},
 	}
 }
@@ -108,11 +110,14 @@ func makeRemigrate(name string) alf.Directive {
 
 			dirFS := os.DirFS(commonArgs.Files)
 			migrationsTable := commonArgs.MigrationsTable
-			err := godfish.ApplyMigration(ctx, theDriver, dirFS, false, "", migrationsTable)
-			if err != nil {
-				return err
-			}
-			return godfish.ApplyMigration(ctx, theDriver, dirFS, true, "", migrationsTable)
+
+			return withConnection(ctx, "", theDriver, func(ictx context.Context) error {
+				err := godfish.ApplyMigration(ictx, theDriver, dirFS, false, "", migrationsTable)
+				if err != nil {
+					return err
+				}
+				return godfish.ApplyMigration(ictx, theDriver, dirFS, true, "", migrationsTable)
+			})
 		},
 	}
 }
@@ -161,30 +166,36 @@ func makeRollback(name string) alf.Directive {
 				defer cancel()
 			}
 
-			var err error
 			dirFS := os.DirFS(commonArgs.Files)
 			migrationsTable := commonArgs.MigrationsTable
+			var f func(context.Context) error
 
 			if version == "" {
-				err = godfish.ApplyMigration(
-					ctx,
-					theDriver,
-					dirFS,
-					false,
-					version,
-					migrationsTable,
-				)
+				f = func(ictx context.Context) error {
+					return godfish.ApplyMigration(
+						ictx,
+						theDriver,
+						dirFS,
+						false,
+						version,
+						migrationsTable,
+					)
+				}
+
 			} else {
-				err = godfish.Migrate(
-					ctx,
-					theDriver,
-					dirFS,
-					false,
-					version,
-					migrationsTable,
-				)
+				f = func(ictx context.Context) error {
+					return godfish.Migrate(
+						ictx,
+						theDriver,
+						dirFS,
+						false,
+						version,
+						migrationsTable,
+					)
+				}
 			}
-			return err
+
+			return withConnection(ctx, "", theDriver, f)
 		},
 	}
 }

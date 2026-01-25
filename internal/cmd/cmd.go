@@ -25,7 +25,7 @@ var (
 	// bin is the name of the binary.
 	bin = os.Args[0]
 	// theDriver is passed in from a Driver's package main.
-	theDriver godfish.Driver
+	theDriver DriverConnector
 )
 
 // Root abstracts a top-level command from package main.
@@ -35,7 +35,7 @@ type Root interface {
 }
 
 // New constructs a top-level command with subcommands.
-func New(driver godfish.Driver, sampleDSN string) Root {
+func New(driver DriverConnector, sampleDSN string) Root {
 	theDriver = driver
 	del := &alf.Delegator{
 		Description: "main command for " + bin,
@@ -254,3 +254,54 @@ func resolveConfigVal(flags *flag.FlagSet, targetFlagName, valFromConf, defaultV
 }
 
 var exampleDurationVals = []string{"30s", "5m", "1h2m3s"}
+
+// DriverConnector is a godfish Driver with connection management.
+type DriverConnector interface {
+	godfish.Driver
+	Connector
+}
+
+// Connector manages DB connections.
+type Connector interface {
+	// Connect should open a connection to the database.
+	Connect(dsn string) error
+	// Close should close the database connection.
+	Close() error
+}
+
+// withConnection runs a DB operation f after connecting to the DB and before
+// closing the connection. The callback function f is passed the context ctx,
+// and is meant as a placeholder for a godfish.Driver.
+//
+// The input dsn (data source name) is a DB-specific connection string, and is
+// a soft requirement. If empty then it looks up an environment variable DB_DSN.
+// In the case that the input dsn is empty and the env var is unset or empty,
+// then this func returns with an error.
+func withConnection(ctx context.Context, dsn string, conn Connector, f func(context.Context) error) (err error) {
+	if dsn == "" {
+		if dsn, err = getDSN(); err != nil {
+			err = fmt.Errorf("missing input dsn, %w", err)
+			return
+		}
+	}
+
+	if err = conn.Connect(dsn); err != nil {
+		return err
+	}
+	defer func() {
+		if cerr := conn.Close(); cerr != nil {
+			slog.Warn("closing driver", slog.Any("error", cerr))
+		}
+	}()
+
+	err = f(ctx)
+	return
+}
+
+func getDSN() (dsn string, err error) {
+	dsn = os.Getenv(internal.DSNKey)
+	if dsn == "" {
+		err = fmt.Errorf("missing environment variable: %s", internal.DSNKey)
+	}
+	return
+}

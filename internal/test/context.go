@@ -21,10 +21,6 @@ func testContext(t *testing.T, driver godfish.Driver) {
 	const table = internal.DefaultMigrationsTableName
 
 	{ // Setup
-		if err := driver.Connect(mustDSN()); err != nil {
-			t.Fatal(err)
-		}
-		defer driver.Close()
 		defer func() {
 			// Reset
 			err := godfish.Migrate(t.Context(), driver, dirFS, false, "1234", table)

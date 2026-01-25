@@ -2,16 +2,12 @@ package godfish
 
 import "context"
 
-// Driver adapts a database implementation to use godfish.
+// Driver adapts a database implementation to use godfish. Implementations
+// are responsible opening a connection, maintaining it and closing it after
+// operations are done.
 type Driver interface {
 	// Name should return the name of the driver: ie: postgres, mysql, etc
 	Name() string
-
-	// Connect should open a connection to the database.
-	Connect(dsn string) error
-	// Close should close the database connection.
-	Close() error
-
 	// AppliedVersions queries the schema migrations table for migration
 	// versions that have been executed against the database. If the schema
 	// migrations table does not exist, the returned error should be

@@ -14,15 +14,15 @@ import (
 )
 
 // NewDriver creates a new mysql driver.
-func NewDriver() godfish.Driver { return &driver{} }
+func NewDriver() *Driver { return &Driver{} }
 
-// driver implements the godfish.Driver interface for mysql databases.
-type driver struct {
+// Driver implements the [godfish.Driver] interface for mysql databases.
+type Driver struct {
 	connection *sql.DB
 }
 
-func (d *driver) Name() string { return "mysql" }
-func (d *driver) Connect(dsn string) (err error) {
+func (d *Driver) Name() string { return "mysql" }
+func (d *Driver) Connect(dsn string) (err error) {
 	if d.connection != nil {
 		return
 	}
@@ -34,7 +34,7 @@ func (d *driver) Connect(dsn string) (err error) {
 	return
 }
 
-func (d *driver) Close() (err error) {
+func (d *Driver) Close() (err error) {
 	conn := d.connection
 	if conn == nil {
 		return
@@ -46,7 +46,7 @@ func (d *driver) Close() (err error) {
 
 var statementDelimiter = regexp.MustCompile(`;\s*\n`)
 
-func (d *driver) Execute(ctx context.Context, query string, args ...any) (err error) {
+func (d *Driver) Execute(ctx context.Context, query string, args ...any) (err error) {
 	// Attempt to support migrations with 1 or more statements. AFAIK, the
 	// standard library does not support executing multiple statements at once.
 	// As a workaround, break them up and apply them.
@@ -73,7 +73,7 @@ func (d *driver) Execute(ctx context.Context, query string, args ...any) (err er
 	return tx.Commit()
 }
 
-func (d *driver) CreateSchemaMigrationsTable(ctx context.Context, migrationsTable string) (err error) {
+func (d *Driver) CreateSchemaMigrationsTable(ctx context.Context, migrationsTable string) (err error) {
 	cleanedTableName, err := cleanIdentifier(migrationsTable)
 	if err != nil {
 		return
@@ -84,7 +84,7 @@ func (d *driver) CreateSchemaMigrationsTable(ctx context.Context, migrationsTabl
 	return
 }
 
-func (d *driver) AppliedVersions(ctx context.Context, migrationsTable string) (out godfish.AppliedVersions, err error) {
+func (d *Driver) AppliedVersions(ctx context.Context, migrationsTable string) (out godfish.AppliedVersions, err error) {
 	cleanedTableName, err := cleanIdentifier(migrationsTable)
 	if err != nil {
 		return
@@ -103,7 +103,7 @@ func (d *driver) AppliedVersions(ctx context.Context, migrationsTable string) (o
 	return
 }
 
-func (d *driver) UpdateSchemaMigrations(ctx context.Context, migrationsTable string, forward bool, version string) (err error) {
+func (d *Driver) UpdateSchemaMigrations(ctx context.Context, migrationsTable string, forward bool, version string) (err error) {
 	cleanedTableName, err := cleanIdentifier(migrationsTable)
 	if err != nil {
 		return

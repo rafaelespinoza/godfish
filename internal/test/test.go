@@ -19,8 +19,25 @@ import (
 	"github.com/rafaelespinoza/godfish/internal/stub"
 )
 
+// DriverConnector is a godfish.Driver with connection management.
+type DriverConnector interface {
+	godfish.Driver
+	Connect(dsn string) error
+	Close() error
+}
+
 // RunDriverTests tests an implementation of the [godfish.Driver] interface.
-func RunDriverTests(t *testing.T, d godfish.Driver) {
+// Callers should set the env var, DB_DSN.
+func RunDriverTests(t *testing.T, d DriverConnector) {
+	dsn := os.Getenv(internal.DSNKey)
+	if dsn == "" {
+		t.Fatalf("define env var %q for these tests", internal.DSNKey)
+	}
+	if err := d.Connect(dsn); err != nil {
+		t.Fatal(err)
+	}
+	defer d.Close()
+
 	var q testdataQueries
 	q.populateContents(t, d)
 
@@ -103,14 +120,6 @@ func (q *testdataQueries) populateContents(t *testing.T, d godfish.Driver) {
 
 type migrationContent struct{ Forward, Reverse string }
 
-func mustDSN() string {
-	dsn := os.Getenv(internal.DSNKey)
-	if dsn == "" {
-		panic("empty environment variable " + internal.DSNKey)
-	}
-	return dsn
-}
-
 // Magic option values for test setup and teardown.
 const (
 	skipMigration = "-"
@@ -141,10 +150,6 @@ func teardown(t *testing.T, driver godfish.Driver, path string, migrationsTable 
 	migrationsTable = cmp.Or(migrationsTable, internal.DefaultMigrationsTableName)
 
 	var err error
-	if err = driver.Connect(mustDSN()); err != nil {
-		t.Fatalf("error connecting to DB in teardown: %v", err)
-	}
-
 	// Use a context with its own timeout, rather than directly use the test's
 	// context to ensure that the caller's test cleanup does not prevent
 	// this function from completing.
@@ -171,9 +176,6 @@ func teardown(t *testing.T, driver godfish.Driver, path string, migrationsTable 
 		t.Fatalf("error executing query (%q) in teardown: %v", truncate, err)
 	}
 	_ = os.RemoveAll(path)
-	if err := driver.Close(); err != nil {
-		t.Fatalf("error closing driver in teardown: %v", err)
-	}
 }
 
 func formattedTime(v string) internal.Version {
@@ -276,17 +278,6 @@ func collectAppliedVersions(t *testing.T, driver godfish.Driver, migrationsTable
 	t.Helper()
 
 	migrationsTable = cmp.Or(migrationsTable, internal.DefaultMigrationsTableName)
-
-	// Collect output of AppliedVersions.
-	// Reconnect here because ApplyMigration closes the connection.
-	if err := driver.Connect(mustDSN()); err != nil {
-		t.Fatalf("connecting to DB from collectAppliedVersions: %s", err)
-	}
-	defer func() {
-		if cerr := driver.Close(); cerr != nil {
-			slog.Warn("closing driver from func collectAppliedVersions", slog.Any("error", cerr))
-		}
-	}()
 
 	appliedVersions, err := driver.AppliedVersions(t.Context(), migrationsTable)
 	if err != nil {

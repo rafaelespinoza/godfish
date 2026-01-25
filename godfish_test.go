@@ -3,15 +3,19 @@ package godfish_test
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"testing/fstest"
 
 	"github.com/rafaelespinoza/godfish"
 	"github.com/rafaelespinoza/godfish/internal"
 	"github.com/rafaelespinoza/godfish/internal/stub"
 	"github.com/rafaelespinoza/godfish/internal/test"
+	"github.com/rafaelespinoza/godfish/testdata"
 )
 
 func TestCreateMigrationFiles(t *testing.T) {
@@ -50,57 +54,91 @@ func TestCreateMigrationFiles(t *testing.T) {
 }
 
 func TestMigrate(t *testing.T) {
-	t.Run("missing DB_DSN", func(t *testing.T) {
-		t.Setenv(internal.DSNKey, "")
+	// There are more detailed tests in the internal/test package.
+	dirFS, err := fs.Sub(testdata.Migrations, "default")
+	if err != nil {
+		t.Fatal(err)
+	}
 
-		dirFS := os.DirFS(t.TempDir())
-		err := godfish.Migrate(t.Context(), stub.NewDriver(), dirFS, false, "", "")
-		if err == nil {
-			t.Fatalf("expected an error, got %v", err)
+	t.Run("all the way up and down", func(t *testing.T) {
+		driver := stub.NewDriver()
+		var err error
+		if err = godfish.Migrate(t.Context(), driver, dirFS, true, "", ""); err != nil {
+			t.Fatal(err)
 		}
-		got := err.Error()
-		if !strings.Contains(got, internal.DSNKey) {
-			t.Errorf("expected error message %q to mention %q", got, internal.DSNKey)
+
+		if err = godfish.Migrate(t.Context(), driver, dirFS, false, "", ""); err != nil {
+			t.Fatal(err)
+		}
+	})
+
+	t.Run("bad version", func(t *testing.T) {
+		driver := stub.NewDriver()
+		err := godfish.Migrate(t.Context(), driver, dirFS, true, "bad", "")
+		if err == nil {
+			t.Fatal("expected error")
+		}
+		t.Log(err)
+		if m := err.Error(); !strings.Contains(m, "version") {
+			t.Errorf("expected for error (%v) to mention %q", m, "version")
 		}
 	})
 }
 
 func TestApplyMigration(t *testing.T) {
-	t.Run("missing DB_DSN", func(t *testing.T) {
-		t.Setenv(internal.DSNKey, "")
+	// There are more detailed tests in the internal/test package.
+	okFS, err := fs.Sub(testdata.Migrations, "default")
+	if err != nil {
+		t.Fatal(err)
+	}
 
-		dirFS := os.DirFS(t.TempDir())
-		err := godfish.ApplyMigration(t.Context(), stub.NewDriver(), dirFS, false, "", "")
-		if err == nil {
-			t.Fatalf("expected an error, got %v", err)
+	t.Run("all the way up and down", func(t *testing.T) {
+		driver := stub.NewDriver()
+		var err error
+		if err = godfish.ApplyMigration(t.Context(), driver, okFS, true, "", ""); err != nil {
+			t.Fatal(err)
 		}
-		got := err.Error()
-		if !strings.Contains(got, internal.DSNKey) {
-			t.Errorf("expected error message %q to mention %q", got, internal.DSNKey)
+
+		if err = godfish.ApplyMigration(t.Context(), driver, okFS, false, "", ""); err != nil {
+			t.Fatal(err)
+		}
+	})
+
+	t.Run("version empty, not found", func(t *testing.T) {
+		driver := stub.NewDriver()
+		fsys := fstest.MapFS{}
+		err := godfish.ApplyMigration(t.Context(), driver, fsys, true, "", "")
+		if err == nil {
+			t.Fatal("expected an error but got nil")
+		}
+		t.Log(err)
+		if !errors.Is(err, internal.ErrNotFound) {
+			t.Errorf("expected for error (%v) to be %v", err, internal.ErrNotFound)
+		}
+	})
+
+	t.Run("version specified, not found", func(t *testing.T) {
+		driver := stub.NewDriver()
+		err := godfish.ApplyMigration(t.Context(), driver, okFS, true, "1111", "")
+		if err == nil {
+			t.Fatal("expected an error but got nil")
+		}
+		t.Log(err)
+		if !errors.Is(err, internal.ErrNotFound) {
+			t.Errorf("expected for error (%v) to be %v", err, internal.ErrNotFound)
 		}
 	})
 }
 
 func TestInfo(t *testing.T) {
-	t.Run("missing DB_DSN", func(t *testing.T) {
-		t.Setenv(internal.DSNKey, "")
-
-		dirFS := os.DirFS(t.TempDir())
-		err := godfish.Info(t.Context(), stub.NewDriver(), dirFS, false, "", os.Stderr, "", "")
-		if err == nil {
-			t.Fatalf("expected an error, got %v", err)
-		}
-		got := err.Error()
-		if !strings.Contains(got, internal.DSNKey) {
-			t.Errorf("expected error message %q to mention %q", got, internal.DSNKey)
-		}
-	})
+	okFS, err := fs.Sub(testdata.Migrations, "default")
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	t.Run("unknown format does not error out", func(t *testing.T) {
-		t.Setenv(internal.DSNKey, "test")
-
-		dirFS := os.DirFS(t.TempDir())
-		err := godfish.Info(t.Context(), stub.NewDriver(), dirFS, false, "", os.Stderr, "tea_ess_vee", "")
+		driver := stub.NewDriver()
+		err := godfish.Info(t.Context(), driver, okFS, false, "", os.Stderr, "tea_ess_vee", "")
 		if err != nil {
 			t.Fatalf("unexpected error, %v", err)
 		}

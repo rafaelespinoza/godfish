@@ -35,13 +35,15 @@ func Example_embed() {
 		migrationsDir fs.FS
 	)
 
-	// To connect to the DB with this library set the environment variable, DB_DSN.
-	dbDSN := filepath.Join(os.TempDir(), "godfish_test.sqlite")
-	if err = os.Setenv("DB_DSN", dbDSN); err != nil {
-		fmt.Println("setting env var DB_DSN", err)
+	// dsn is a database-specific connection string (data source name). In this
+	// sqlite3 example, it's a path to a file.
+	dsn := filepath.Join(os.TempDir(), "godfish_test.sqlite")
+	driver := sqlite3.NewDriver()
+	if err = driver.Connect(dsn); err != nil {
+		fmt.Println("connecting to DB", err)
 		return
 	}
-	driver := sqlite3.NewDriver()
+	defer func() { _ = driver.Close() }()
 
 	// Use fs.Sub to reference a subdirectory of the embedded files.
 	if migrationsDir, err = fs.Sub(migrationsFS, "testdata/default"); err != nil {

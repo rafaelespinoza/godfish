@@ -1,9 +1,11 @@
 package cmd
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -285,4 +287,162 @@ func TestConfiguration(t *testing.T) {
 			})
 		})
 	})
+}
+
+func TestWithConnection(t *testing.T) {
+	t.Run("dsn unset", func(t *testing.T) {
+		t.Setenv(internal.DSNKey, "")
+
+		conn := connector{}
+		err := withConnection(t.Context(), "", &conn, func(ictx context.Context) error {
+			return nil
+		})
+
+		if err == nil {
+			t.Fatal("expected an error")
+		}
+		if m := err.Error(); !strings.Contains(m, internal.DSNKey) {
+			t.Errorf("expected for error message (%v) to contain %q", m, internal.DSNKey)
+		}
+	})
+
+	for _, test := range []struct {
+		name      string
+		inputDSN  string
+		dsnEnvVar string
+	}{
+		{name: "input non-empty, env var empty", inputDSN: "input", dsnEnvVar: ""},
+		{name: "input empty, env var non-empty", inputDSN: "", dsnEnvVar: "envvar"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			t.Run("err Connect", func(t *testing.T) {
+				conn := connector{
+					ConnectFn: func(d string) error { return errors.New("connect") },
+				}
+
+				t.Setenv(internal.DSNKey, test.dsnEnvVar)
+				err := withConnection(t.Context(), test.inputDSN, &conn, func(ictx context.Context) error {
+					return nil
+				})
+
+				if err == nil {
+					t.Fatal("expected an error")
+				}
+				if m := err.Error(); !strings.Contains(m, "connect") {
+					t.Errorf("expected for error message (%v) to contain %q", m, "connect")
+				}
+			})
+
+			t.Run("err Close", func(t *testing.T) {
+				// capture log message
+				var buf bytes.Buffer
+				l := slog.Default()
+				t.Cleanup(func() { slog.SetDefault(l) })
+				slog.SetDefault(slog.New(slog.NewTextHandler(&buf, nil)))
+
+				conn := connector{
+					ConnectFn: func(d string) error { return nil },
+					CloseFn:   func() error { return errors.New("close") },
+				}
+
+				t.Setenv(internal.DSNKey, test.dsnEnvVar)
+				err := withConnection(t.Context(), test.inputDSN, &conn, func(ictx context.Context) error {
+					return nil
+				})
+
+				if err != nil {
+					t.Fatalf("unexpected error %v", err)
+				}
+
+				if got := buf.String(); !strings.Contains(got, "close") {
+					t.Errorf("expected for log message (%v) to contain %q", got, "close")
+				}
+			})
+
+			t.Run("err callback func f", func(t *testing.T) {
+				var calledConnect, calledClose bool
+				conn := connector{
+					ConnectFn: func(d string) error {
+						calledConnect = true
+						return nil
+					},
+					CloseFn: func() error {
+						calledClose = true
+						return nil
+					},
+				}
+
+				t.Setenv(internal.DSNKey, test.dsnEnvVar)
+				err := withConnection(t.Context(), test.inputDSN, &conn, func(ictx context.Context) error {
+					return errors.New("press f to pay respects")
+				})
+
+				if err == nil {
+					t.Fatal("expected an error")
+				}
+				if m := err.Error(); !strings.Contains(m, "press f to pay respects") {
+					t.Errorf("expected for error message (%v) to contain %q", m, "press f to pay respects")
+				}
+				if !calledConnect {
+					t.Error("expected to call Connect")
+				}
+				if !calledClose {
+					t.Error("expected to call Close")
+				}
+			})
+
+			t.Run("ok", func(t *testing.T) {
+				var calledConnect, calledClose bool
+				conn := connector{
+					ConnectFn: func(d string) error {
+						calledConnect = true
+						return nil
+					},
+					CloseFn: func() error {
+						calledClose = true
+						return nil
+					},
+				}
+				var calledF bool
+
+				t.Setenv(internal.DSNKey, test.dsnEnvVar)
+				err := withConnection(t.Context(), test.inputDSN, &conn, func(ictx context.Context) error {
+					calledF = true
+					return nil
+				})
+
+				if err != nil {
+					t.Fatalf("unexpected error %v", err)
+				}
+				if !calledConnect {
+					t.Error("expected to call Connect")
+				}
+				if !calledClose {
+					t.Error("expected to call Close")
+				}
+				if !calledF {
+					t.Error("expected to call function f")
+				}
+			})
+		})
+	}
+}
+
+type connector struct {
+	ConnectFn func(d string) error
+	CloseFn   func() error
+}
+
+func (c *connector) Connect(dsn string) error {
+	if c.ConnectFn == nil {
+		panic("define ConnectFn")
+	}
+	return c.ConnectFn(dsn)
+}
+
+func (c *connector) Close() error {
+	if c.CloseFn == nil {
+		panic("define CloseFn")
+	}
+	return c.CloseFn()
 }

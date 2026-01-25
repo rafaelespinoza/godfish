@@ -48,22 +48,7 @@ func CreateMigrationFiles(migrationName string, reversible bool, dirpath, fwdlab
 // it already exists.
 func Migrate(ctx context.Context, driver Driver, dirFS fs.FS, forward bool, finishAtVersion string, migrationsTable string) (err error) {
 	migrationsTable = cmp.Or(migrationsTable, internal.DefaultMigrationsTableName)
-	var (
-		dsn        string
-		migrations []*internal.Migration
-	)
-	if dsn, err = getDSN(); err != nil {
-		return
-	}
-	if err = driver.Connect(dsn); err != nil {
-		return
-	}
-	defer func() {
-		if cerr := driver.Close(); cerr != nil {
-			slog.Warn("closing driver from func Migrate", slog.Any("error", cerr))
-		}
-	}()
-
+	var migrations []*internal.Migration
 	direction := internal.DirReverse
 	if forward {
 		direction = internal.DirForward
@@ -109,22 +94,9 @@ var ErrSchemaMigrationsDoesNotExist = errors.New("schema migrations table does n
 func ApplyMigration(ctx context.Context, driver Driver, dirFS fs.FS, forward bool, version, migrationsTable string) (err error) {
 	migrationsTable = cmp.Or(migrationsTable, internal.DefaultMigrationsTableName)
 	var (
-		dsn        string
 		pathToFile string
 		mig        *internal.Migration
 	)
-
-	if dsn, err = getDSN(); err != nil {
-		return
-	}
-	if err = driver.Connect(dsn); err != nil {
-		return
-	}
-	defer func() {
-		if cerr := driver.Close(); cerr != nil {
-			slog.Warn("closing driver from func ApplyMigration", slog.Any("error", cerr))
-		}
-	}()
 
 	direction := internal.DirReverse
 	if forward {
@@ -250,18 +222,6 @@ func makeDurationMSAttr(startedAt time.Time) slog.Attr {
 // have the need to.
 func Info(ctx context.Context, driver Driver, directory fs.FS, forward bool, finishAtVersion string, w io.Writer, format string, migrationsTable string) (err error) {
 	migrationsTable = cmp.Or(migrationsTable, internal.DefaultMigrationsTableName)
-	var dsn string
-	if dsn, err = getDSN(); err != nil {
-		return
-	}
-	if err = driver.Connect(dsn); err != nil {
-		return err
-	}
-	defer func() {
-		if cerr := driver.Close(); cerr != nil {
-			slog.Warn("closing driver from func Info", slog.Any("error", cerr))
-		}
-	}()
 
 	direction := internal.DirReverse
 	if forward {
@@ -584,14 +544,6 @@ func printMigrations(p internal.InfoPrinter, state string, migrations []*interna
 			err = fmt.Errorf("%w; item %d", err, i)
 			return
 		}
-	}
-	return
-}
-
-func getDSN() (dsn string, err error) {
-	dsn = os.Getenv(internal.DSNKey)
-	if dsn == "" {
-		err = fmt.Errorf("missing environment variable: %s", internal.DSNKey)
 	}
 	return
 }

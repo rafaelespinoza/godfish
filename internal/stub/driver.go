@@ -11,17 +11,17 @@ import (
 	"github.com/rafaelespinoza/godfish/internal"
 )
 
-type driver struct {
+type Driver struct {
 	appliedVersions godfish.AppliedVersions
 }
 
-func NewDriver() godfish.Driver { return &driver{} }
+func NewDriver() *Driver { return &Driver{} }
 
-func (d *driver) Name() string             { return "stub" }
-func (d *driver) Connect(dsn string) error { return nil }
-func (d *driver) Close() error             { return nil }
+func (d *Driver) Name() string             { return "stub" }
+func (d *Driver) Connect(dsn string) error { return nil }
+func (d *Driver) Close() error             { return nil }
 
-func (d *driver) CreateSchemaMigrationsTable(ctx context.Context, migrationsTable string) error {
+func (d *Driver) CreateSchemaMigrationsTable(ctx context.Context, migrationsTable string) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -35,7 +35,7 @@ func (d *driver) CreateSchemaMigrationsTable(ctx context.Context, migrationsTabl
 	return nil
 }
 
-func (d *driver) Execute(ctx context.Context, q string, a ...any) error {
+func (d *Driver) Execute(ctx context.Context, q string, a ...any) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -45,7 +45,7 @@ func (d *driver) Execute(ctx context.Context, q string, a ...any) error {
 	return nil
 }
 
-func (d *driver) UpdateSchemaMigrations(ctx context.Context, migrationsTable string, forward bool, version string) error {
+func (d *Driver) UpdateSchemaMigrations(ctx context.Context, migrationsTable string, forward bool, version string) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -84,7 +84,7 @@ func (d *driver) UpdateSchemaMigrations(ctx context.Context, migrationsTable str
 	return nil
 }
 
-func (d *driver) AppliedVersions(ctx context.Context, migrationsTable string) (godfish.AppliedVersions, error) {
+func (d *Driver) AppliedVersions(ctx context.Context, migrationsTable string) (godfish.AppliedVersions, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
@@ -101,7 +101,7 @@ func (d *driver) AppliedVersions(ctx context.Context, migrationsTable string) (g
 // Teardown resets the stub driver in tests. All other Driver implementations
 // pass through without effect.
 func Teardown(drv godfish.Driver) {
-	d, ok := drv.(*driver)
+	d, ok := drv.(*Driver)
 	if !ok {
 		return
 	}

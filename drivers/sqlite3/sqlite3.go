@@ -9,19 +9,20 @@ import (
 
 	"github.com/rafaelespinoza/godfish"
 	"github.com/rafaelespinoza/godfish/internal"
+
 	sqlib "modernc.org/sqlite"
 )
 
 // NewDriver creates a new sqlite3 driver.
-func NewDriver() godfish.Driver { return &driver{} }
+func NewDriver() *Driver { return &Driver{} }
 
-// driver implements the Driver interface for sqlite3 databases.
-type driver struct {
+// Driver implements the [godfish.Driver] interface for sqlite3 databases.
+type Driver struct {
 	connection *sql.DB
 }
 
-func (d *driver) Name() string { return "sqlite" }
-func (d *driver) Connect(dsn string) (err error) {
+func (d *Driver) Name() string { return "sqlite" }
+func (d *Driver) Connect(dsn string) (err error) {
 	if d.connection != nil {
 		return
 	}
@@ -33,7 +34,7 @@ func (d *driver) Connect(dsn string) (err error) {
 	return
 }
 
-func (d *driver) Close() (err error) {
+func (d *Driver) Close() (err error) {
 	conn := d.connection
 	if conn == nil {
 		return
@@ -43,12 +44,12 @@ func (d *driver) Close() (err error) {
 	return
 }
 
-func (d *driver) Execute(ctx context.Context, query string, args ...any) (err error) {
+func (d *Driver) Execute(ctx context.Context, query string, args ...any) (err error) {
 	_, err = d.connection.ExecContext(ctx, query)
 	return
 }
 
-func (d *driver) CreateSchemaMigrationsTable(ctx context.Context, migrationsTable string) (err error) {
+func (d *Driver) CreateSchemaMigrationsTable(ctx context.Context, migrationsTable string) (err error) {
 	cleanedTableName, err := cleanIdentifier(migrationsTable)
 	if err != nil {
 		return
@@ -59,7 +60,7 @@ func (d *driver) CreateSchemaMigrationsTable(ctx context.Context, migrationsTabl
 	return
 }
 
-func (d *driver) AppliedVersions(ctx context.Context, migrationsTable string) (out godfish.AppliedVersions, err error) {
+func (d *Driver) AppliedVersions(ctx context.Context, migrationsTable string) (out godfish.AppliedVersions, err error) {
 	cleanedTableName, err := cleanIdentifier(migrationsTable)
 	if err != nil {
 		return
@@ -78,7 +79,7 @@ func (d *driver) AppliedVersions(ctx context.Context, migrationsTable string) (o
 	return
 }
 
-func (d *driver) UpdateSchemaMigrations(ctx context.Context, migrationsTable string, forward bool, version string) (err error) {
+func (d *Driver) UpdateSchemaMigrations(ctx context.Context, migrationsTable string, forward bool, version string) (err error) {
 	cleanedTableName, err := cleanIdentifier(migrationsTable)
 	if err != nil {
 		return
