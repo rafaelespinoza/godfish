@@ -8,25 +8,31 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/rafaelespinoza/godfish/internal"
-	"github.com/rafaelespinoza/godfish/internal/stub"
 )
 
 func TestTSV(t *testing.T) {
 	var buf bytes.Buffer
 	names := []string{"alfa", "bravo", "charlie", "delta"}
 
-	if err := printMigrations(internal.NewTSV(&buf), "up", mustMakeMigrations(t, names...)); err != nil {
+	// Set up migrations to print. The first half is considered in the past,
+	// applied. The latter half is considered in the future, not yet applied.
+	migrations := mustMakeMigrations(t, names...)
+	if err := printMigrations(internal.NewTSV(&buf), "up", migrations[:2]); err != nil {
+		t.Fatal(err)
+	}
+	if err := printMigrations(internal.NewTSV(&buf), "down", migrations[2:]); err != nil {
 		t.Fatal(err)
 	}
 
-	const numExpectedParts = 3
+	const numExpectedParts = 4
 	expected := [][numExpectedParts]string{
-		{"up", "1000", "forward-1000-alfa.sql"},
-		{"up", "2000", "forward-2000-bravo.sql"},
-		{"up", "3000", "forward-3000-charlie.sql"},
-		{"up", "4000", "forward-4000-delta.sql"},
+		{"up", "1000", "1000-01-02 15:04:05", "alfa"},
+		{"up", "2000", "2000-01-02 15:04:05", "bravo"},
+		{"down", "3000", "", "charlie"},
+		{"down", "4000", "", "delta"},
 	}
 
 	for i := range len(names) {
@@ -58,15 +64,21 @@ func TestJSON(t *testing.T) {
 	var buf bytes.Buffer
 	names := []string{"alfa", "bravo", "charlie", "delta"}
 
-	if err := printMigrations(internal.NewJSON(&buf), "up", mustMakeMigrations(t, names...)); err != nil {
+	// Set up migrations to print. The first half is considered in the past,
+	// applied. The latter half is considered in the future, not yet applied.
+	migrations := mustMakeMigrations(t, names...)
+	if err := printMigrations(internal.NewJSON(&buf), "up", migrations[:2]); err != nil {
+		t.Fatal(err)
+	}
+	if err := printMigrations(internal.NewJSON(&buf), "down", migrations[2:]); err != nil {
 		t.Fatal(err)
 	}
 
 	expected := []map[string]string{
-		{"state": "up", "version": "1000", "filename": "forward-1000-alfa.sql"},
-		{"state": "up", "version": "2000", "filename": "forward-2000-bravo.sql"},
-		{"state": "up", "version": "3000", "filename": "forward-3000-charlie.sql"},
-		{"state": "up", "version": "4000", "filename": "forward-4000-delta.sql"},
+		{"state": "up", "version": "1000", "executed_at": "1000-01-02 15:04:05", "label": "alfa"},
+		{"state": "up", "version": "2000", "executed_at": "2000-01-02 15:04:05", "label": "bravo"},
+		{"state": "down", "version": "3000", "executed_at": "", "label": "charlie"},
+		{"state": "down", "version": "4000", "executed_at": "", "label": "delta"},
 	}
 
 	for i := range len(names) {
@@ -79,7 +91,7 @@ func TestJSON(t *testing.T) {
 		if err := json.Unmarshal(line, &data); err != nil {
 			t.Fatal(err)
 		}
-		expectedKeys := []string{"state", "version", "filename"}
+		expectedKeys := []string{"state", "version", "executed_at", "label"}
 		if len(data) != len(expectedKeys) {
 			t.Errorf("wrong number of keys; got %d, expected %d", len(data), len(expectedKeys))
 		}
@@ -98,30 +110,39 @@ func TestJSON(t *testing.T) {
 	}
 }
 
-func mustMakeMigrations(t *testing.T, names ...string) []*internal.Migration {
+// mustMakeMigrations creates migrations based on the input labels. The index
+// position of each label in labels indirectly determines the Version,
+// ExecutedAt fields of each Migration.
+func mustMakeMigrations(t *testing.T, labels ...string) []internal.Migration {
 	t.Helper()
 
-	dir := t.TempDir()
+	out := make([]internal.Migration, len(labels))
+	now := time.Now()
 
-	out := make([]*internal.Migration, len(names))
-
-	for i := range len(names) {
-		params, err := internal.NewMigrationParams(names[i], false, dir, "forward", "reverse")
+	for i, label := range labels {
+		num := (i + 1) * 1000
+		version, err := internal.ParseVersion(strconv.Itoa(num))
 		if err != nil {
 			t.Fatalf("error on names[%d]: %v", i, err)
 		}
-		version, err := internal.ParseVersion(strconv.Itoa((i + 1) * 1000))
-		if err != nil {
-			t.Fatalf("error on names[%d]: %v", i, err)
+
+		mig := internal.Migration{
+			Indirection: internal.Indirection{Label: "forward", Value: internal.DirForward},
+			Label:       label,
+			Version:     version,
 		}
-		out[i] = stub.NewMigration(params.Forward, version, internal.Indirection{})
+		executedAt := time.Date(num, time.January, 2, 15, 4, 5, 0, time.UTC)
+		if executedAt.Before(now) {
+			mig.ExecutedAt = executedAt
+		}
+		out[i] = mig
 	}
 	return out
 }
 
-func printMigrations(p internal.InfoPrinter, state string, migrations []*internal.Migration) (err error) {
+func printMigrations(p internal.InfoPrinter, state string, migrations []internal.Migration) (err error) {
 	for i, mig := range migrations {
-		if err = p.PrintInfo(state, *mig); err != nil {
+		if err = p.PrintInfo(state, mig); err != nil {
 			err = fmt.Errorf("%w; item %d", err, i)
 			return
 		}

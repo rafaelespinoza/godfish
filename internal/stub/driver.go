@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/rafaelespinoza/godfish"
 	"github.com/rafaelespinoza/godfish/internal"
@@ -45,7 +46,7 @@ func (d *Driver) Execute(ctx context.Context, q string, a ...any) error {
 	return nil
 }
 
-func (d *Driver) UpdateSchemaMigrations(ctx context.Context, migrationsTable string, forward bool, version string) error {
+func (d *Driver) UpdateSchemaMigrations(ctx context.Context, migrationsTable string, forward bool, version, label string) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -69,10 +70,20 @@ func (d *Driver) UpdateSchemaMigrations(ctx context.Context, migrationsTable str
 		)
 	}
 	if forward {
-		stubbedAV.versions = append(stubbedAV.versions, version)
+		ver, err := internal.ParseVersion(version)
+		if err != nil {
+			return fmt.Errorf("failed to parse version from %q: %w", version, err)
+		}
+		now := time.Now().UTC()
+		stubbedAV.versions = append(stubbedAV.versions, internal.Migration{
+			Indirection: internal.Indirection{Value: internal.DirForward, Label: "forward"},
+			Label:       label,
+			Version:     ver,
+			ExecutedAt:  now,
+		})
 	} else {
 		for i, v := range stubbedAV.versions {
-			if v == version {
+			if version == v.Version.String() {
 				stubbedAV.versions = append(
 					stubbedAV.versions[:i],
 					stubbedAV.versions[i+1:]...,

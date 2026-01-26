@@ -70,8 +70,8 @@ func testApplyMigration(t *testing.T, driver godfish.Driver, queries testdataQue
 			}
 		}
 
-		actualVersions := collectAppliedVersions(t, driver, expected.migrationsTable)
-		testAppliedVersions(t, actualVersions, expected.appliedVersions)
+		actualVersions := collectAppliedMigrations(t, driver, expected.migrationsTable)
+		testAppliedMigrations(t, actualVersions, expected.appliedVersions)
 	}
 
 	var defaultStubs = []testDriverStub{
@@ -521,8 +521,8 @@ func testApplyMigration(t *testing.T, driver godfish.Driver, queries testdataQue
 		for _, test := range invalidMigrationsTableTestCases {
 			t.Run(test.name, func(t *testing.T) {
 				// Check that there's a clean slate.
-				appliedVersions := collectAppliedVersions(t, driver, okTable)
-				testAppliedVersions(t, appliedVersions, []string{})
+				appliedVersions := collectAppliedMigrations(t, driver, okTable)
+				testAppliedMigrations(t, appliedVersions, []string{})
 
 				// // Check that it didn't try to do something silly, like update another table instead.
 				// appliedVersions = collectAppliedVersions(t, driver, internal.DefaultMigrationsTableName)

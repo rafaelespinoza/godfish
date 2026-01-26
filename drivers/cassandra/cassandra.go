@@ -5,6 +5,7 @@ import (
 	"context"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/gocql/gocql"
 	"github.com/rafaelespinoza/godfish"
@@ -72,7 +73,11 @@ func (d *Driver) CreateSchemaMigrationsTable(ctx context.Context, migrationsTabl
 		return
 	}
 
-	q := `CREATE TABLE IF NOT EXISTS ` + cleanedTableName + ` (migration_id TEXT PRIMARY KEY)`
+	q := `CREATE TABLE IF NOT EXISTS ` + cleanedTableName + ` (
+	migration_id TEXT PRIMARY KEY,
+	label TEXT,
+	executed_at BIGINT
+)`
 	err = d.connection.Query(q).WithContext(ctx).Exec()
 	return
 }
@@ -83,7 +88,7 @@ func (d *Driver) AppliedVersions(ctx context.Context, migrationsTable string) (o
 		return
 	}
 
-	q := `SELECT migration_id FROM ` + cleanedTableName
+	q := `SELECT migration_id, label, executed_at FROM ` + cleanedTableName
 	query := d.connection.Query(q).WithContext(ctx)
 
 	av := execAllAscending(query)
@@ -112,7 +117,7 @@ func (d *Driver) AppliedVersions(ctx context.Context, migrationsTable string) (o
 	return
 }
 
-func (d *Driver) UpdateSchemaMigrations(ctx context.Context, migrationsTable string, forward bool, version string) (err error) {
+func (d *Driver) UpdateSchemaMigrations(ctx context.Context, migrationsTable string, forward bool, version, label string) (err error) {
 	cleanedTableName, err := cleanIdentifier(migrationsTable)
 	if err != nil {
 		return
@@ -121,11 +126,13 @@ func (d *Driver) UpdateSchemaMigrations(ctx context.Context, migrationsTable str
 	conn := d.connection
 	var q string
 	if forward {
-		q = `INSERT INTO ` + cleanedTableName + ` (migration_id) VALUES (?)`
+		q = `INSERT INTO ` + cleanedTableName + ` (migration_id, label, executed_at) VALUES (?, ?, ?)`
+		now := time.Now().UTC()
+		err = conn.Query(q, version, label, now.Unix()).WithContext(ctx).Exec()
 	} else {
 		q = `DELETE FROM ` + cleanedTableName + ` WHERE migration_id = ?`
+		err = conn.Query(q, version).WithContext(ctx).Exec()
 	}
-	err = conn.Query(q, version).WithContext(ctx).Exec()
 	return
 }
 

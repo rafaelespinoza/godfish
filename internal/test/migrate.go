@@ -19,17 +19,17 @@ func testMigrate(t *testing.T, driver godfish.Driver, queries testdataQueries) {
 			t.Fatalf("could not Migrate in %s Direction; %v", internal.DirForward, err)
 		}
 
-		appliedVersions := collectAppliedVersions(t, driver, migrationsTable)
-		testAppliedVersions(t, appliedVersions, expectedVersions)
+		appliedVersions := collectAppliedMigrations(t, driver, migrationsTable)
+		testAppliedMigrations(t, appliedVersions, expectedVersions)
 
 		err = godfish.Migrate(t.Context(), driver, dirFS, false, expectedVersions[0], migrationsTable)
 		if err != nil {
 			t.Fatalf("could not Migrate in %s Direction; %v", internal.DirReverse, err)
 		}
 
-		appliedVersions = collectAppliedVersions(t, driver, migrationsTable)
+		appliedVersions = collectAppliedMigrations(t, driver, migrationsTable)
 		expectedVersions = []string{}
-		testAppliedVersions(t, appliedVersions, expectedVersions)
+		testAppliedMigrations(t, appliedVersions, expectedVersions)
 	}
 
 	t.Run("migrations on filesystem", func(t *testing.T) {
@@ -86,8 +86,8 @@ func testMigrate(t *testing.T, driver godfish.Driver, queries testdataQueries) {
 		for _, test := range invalidMigrationsTableTestCases {
 			t.Run(test.name, func(t *testing.T) {
 				// Check that there's a clean slate.
-				appliedVersions := collectAppliedVersions(t, driver, internal.DefaultMigrationsTableName)
-				testAppliedVersions(t, appliedVersions, []string{})
+				appliedVersions := collectAppliedMigrations(t, driver, internal.DefaultMigrationsTableName)
+				testAppliedMigrations(t, appliedVersions, []string{})
 
 				err := godfish.Migrate(t.Context(), driver, dirFS, true, "", test.migrationsTable)
 				if !errors.Is(err, internal.ErrDataInvalid) {
@@ -98,8 +98,8 @@ func testMigrate(t *testing.T, driver godfish.Driver, queries testdataQueries) {
 				}
 
 				// Check that it didn't try to do something silly, like update another table instead.
-				appliedVersions = collectAppliedVersions(t, driver, internal.DefaultMigrationsTableName)
-				testAppliedVersions(t, appliedVersions, []string{})
+				appliedVersions = collectAppliedMigrations(t, driver, internal.DefaultMigrationsTableName)
+				testAppliedMigrations(t, appliedVersions, []string{})
 			})
 		}
 	})

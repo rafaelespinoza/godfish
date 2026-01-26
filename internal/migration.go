@@ -17,6 +17,7 @@ type Migration struct {
 	Indirection Indirection
 	Label       string
 	Version     Version
+	ExecutedAt  time.Time
 }
 
 // ParseMigration constructs a Migration from a Filename.

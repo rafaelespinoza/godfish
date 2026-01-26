@@ -14,10 +14,10 @@ func testUpdateSchemaMigrations(t *testing.T, driver godfish.Driver) {
 		for _, test := range invalidMigrationsTableTestCases {
 			t.Run(test.name, func(t *testing.T) {
 				// Check that there's a clean slate.
-				appliedVersions := collectAppliedVersions(t, driver, internal.DefaultMigrationsTableName)
-				testAppliedVersions(t, appliedVersions, []string{})
+				appliedVersions := collectAppliedMigrations(t, driver, internal.DefaultMigrationsTableName)
+				testAppliedMigrations(t, appliedVersions, []string{})
 
-				err := driver.UpdateSchemaMigrations(t.Context(), test.migrationsTable, true, "1234")
+				err := driver.UpdateSchemaMigrations(t.Context(), test.migrationsTable, true, "1234", test.migrationsTable)
 				if !errors.Is(err, internal.ErrDataInvalid) {
 					t.Fatalf("expected error (%v) to match %v", err, internal.ErrDataInvalid)
 				}
@@ -26,8 +26,8 @@ func testUpdateSchemaMigrations(t *testing.T, driver godfish.Driver) {
 				}
 
 				// Check that it didn't try to do something silly, like update another table instead.
-				appliedVersions = collectAppliedVersions(t, driver, internal.DefaultMigrationsTableName)
-				testAppliedVersions(t, appliedVersions, []string{})
+				appliedVersions = collectAppliedMigrations(t, driver, internal.DefaultMigrationsTableName)
+				testAppliedMigrations(t, appliedVersions, []string{})
 			})
 		}
 	})

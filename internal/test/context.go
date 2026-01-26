@@ -27,21 +27,21 @@ func testContext(t *testing.T, driver godfish.Driver) {
 			if err != nil {
 				t.Fatalf("resetting DB, could not Migrate in %s Direction; %v", internal.DirReverse, err)
 			}
-			appliedVersions := collectAppliedVersions(t, driver, table)
-			testAppliedVersions(t, appliedVersions, []string{})
+			appliedVersions := collectAppliedMigrations(t, driver, table)
+			testAppliedMigrations(t, appliedVersions, []string{})
 		}()
 		if err = driver.CreateSchemaMigrationsTable(t.Context(), table); err != nil {
 			t.Fatal(err)
 		}
 
 		// Ensure a clean slate, then set expected state.
-		appliedVersions := collectAppliedVersions(t, driver, table)
-		testAppliedVersions(t, appliedVersions, []string{})
+		appliedVersions := collectAppliedMigrations(t, driver, table)
+		testAppliedMigrations(t, appliedVersions, []string{})
 		if err = godfish.ApplyMigration(t.Context(), driver, dirFS, true, "1234", table); err != nil {
 			t.Fatal(err)
 		}
-		appliedVersions = collectAppliedVersions(t, driver, table)
-		testAppliedVersions(t, appliedVersions, []string{"1234"})
+		appliedVersions = collectAppliedMigrations(t, driver, table)
+		testAppliedMigrations(t, appliedVersions, []string{"1234"})
 	}
 
 	t.Run("timeout", func(t *testing.T) {
@@ -53,8 +53,8 @@ func testContext(t *testing.T, driver godfish.Driver) {
 		if !errors.Is(err, context.DeadlineExceeded) {
 			t.Errorf("expected for error (%v) to match %v", err, context.DeadlineExceeded)
 		}
-		appliedVersions := collectAppliedVersions(t, driver, table)
-		testAppliedVersions(t, appliedVersions, []string{"1234"})
+		appliedVersions := collectAppliedMigrations(t, driver, table)
+		testAppliedMigrations(t, appliedVersions, []string{"1234"})
 	})
 
 	t.Run("cancel", func(t *testing.T) {
@@ -66,7 +66,7 @@ func testContext(t *testing.T, driver godfish.Driver) {
 		if !errors.Is(err, context.Canceled) {
 			t.Errorf("expected for error (%v) to match %v", err, context.Canceled)
 		}
-		appliedVersions := collectAppliedVersions(t, driver, table)
-		testAppliedVersions(t, appliedVersions, []string{"1234"})
+		appliedVersions := collectAppliedMigrations(t, driver, table)
+		testAppliedMigrations(t, appliedVersions, []string{"1234"})
 	})
 }

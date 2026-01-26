@@ -197,6 +197,7 @@ func runMigration(ctx context.Context, driver Driver, dir fs.FS, pathToFile stri
 		migrationsTable,
 		mig.Indirection.Value == internal.DirForward,
 		mig.Version.String(),
+		mig.Label,
 	)
 	if err != nil {
 		lgr.Error("updating schema migrations table", slog.Any("error", err), makeDurationMSAttr(startTime))
@@ -294,7 +295,7 @@ func (m *migrationFinder) query(ctx context.Context, driver Driver, migrationsTa
 		slog.Int("count", len(available)),
 		slog.Any("available", internal.Migrations(available)),
 	)
-	applied, err := scanAppliedVersions(ctx, driver, m.dirFS, migrationsTable)
+	applied, err := scanAppliedVersions(ctx, driver, migrationsTable)
 	if errors.Is(err, ErrSchemaMigrationsDoesNotExist) {
 		// The next invocation of CreateSchemaMigrationsTable should fix this.
 		// We can continue with zero value for now.
@@ -408,7 +409,7 @@ func (m *migrationFinder) available() (out []*internal.Migration, err error) {
 	return
 }
 
-func scanAppliedVersions(ctx context.Context, driver Driver, dirFS fs.FS, migrationsTable string) (out []*internal.Migration, err error) {
+func scanAppliedVersions(ctx context.Context, driver Driver, migrationsTable string) (out []*internal.Migration, err error) {
 	var rows AppliedVersions
 	if rows, err = driver.AppliedVersions(ctx, migrationsTable); err != nil {
 		return
@@ -419,26 +420,27 @@ func scanAppliedVersions(ctx context.Context, driver Driver, dirFS fs.FS, migrat
 		}
 	}()
 	for rows.Next() {
-		var version, basename string
-		var mig *internal.Migration
-		if err = rows.Scan(&version); err != nil {
+		var version, label string
+		var executedAt int64
+		if err = rows.Scan(&version, &label, &executedAt); err != nil {
 			return
 		}
-		basename, err = figureOutBasename(dirFS, internal.DirForward, version)
-		lgr := slog.With(slog.String("version", version), slog.String("basename", basename))
-		if errors.Is(err, internal.ErrNotFound) {
-			lgr.Warn("scanning applied versions and figuring out basename, swallowing error and continuing", slog.Any("error", err))
-			err = nil // swallow error and continue
-		} else if err != nil {
+
+		ver, verr := internal.ParseVersion(version)
+		if verr != nil {
+			err = fmt.Errorf("%w; while scanning applied versions, parsing version (%v) from DB: %w", internal.ErrDataInvalid, version, verr)
 			return
 		}
-		mig, err = internal.ParseMigration(internal.Filename(basename))
-		if errors.Is(err, internal.ErrDataInvalid) {
-			lgr.Warn("scanning applied versions and parsing migration basename, swallowing error and continuing", slog.Any("error", err))
-			err = nil // swallow error and continue
-		} else if mig != nil {
-			out = append(out, mig)
+		var executedAtTime time.Time
+		if executedAt > 0 {
+			executedAtTime = time.Unix(executedAt, 0).UTC()
 		}
+		out = append(out, &internal.Migration{
+			Indirection: internal.Indirection{Value: internal.DirForward},
+			Label:       label,
+			Version:     ver,
+			ExecutedAt:  executedAtTime,
+		})
 	}
 
 	return

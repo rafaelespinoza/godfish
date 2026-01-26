@@ -4,6 +4,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"time"
 
 	"github.com/lib/pq"
 	"github.com/rafaelespinoza/godfish"
@@ -52,7 +53,11 @@ func (d *Driver) CreateSchemaMigrationsTable(ctx context.Context, migrationsTabl
 		return
 	}
 
-	q := `CREATE TABLE IF NOT EXISTS ` + cleanedTableName + ` (migration_id VARCHAR(128) PRIMARY KEY NOT NULL)`
+	q := `CREATE TABLE IF NOT EXISTS ` + cleanedTableName + ` (
+	migration_id VARCHAR(128) PRIMARY KEY NOT NULL,
+	label VARCHAR(255) DEFAULT '',
+	executed_at BIGINT DEFAULT 0
+)`
 	_, err = d.connection.ExecContext(ctx, q)
 	return
 }
@@ -64,7 +69,7 @@ func (d *Driver) AppliedVersions(ctx context.Context, migrationsTable string) (o
 	}
 
 	// #nosec G202 -- table name was sanitized
-	q := `SELECT migration_id FROM ` + cleanedTableName + ` ORDER BY migration_id ASC`
+	q := `SELECT migration_id, label, executed_at FROM ` + cleanedTableName + ` ORDER BY migration_id ASC`
 	rows, err := d.connection.QueryContext(ctx, q)
 	if ierr, ok := err.(*pq.Error); ok {
 		// https://www.postgresql.org/docs/current/errcodes-appendix.html
@@ -76,7 +81,7 @@ func (d *Driver) AppliedVersions(ctx context.Context, migrationsTable string) (o
 	return
 }
 
-func (d *Driver) UpdateSchemaMigrations(ctx context.Context, migrationsTable string, forward bool, version string) (err error) {
+func (d *Driver) UpdateSchemaMigrations(ctx context.Context, migrationsTable string, forward bool, version, label string) (err error) {
 	cleanedTableName, err := cleanIdentifier(migrationsTable)
 	if err != nil {
 		return
@@ -86,8 +91,9 @@ func (d *Driver) UpdateSchemaMigrations(ctx context.Context, migrationsTable str
 	var q string
 	if forward {
 		// #nosec G202 -- table name was sanitized
-		q = `INSERT INTO ` + cleanedTableName + ` (migration_id) VALUES ($1) RETURNING migration_id`
-		_, err = conn.ExecContext(ctx, q, version)
+		q = `INSERT INTO ` + cleanedTableName + ` (migration_id, label, executed_at) VALUES ($1, $2, $3) RETURNING migration_id`
+		now := time.Now().UTC()
+		_, err = conn.ExecContext(ctx, q, version, label, now.Unix())
 	} else {
 		// #nosec G202 -- table name was sanitized
 		q = `DELETE FROM ` + cleanedTableName + ` WHERE migration_id = $1 RETURNING migration_id`

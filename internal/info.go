@@ -3,6 +3,7 @@ package internal
 import (
 	"fmt"
 	"io"
+	"time"
 )
 
 // InfoPrinter outputs the state of one migration.
@@ -22,8 +23,8 @@ type jsonPrinter struct{ w io.Writer }
 func (p *tsvPrinter) PrintInfo(state string, mig Migration) (e error) {
 	_, e = fmt.Fprintf(
 		p.w,
-		"%s\t%s\t%s\n",
-		state, mig.Version.String(), mig.ToFilename(),
+		"%s\t%s\t%s\t%s\n",
+		state, mig.Version.String(), formatTime(mig.ExecutedAt), mig.Label,
 	)
 	return
 }
@@ -31,9 +32,17 @@ func (p *tsvPrinter) PrintInfo(state string, mig Migration) (e error) {
 func (p *jsonPrinter) PrintInfo(state string, mig Migration) (e error) {
 	_, e = fmt.Fprintf(
 		p.w,
-		`{"state":%q,"version":%q,"filename":%q}
+		`{"state":%q,"version":%q,"executed_at":%q,"label":%q}
 `, // delimit each migration by a newline.
-		state, mig.Version.String(), mig.ToFilename(),
+		state, mig.Version.String(), formatTime(mig.ExecutedAt), mig.Label,
 	)
 	return
+}
+
+func formatTime(t time.Time) string {
+	t = t.UTC()
+	if t.IsZero() {
+		return ""
+	}
+	return t.Format(time.DateTime)
 }

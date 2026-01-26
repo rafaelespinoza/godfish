@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"time"
 
 	my "github.com/go-sql-driver/mysql"
 	"github.com/rafaelespinoza/godfish"
@@ -79,7 +80,11 @@ func (d *Driver) CreateSchemaMigrationsTable(ctx context.Context, migrationsTabl
 		return
 	}
 
-	q := `CREATE TABLE IF NOT EXISTS ` + cleanedTableName + ` (migration_id VARCHAR(128) PRIMARY KEY NOT NULL)`
+	q := `CREATE TABLE IF NOT EXISTS ` + cleanedTableName + ` (
+	migration_id VARCHAR(128) PRIMARY KEY NOT NULL,
+	label VARCHAR(255) DEFAULT '',
+	executed_at BIGINT DEFAULT 0
+)`
 	_, err = d.connection.ExecContext(ctx, q)
 	return
 }
@@ -91,7 +96,7 @@ func (d *Driver) AppliedVersions(ctx context.Context, migrationsTable string) (o
 	}
 
 	// #nosec G202 -- table name was sanitized
-	q := `SELECT migration_id FROM ` + cleanedTableName + ` ORDER BY migration_id ASC`
+	q := `SELECT migration_id, label, executed_at FROM ` + cleanedTableName + ` ORDER BY migration_id ASC`
 	rows, err := d.connection.QueryContext(ctx, q)
 	if ierr, ok := err.(*my.MySQLError); ok {
 		// https://dev.mysql.com/doc/refman/8.0/en/server-error-reference.html#error_er_no_such_table
@@ -103,7 +108,7 @@ func (d *Driver) AppliedVersions(ctx context.Context, migrationsTable string) (o
 	return
 }
 
-func (d *Driver) UpdateSchemaMigrations(ctx context.Context, migrationsTable string, forward bool, version string) (err error) {
+func (d *Driver) UpdateSchemaMigrations(ctx context.Context, migrationsTable string, forward bool, version, label string) (err error) {
 	cleanedTableName, err := cleanIdentifier(migrationsTable)
 	if err != nil {
 		return
@@ -113,8 +118,9 @@ func (d *Driver) UpdateSchemaMigrations(ctx context.Context, migrationsTable str
 	var q string
 	if forward {
 		// #nosec G202 -- table name was sanitized
-		q = `INSERT INTO ` + cleanedTableName + ` (migration_id) VALUES (?)`
-		_, err = conn.ExecContext(ctx, q, version)
+		q = `INSERT INTO ` + cleanedTableName + ` (migration_id, label, executed_at) VALUES (?, ?, ?)`
+		now := time.Now().UTC()
+		_, err = conn.ExecContext(ctx, q, version, label, now.Unix())
 	} else {
 		// #nosec G202 -- table name was sanitized
 		q = `DELETE FROM ` + cleanedTableName + ` WHERE migration_id = ?`

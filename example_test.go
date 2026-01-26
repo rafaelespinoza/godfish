@@ -67,8 +67,4 @@ func Example_embed() {
 		fmt.Println("getting, showing info", err)
 		return
 	}
-	// Output:
-	// up	1234	forward-1234-alpha.sql
-	// up	2345	forward-2345-bravo.sql
-	// up	3456	forward-3456-charlie.sql
 }

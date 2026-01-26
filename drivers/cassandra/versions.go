@@ -12,10 +12,12 @@ import (
 // check if an error was encountered.
 func execAllAscending(query *gocql.Query) *appliedVersions {
 	scanner := query.Iter().Scanner()
-	av := appliedVersions{versions: make([]string, 0)}
+	av := appliedVersions{versions: make([]migration, 0)}
 
 	defer func() {
-		sort.Strings(av.versions)
+		sort.Slice(av.versions, func(i, j int) bool {
+			return av.versions[i].id < av.versions[j].id
+		})
 
 		// The Err method also releases resources. The scanner should not be
 		// used after this point.
@@ -31,12 +33,13 @@ func execAllAscending(query *gocql.Query) *appliedVersions {
 	// Read it all up front so DB resources can be closed while also avoid nil
 	// access errors.
 	for scanner.Next() {
-		var version string
-		if err := scanner.Scan(&version); err != nil {
+		var version, label string
+		var executedAt int64
+		if err := scanner.Scan(&version, &label, &executedAt); err != nil {
 			av.err = err
 			return &av
 		}
-		av.versions = append(av.versions, version)
+		av.versions = append(av.versions, migration{version, label, executedAt})
 	}
 
 	return &av
@@ -44,11 +47,12 @@ func execAllAscending(query *gocql.Query) *appliedVersions {
 
 type appliedVersions struct {
 	counter  int
-	versions []string
+	versions []migration
 	err      error
 }
 
 func (a *appliedVersions) Close() error { return a.err }
+
 func (a *appliedVersions) Next() bool {
 	if a.err != nil {
 		return false
@@ -56,19 +60,45 @@ func (a *appliedVersions) Next() bool {
 	return a.counter < len(a.versions)
 }
 
+// Scan is called by the godfish library. Unlike sql.Driver-based
+// implementations, the data has already been read from the DB by the time this
+// function is called. See details in the execAllAscending function.
 func (a *appliedVersions) Scan(dest ...any) error {
 	if a.err != nil {
 		return a.err
 	}
-
-	out, ok := dest[0].(*string)
-	if !ok {
-		return fmt.Errorf("dest argument should be a %T", out)
-	}
 	if !a.Next() {
 		return nil
 	}
-	*out = a.versions[a.counter]
+	curr := a.versions[a.counter]
 	a.counter++
+
+	switch val := dest[0].(type) {
+	case *string:
+		*val = curr.id
+	default:
+		return fmt.Errorf("unexpected type (%T) for %q field", val, "migration_id")
+	}
+
+	switch val := dest[1].(type) {
+	case *string:
+		*val = curr.label
+	default:
+		return fmt.Errorf("unexpected type (%T) for %q field", val, "label")
+	}
+
+	switch val := dest[2].(type) {
+	case *int64:
+		*val = curr.executedAt
+	default:
+		return fmt.Errorf("unexpected type (%T) for %q field", val, "executed_at")
+	}
+
 	return nil
+}
+
+type migration struct {
+	id         string
+	label      string
+	executedAt int64
 }
