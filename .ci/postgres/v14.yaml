@@ -16,7 +16,7 @@ services:
             -
                 type: bind
                 source: /tmp/godfish_test/postgres_v14/.test_coverage
-                target: /tmp
+                target: /tmp/test_coverage
     server:
         build:
             context: ../..

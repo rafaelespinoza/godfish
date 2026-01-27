@@ -74,6 +74,10 @@ build-cassandra: (_build_driver "cassandra" (_CASSANDRA_PATH / "godfish"))
 test-cassandra *args:
     {{ GO }} test {{ args }} {{ _CASSANDRA_PATH }}/...
 
+# Compile binary for cassandra, integration test coverage
+[group('driver-cassandra')]
+build-cassandra-test: (_build_driver "cassandra_test" (_CASSANDRA_PATH / "godfish") "-cover")
+
 [private]
 _MYSQL_PATH := _BASE_DRIVER_PATH / "mysql"
 
@@ -85,6 +89,10 @@ build-mysql: (_build_driver "mysql" (_MYSQL_PATH / "godfish"))
 [group('driver-mysql')]
 test-mysql *args:
     {{ GO }} test {{ args }} {{ _MYSQL_PATH }}/...
+
+# Compile binary for mysql, integration test coverage
+[group('driver-mysql')]
+build-mysql-test: (_build_driver "mysql_test" (_MYSQL_PATH / "godfish") "-cover")
 
 [private]
 _POSTGRES_PATH := _BASE_DRIVER_PATH / "postgres"
@@ -98,6 +106,10 @@ build-postgres: (_build_driver "postgres" (_POSTGRES_PATH / "godfish"))
 test-postgres *args:
     {{ GO }} test {{ args }} {{ _POSTGRES_PATH }}/...
 
+# Compile binary for postgres, integration test coverage
+[group('driver-postgres')]
+build-postgres-test: (_build_driver "postgres_test" (_POSTGRES_PATH / "godfish") "-cover")
+
 [private]
 _SQLITE3_PATH := _BASE_DRIVER_PATH / "sqlite3"
 
@@ -109,6 +121,10 @@ build-sqlite3: (_build_driver "sqlite3" (_SQLITE3_PATH / "godfish"))
 [group('driver-sqlite3')]
 test-sqlite3 *args:
     {{ GO }} test {{ args }} {{ _SQLITE3_PATH }}/...
+
+# Compile binary for sqlite3, integration test coverage
+[group('driver-sqlite3')]
+build-sqlite3-test: (_build_driver "sqlite3_test" (_SQLITE3_PATH / "godfish") "-cover")
 
 [private]
 _SQLSERVER_PATH := _BASE_DRIVER_PATH / "sqlserver"
@@ -122,12 +138,16 @@ build-sqlserver: (_build_driver "sqlserver" (_SQLSERVER_PATH / "godfish"))
 test-sqlserver *args:
     {{ GO }} test {{ args }} {{ _SQLSERVER_PATH }}/...
 
-_build_driver driver_name src_path:
+# Compile binary for sqlserver, integration test coverage
+[group('driver-sqlserver')]
+build-sqlserver-test: (_build_driver "sqlserver_test" (_SQLSERVER_PATH / "godfish") "-cover")
+
+_build_driver driver_name src_path *build_flags:
     #!/bin/sh
     set -eu
     bin={{ clean(BIN_DIR / "godfish_" + driver_name) }}
     mkdir -pv {{ BIN_DIR }}
     ldflags="{{ _LDFLAGS }}{{ _LDFLAGS_BASE_PREFIX }}.versionDriver={{ driver_name }}"
-    {{ GO }} build -o="${bin}" -v -ldflags="${ldflags}" {{ src_path }}
+    {{ GO }} build -o="${bin}" -v -ldflags="${ldflags}" {{ build_flags }} {{ src_path }}
     "${bin}" version
     echo "built {{ driver_name }} to ${bin}"

@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"io/fs"
@@ -79,9 +80,13 @@ func makeInfo(name string) alf.Directive {
 
 			dirFS := os.DirFS(commonArgs.Files)
 			migrationsTable := commonArgs.MigrationsTable
-			return withConnection(ctx, "", theDriver, func(ictx context.Context) error {
+			err := withConnection(ctx, "", theDriver, func(ictx context.Context) error {
 				return godfish.Info(ictx, theDriver, dirFS.(fs.ReadDirFS), forward(direction), version, os.Stdout, format, migrationsTable)
 			})
+			if errors.Is(err, godfish.ErrSchemaMigrationsMissingColumns) {
+				err = fmt.Errorf("%w; run the %q command to fix this", err, upgradeCmdName)
+			}
+			return err
 		},
 	}
 }

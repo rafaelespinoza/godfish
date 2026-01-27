@@ -2,13 +2,14 @@ package cassandra
 
 import (
 	"fmt"
+	"log/slog"
 	"sort"
 
 	"github.com/gocql/gocql"
 )
 
 // execAllAscending executes query, reads the entire results and then sorts the
-// results ascendingly. The output av will be non-nil, read its err field to
+// results ascendingly. The output av will be non-nil, read its error fields to
 // check if an error was encountered.
 func execAllAscending(query *gocql.Query) *appliedVersions {
 	scanner := query.Iter().Scanner()
@@ -21,13 +22,7 @@ func execAllAscending(query *gocql.Query) *appliedVersions {
 
 		// The Err method also releases resources. The scanner should not be
 		// used after this point.
-		closeErr := scanner.Err()
-		if av.err != nil && closeErr != nil {
-			// These errors might be the same error, not entirely sure...
-			av.err = fmt.Errorf("original err: %w; close err: %v", av.err, closeErr)
-			return
-		}
-		av.err = closeErr
+		av.closingErr = scanner.Err()
 	}()
 
 	// Read it all up front so DB resources can be closed while also avoid nil
@@ -36,10 +31,14 @@ func execAllAscending(query *gocql.Query) *appliedVersions {
 		var version, label string
 		var executedAt int64
 		if err := scanner.Scan(&version, &label, &executedAt); err != nil {
-			av.err = err
+			av.scanningErr = err
 			return &av
 		}
 		av.versions = append(av.versions, migration{version, label, executedAt})
+		slog.Debug(
+			msgPrefix+"scanned version",
+			slog.String("version", version), slog.String("label", label), slog.Int64("executed_at", executedAt),
+		)
 	}
 
 	return &av
@@ -48,13 +47,20 @@ func execAllAscending(query *gocql.Query) *appliedVersions {
 type appliedVersions struct {
 	counter  int
 	versions []migration
-	err      error
+	// closingErr may hold an error from closing the scanner via the `Scanner.Err`
+	// method, which also releases resources. An error here is more likely to
+	// indicate an infrastructual problem than the scanningErr field.
+	closingErr error
+	// scanningErr may hold an error from scanning a result row via the method
+	// `Scanner.Scan`. An error here is more likely indicates an issue with
+	// the application code than the closingErr field.
+	scanningErr error
 }
 
-func (a *appliedVersions) Close() error { return a.err }
+func (a *appliedVersions) Close() error { return a.closingErr }
 
 func (a *appliedVersions) Next() bool {
-	if a.err != nil {
+	if a.scanningErr != nil {
 		return false
 	}
 	return a.counter < len(a.versions)
@@ -64,8 +70,8 @@ func (a *appliedVersions) Next() bool {
 // implementations, the data has already been read from the DB by the time this
 // function is called. See details in the execAllAscending function.
 func (a *appliedVersions) Scan(dest ...any) error {
-	if a.err != nil {
-		return a.err
+	if a.scanningErr != nil {
+		return a.scanningErr
 	}
 	if !a.Next() {
 		return nil

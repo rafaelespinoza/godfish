@@ -77,6 +77,14 @@ migrations table. By default its name is `schema_migrations`. A migration
 that has not yet been applied will be a file in the directory, but without a
 corresponding entry in the DB table.
 
+The shape of the schema migrations table is roughly:
+
+| column         | type    | description                                          |
+|----------------|---------|------------------------------------------------------|
+| `migration_id` | varchar | primary key timestamp, derived from filename version |
+| `label`        | varchar | describes the migration, also derived from filename  |
+| `executed_at`  | integer | unix epoch of when migration was applied             |
+
 ## usage
 
 Not only is this tool a CLI, it's also a database migration library. Most of the
@@ -179,6 +187,17 @@ by the `godfish` library can be combined into a single self-contained binary by
 using the [`embed`](https://pkg.go.dev/embed) package.
 See the [go doc](https://pkg.go.dev/github.com/rafaelespinoza/godfish?tab=doc)
 page for an example.
+
+### upgrading schema migrations
+
+If you have data created with `v0.14.0` or lower and then later on use a newer
+version, then you may run into an error message like:
+```
+schema migrations table is missing columns; run the upgrade command to fix this
+```
+
+A schema migrations table created with versions <= `v0.14.0` will lack the
+`label` and `executed_at` columns. The `upgrade` command adds them.
 
 ## other minutiae
 

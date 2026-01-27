@@ -45,6 +45,7 @@ func RunDriverTests(t *testing.T, d DriverConnector) {
 	t.Run("Info", func(t *testing.T) { testInfo(t, d, q) })
 	t.Run("ApplyMigration", func(t *testing.T) { testApplyMigration(t, d, q) })
 	t.Run("UpdateSchemaMigrations", func(t *testing.T) { testUpdateSchemaMigrations(t, d) })
+	t.Run("UpgradeSchemaMigrations", func(t *testing.T) { testUpgradeSchemaMigrations(t, d, q) })
 	t.Run("Context", func(t *testing.T) { testContext(t, d) })
 }
 

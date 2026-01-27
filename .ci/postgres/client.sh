@@ -2,6 +2,9 @@
 
 set -eu
 
+: "${TEST_COVERAGE_BASE_DIR:?TEST_COVERAGE_BASE_DIR is required}"
+: "${GOCOVERDIR:?GOCOVERDIR is required}"
+
 dbhost="${1:?missing dbhost}"
 dbname='godfish_test'
 dbuser='godfish'
@@ -9,7 +12,7 @@ dbuser='godfish'
 ./bin/godfish_postgres version
 
 echo "testing godfish"
-just test '-v -count=1 -coverprofile=/tmp/cover.out'
+just test -v -count=1 -coverprofile="${TEST_COVERAGE_BASE_DIR}/cover.out"
 
 # Wait for db server to be ready, with some limits.
 
@@ -26,5 +29,9 @@ until PGPASSWORD="${POSTGRES_PASSWORD}" psql -h "${dbhost}" -U "${dbuser}" "${db
 done
 >&2 echo "db is up"
 
+echo "testing godfish upgrade path"
+./.ci/upgrade_test.sh postgres
+go tool covdata textfmt -i="${GOCOVERDIR}" -o="${TEST_COVERAGE_BASE_DIR}/integration.out"
+
 echo "testing godfish against live db"
-just test-postgres '-v -count=1 -coverprofile=/tmp/cover_driver.out'
+just test-postgres -v -count=1 -coverprofile="${TEST_COVERAGE_BASE_DIR}/cover_driver.out"

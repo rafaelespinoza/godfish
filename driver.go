@@ -11,7 +11,8 @@ type Driver interface {
 	// AppliedVersions queries the schema migrations table for migration
 	// versions that have been executed against the database. If the schema
 	// migrations table does not exist, the returned error should be
-	// ErrSchemaMigrationsDoesNotExist.
+	// ErrSchemaMigrationsDoesNotExist. If the table exists, but it is missing some
+	// newer columns, then it should return ErrSchemaMigrationsMissingColumns.
 	AppliedVersions(ctx context.Context, migrationsTable string) (AppliedVersions, error)
 	// CreateSchemaMigrationsTable should create a table to record migration
 	// versions once they've been applied. The version should be a timestamp as
@@ -25,6 +26,12 @@ type Driver interface {
 	// has been successfully applied by adding a new row to the schema
 	// migrations table.
 	UpdateSchemaMigrations(ctx context.Context, migrationsTable string, forward bool, version, label string) error
+	// UpgradeSchemaMigrations adds new columns to the migrationsTable. The new
+	// columns are some extra metadata. Roughly, they should be:
+	//
+	// 	label VARCHAR (or equivalent) default ""
+	// 	executed_at INTEGER (or equivalent) default 0
+	UpgradeSchemaMigrations(ctx context.Context, migrationsTable string) error
 }
 
 // AppliedVersions represents an iterative list of migrations that have been run

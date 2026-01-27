@@ -18,7 +18,7 @@ services:
             -
                 type: bind
                 source: /tmp/godfish_test/mariadb/.test_coverage
-                target: /tmp
+                target: /tmp/test_coverage
     server:
         image: docker.io/mariadb:10.6
         env_file: env

@@ -14,7 +14,7 @@ services:
             -
                 type: bind
                 source: /tmp/godfish_test/cassandra_v4/.test_coverage
-                target: /tmp
+                target: /tmp/test_coverage
     server:
         image: docker.io/cassandra:4.1.10
         expose:

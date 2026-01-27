@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -59,7 +60,7 @@ func makeMigrate(name string) alf.Directive {
 
 			dirFS := os.DirFS(commonArgs.Files)
 
-			return withConnection(ctx, "", theDriver, func(ictx context.Context) error {
+			err := withConnection(ctx, "", theDriver, func(ictx context.Context) error {
 				return godfish.Migrate(
 					ictx,
 					theDriver,
@@ -69,6 +70,11 @@ func makeMigrate(name string) alf.Directive {
 					commonArgs.MigrationsTable,
 				)
 			})
+
+			if errors.Is(err, godfish.ErrSchemaMigrationsMissingColumns) {
+				err = fmt.Errorf("%w; run the %q command to fix this", err, upgradeCmdName)
+			}
+			return err
 		},
 	}
 }
@@ -111,13 +117,18 @@ func makeRemigrate(name string) alf.Directive {
 			dirFS := os.DirFS(commonArgs.Files)
 			migrationsTable := commonArgs.MigrationsTable
 
-			return withConnection(ctx, "", theDriver, func(ictx context.Context) error {
+			err := withConnection(ctx, "", theDriver, func(ictx context.Context) error {
 				err := godfish.ApplyMigration(ictx, theDriver, dirFS, false, "", migrationsTable)
 				if err != nil {
 					return err
 				}
 				return godfish.ApplyMigration(ictx, theDriver, dirFS, true, "", migrationsTable)
 			})
+
+			if errors.Is(err, godfish.ErrSchemaMigrationsMissingColumns) {
+				err = fmt.Errorf("%w; run the %q command to fix this", err, upgradeCmdName)
+			}
+			return err
 		},
 	}
 }
@@ -195,7 +206,11 @@ func makeRollback(name string) alf.Directive {
 				}
 			}
 
-			return withConnection(ctx, "", theDriver, f)
+			err := withConnection(ctx, "", theDriver, f)
+			if errors.Is(err, godfish.ErrSchemaMigrationsMissingColumns) {
+				err = fmt.Errorf("%w; run the %q command to fix this", err, upgradeCmdName)
+			}
+			return err
 		},
 	}
 }

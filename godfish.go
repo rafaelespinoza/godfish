@@ -295,7 +295,7 @@ func (m *migrationFinder) query(ctx context.Context, driver Driver, migrationsTa
 		slog.Int("count", len(available)),
 		slog.Any("available", internal.Migrations(available)),
 	)
-	applied, err := scanAppliedVersions(ctx, driver, migrationsTable)
+	applied, err := scanAppliedVersions(ctx, driver, migrationsTable, m.dirFS)
 	if errors.Is(err, ErrSchemaMigrationsDoesNotExist) {
 		// The next invocation of CreateSchemaMigrationsTable should fix this.
 		// We can continue with zero value for now.
@@ -409,7 +409,15 @@ func (m *migrationFinder) available() (out []*internal.Migration, err error) {
 	return
 }
 
-func scanAppliedVersions(ctx context.Context, driver Driver, migrationsTable string) (out []*internal.Migration, err error) {
+// scanAppliedVersions reads the DB for info on already-applied migrations.
+//
+// The dirFS may be used to look up migration metadata from the filesystem if
+// not all of it is available in the DB. One use case for this is when reading
+// the migrationsTable with data inserted prior to being upgraded; ie: the
+// `label` is empty, so try to derive it from another source: the FS. This
+// enhancement will be only attempted if the label column is empty for a
+// migration and the input FS is non-empty.
+func scanAppliedVersions(ctx context.Context, driver Driver, migrationsTable string, dirFS fs.FS) (out []*internal.Migration, err error) {
 	var rows AppliedVersions
 	if rows, err = driver.AppliedVersions(ctx, migrationsTable); err != nil {
 		return
@@ -435,14 +443,49 @@ func scanAppliedVersions(ctx context.Context, driver Driver, migrationsTable str
 		if executedAt > 0 {
 			executedAtTime = time.Unix(executedAt, 0).UTC()
 		}
-		out = append(out, &internal.Migration{
+		mig := internal.Migration{
 			Indirection: internal.Indirection{Value: internal.DirForward},
 			Label:       label,
 			Version:     ver,
 			ExecutedAt:  executedAtTime,
-		})
+		}
+
+		// If this data was originally inserted before the label column was present,
+		// then it would be empty in the DB. Attempt to reconstruct the Label field
+		// based on a matching filename.
+		if mig.Label == "" {
+			// Don't require workflows to lookup missing data from filenames.
+			if dirFS == nil {
+				slog.Debug("input FS is empty, skipping attempt to enhance migration from filename")
+				continue
+			}
+			if eerr := enhanceMigrationFromFilename(dirFS, &mig); eerr != nil {
+				slog.Warn("unable to enhance migration from filename", slog.Any("error", eerr))
+			}
+		}
+		out = append(out, &mig)
 	}
 
+	return
+}
+
+// enhanceMigrationFromFilename attempts to add missing field values to the
+// input migration based on a filename matching the version in dirFS.
+func enhanceMigrationFromFilename(dirFS fs.FS, in *internal.Migration) (err error) {
+	version := in.Version.String()
+	basename, err := figureOutBasename(dirFS, internal.DirForward, version)
+	if err != nil {
+		return
+	}
+
+	mig, err := internal.ParseMigration(internal.Filename(basename))
+	if err != nil {
+		return
+	}
+
+	if in.Label == "" {
+		in.Label = mig.Label
+	}
 	return
 }
 
@@ -548,4 +591,49 @@ func printMigrations(p internal.InfoPrinter, state string, migrations []*interna
 		}
 	}
 	return
+}
+
+// ErrSchemaMigrationsMissingColumns means the schema migrations table exists,
+// but is missing some extra metadata columns.
+var ErrSchemaMigrationsMissingColumns = errors.New("schema migrations table is missing columns")
+
+// UpgradeSchemaMigrations may alter an existing schema migrations table,
+// migrationsTable, to have newer metadata columns. If the table was created
+// with v0.14.0 or lower, then it likely could be upgraded. If the driver
+// detects that the columns already exist in migrationsTable, then the upgrade
+// is avoided without error. If migrationsTable is empty, then it's set to a
+// default value of "schema_migrations".
+func UpgradeSchemaMigrations(ctx context.Context, driver Driver, migrationsTable string) (err error) {
+	migrationsTable = cmp.Or(migrationsTable, internal.DefaultMigrationsTableName)
+
+	lgr := slog.With(slog.String("migrations_table", migrationsTable))
+
+	// Check if table exists but needs an upgrade
+	//
+	// Keep the fs.FS empty here b/c we're not actually interested in the contents
+	// at this time. We want to test if it can be read at all w/o error.
+	var dirFS fs.FS
+	if _, err = scanAppliedVersions(ctx, driver, migrationsTable, dirFS); err != nil {
+		lgr.Debug("from UpgradeSchemaMigrations", slog.Any("error", err))
+		if errors.Is(err, ErrSchemaMigrationsDoesNotExist) {
+			err = fmt.Errorf("%w; cannot upgrade if it does not exist yet", err)
+			return
+		} else if !errors.Is(err, ErrSchemaMigrationsMissingColumns) {
+			return
+		}
+
+		err = nil // Table exists but is missing columns
+	} else {
+		lgr.Info("schema migrations table appears to be in expected shape, no need to upgrade")
+		return
+	}
+
+	startTime := time.Now()
+	lgr.Info("upgrading schema migrations table...")
+	if err = driver.UpgradeSchemaMigrations(ctx, migrationsTable); err != nil {
+		lgr.Error("failed to upgrade schema migrations table", slog.Any("error", err), makeDurationMSAttr(startTime))
+		return err
+	}
+	lgr.Info("schema migrations table upgrade complete", makeDurationMSAttr(startTime))
+	return nil
 }

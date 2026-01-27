@@ -1,6 +1,8 @@
 package godfish_test
 
 import (
+	"bytes"
+	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -143,6 +145,42 @@ func TestInfo(t *testing.T) {
 			t.Fatalf("unexpected error, %v", err)
 		}
 	})
+
+	t.Run("scanned migrations have empty label", func(t *testing.T) {
+		// Check that applied migrations inserted prior to a schema upgrade can have
+		// there Label fields inferred by inspecting matching filenames.
+
+		driver := &Driver{
+			appliedVersionsFn: func(ctx context.Context, migrationsTable string) (godfish.AppliedVersions, error) {
+				// The migrations in the "database" have empty Label fields.
+				applied := stub.NewAppliedVersions(
+					internal.Migration{Indirection: internal.Indirection{}, Version: mustParseVersion(t, "1234")},
+					internal.Migration{Indirection: internal.Indirection{}, Version: mustParseVersion(t, "2345")},
+					internal.Migration{Indirection: internal.Indirection{}, Version: mustParseVersion(t, "3456")},
+				)
+				return applied, nil
+			},
+		}
+
+		var buf bytes.Buffer
+		err := godfish.Info(t.Context(), driver, okFS, true, "3456", &buf, "json", "")
+		if err != nil {
+			t.Fatalf("unexpected error, %v", err)
+		}
+
+		expLabels := []string{"alpha", "bravo", "charlie"}
+		lines := bytes.TrimSpace(buf.Bytes())
+		for i, line := range bytes.Split(lines, []byte{'\n'}) {
+			var item struct{ Label string }
+			if err = json.Unmarshal(line, &item); err != nil {
+				t.Fatal(err)
+			}
+			expLabel := expLabels[i]
+			if got := item.Label; got != expLabel {
+				t.Errorf("item %d, got %q, expected %q", i, got, expLabel)
+			}
+		}
+	})
 }
 
 func TestInit(t *testing.T) {
@@ -203,9 +241,75 @@ func TestAppliedVersions(t *testing.T) {
 	}
 }
 
+func TestUpgradeSchemaMigrations(t *testing.T) {
+	t.Run("error running UpgradeSchemaMigrations", func(t *testing.T) {
+		oof := errors.New("OOF")
+		driver := &Driver{
+			appliedVersionsFn: func(ctx context.Context, migrationsTable string) (godfish.AppliedVersions, error) {
+				return nil, godfish.ErrSchemaMigrationsMissingColumns
+			},
+			upgradeSchemaMigrationsFn: func(ctx context.Context, migrationsTable string) error {
+				return oof
+			},
+		}
+		err := godfish.UpgradeSchemaMigrations(t.Context(), driver, "test")
+		if !errors.Is(err, oof) {
+			t.Errorf("expected error (%v) to be %v", err, oof)
+		}
+	})
+
+	t.Run("ok", func(t *testing.T) {
+		var calledUpgradeFn bool
+		driver := &Driver{
+			appliedVersionsFn: func(ctx context.Context, migrationsTable string) (godfish.AppliedVersions, error) {
+				return nil, godfish.ErrSchemaMigrationsMissingColumns
+			},
+			upgradeSchemaMigrationsFn: func(ctx context.Context, migrationsTable string) error {
+				calledUpgradeFn = true
+				return nil
+			},
+		}
+		err := godfish.UpgradeSchemaMigrations(t.Context(), driver, "test")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !calledUpgradeFn {
+			t.Errorf("expected to call the upgrade method")
+		}
+	})
+}
+
+type Driver struct {
+	*stub.Driver
+	appliedVersionsFn         func(ctx context.Context, migrationsTable string) (godfish.AppliedVersions, error)
+	upgradeSchemaMigrationsFn func(ctx context.Context, migrationsTable string) error
+}
+
+func (d *Driver) AppliedVersions(ctx context.Context, migrationsTable string) (godfish.AppliedVersions, error) {
+	if d.appliedVersionsFn == nil {
+		panic("define appliedVersionsFn")
+	}
+	return d.appliedVersionsFn(ctx, migrationsTable)
+}
+
+func (d *Driver) UpgradeSchemaMigrations(ctx context.Context, migrationsTable string) error {
+	if d.upgradeSchemaMigrationsFn == nil {
+		panic("define upgradeSchemaMigrationsFn")
+	}
+	return d.upgradeSchemaMigrationsFn(ctx, migrationsTable)
+}
+
 func TestDriver(t *testing.T) {
 	// These tests also run in the stub package. They are duplicated here to
 	// make test coverage tool consider the tests in godfish.go as covered.
 	t.Setenv(internal.DSNKey, "stub_dsn")
 	test.RunDriverTests(t, stub.NewDriver())
+}
+
+func mustParseVersion(t *testing.T, v string) internal.Version {
+	out, err := internal.ParseVersion(v)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return out
 }

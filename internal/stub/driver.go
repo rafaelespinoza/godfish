@@ -109,6 +109,17 @@ func (d *Driver) AppliedVersions(ctx context.Context, migrationsTable string) (g
 	return d.appliedVersions, nil
 }
 
+func (d *Driver) UpgradeSchemaMigrations(ctx context.Context, migrationsTable string) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if _, err := cleanIdentifier(migrationsTable); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // Teardown resets the stub driver in tests. All other Driver implementations
 // pass through without effect.
 func Teardown(drv godfish.Driver) {

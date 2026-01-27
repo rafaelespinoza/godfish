@@ -39,6 +39,8 @@ func TestRoot(t *testing.T) {
 		{"remigrate", "-h"},
 		{"rollback"},
 		{"rollback", "-h"},
+		{"upgrade"},
+		{"upgrade", "-h"},
 		{"version"},
 		{"version", "-json"},
 		{"version", "-h"},

@@ -46,6 +46,7 @@ func New(driver DriverConnector, sampleDSN string) Root {
 			"migrate":          makeMigrate("migrate"),
 			"remigrate":        makeRemigrate("remigrate"),
 			"rollback":         makeRollback("rollback"),
+			upgradeCmdName:     makeUpgradeSchemaMigrations(upgradeCmdName),
 			"version":          makeVersion("version"),
 		},
 	}

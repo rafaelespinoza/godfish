@@ -10,12 +10,17 @@ jobs:
       - name: Install just
         uses: extractions/setup-just@v3
       - name: Build environment and run tests
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: just -f ci.Justfile mariadb-up
       - name: Upload code coverage
         uses: codecov/codecov-action@v5
+        env:
+          DATADIR: /tmp/godfish_test/mariadb/.test_coverage
         with:
+          disable_search: true
           fail_ci_if_error: true
-          files: /tmp/godfish_test/mariadb/.test_coverage/cover.out,/tmp/godfish_test/mariadb/.test_coverage/cover_driver.out
+          files: ${{ env.DATADIR }}/cover.out,${{ env.DATADIR }}/integration.out,${{ env.DATADIR }}/cover_driver.out
           token: ${{ secrets.CODECOV_TOKEN }}
           verbose: true
       - name: Teardown
