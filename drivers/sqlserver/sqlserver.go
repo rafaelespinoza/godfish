@@ -65,6 +65,7 @@ func (d *Driver) CreateSchemaMigrationsTable(ctx context.Context, migrationsTabl
 		return
 	}
 
+	// #nosec G202 -- table name was sanitized
 	q := `IF OBJECT_ID(@p1, 'U') IS NULL
 	CREATE TABLE ` + cleanedTableName + ` (
 	migration_id VARCHAR(128) PRIMARY KEY NOT NULL,

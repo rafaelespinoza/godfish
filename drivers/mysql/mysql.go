@@ -84,6 +84,7 @@ func (d *Driver) CreateSchemaMigrationsTable(ctx context.Context, migrationsTabl
 		return
 	}
 
+	// #nosec G202 -- table name was sanitized
 	q := `CREATE TABLE IF NOT EXISTS ` + cleanedTableName + ` (
 	migration_id VARCHAR(128) PRIMARY KEY NOT NULL,
 	label VARCHAR(255) DEFAULT '',

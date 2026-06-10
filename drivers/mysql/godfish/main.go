@@ -10,6 +10,7 @@ import (
 )
 
 func main() {
+	// #nosec G101 -- this is an example to jog the user's memory of the format. Not real credentials.
 	const dsnSample = `username:password@tcp(server_host)/db_name?param1=value&paramN=valueN`
 	root := cmd.New(mysql.NewDriver(), dsnSample)
 	if err := root.Run(context.Background(), os.Args[1:]); err != nil {

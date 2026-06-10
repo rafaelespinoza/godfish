@@ -322,6 +322,8 @@ func testAppliedMigrations(t *testing.T, actual []internal.Migration, expectedVe
 
 	for i, act := range actual {
 		version := act.Version.String()
+
+		// #nosec G602 -- a length check was done earlier in this func
 		if version != expectedVersions[i] {
 			t.Errorf(
 				"index %d; wrong version; got %q, expected %q",
