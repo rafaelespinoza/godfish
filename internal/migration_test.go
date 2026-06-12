@@ -220,7 +220,7 @@ func TestMigrationParams(t *testing.T) {
 		filenameExt        string
 		expectedDirections []string
 		expectError        bool
-		expectedRecords    []slog.Record
+		numExpectedRecords int
 	}
 
 	runTest := func(t *testing.T, test testCase) {
@@ -312,11 +312,34 @@ func TestMigrationParams(t *testing.T) {
 			}
 		}
 
-		t.Logf("got %d records", len(gotRecords))
+		if len(gotRecords) != test.numExpectedRecords {
+			t.Errorf("unexpected number of log records; got %d, expected %d", len(gotRecords), test.numExpectedRecords)
+		}
+
 		for i, gotRecord := range gotRecords {
-			attrs := st.GetRecordAttrs(gotRecord)
-			for j, attr := range attrs {
-				t.Logf("[%d][%d] level=%q msg=%q attr_key=%q attr_val=%v", i, j, gotRecord.Level, gotRecord.Message, attr.Key, attr.Value)
+			if i >= test.numExpectedRecords {
+				break
+			}
+
+			gotMsg := gotRecord.Message
+			if !strings.Contains(gotMsg, "file") {
+				t.Errorf("expected for message (%q) to mention %q", gotMsg, "file")
+			}
+
+			if !strings.Contains(gotMsg, "did not create") {
+				attrs := st.GetRecordAttrs(gotRecord)
+				// Look for a string attribute with a key "filename" and a value that
+				// matches the name of the file created earlier.
+				check := st.HasMatch(func(a slog.Attr) bool {
+					if a.Key != "filename" || a.Value.Kind() != slog.KindString {
+						return false
+					}
+					base := filepath.Base(a.Value.String())
+					return strings.Contains(base, test.name)
+				})
+				if err = check(attrs); err != nil {
+					t.Errorf("[%d] %s", i, err)
+				}
 			}
 		}
 	}
@@ -330,6 +353,7 @@ func TestMigrationParams(t *testing.T) {
 			revLabel:           "reverse",
 			filenameExt:        ".sql",
 			expectedDirections: []string{"forward", "reverse"},
+			numExpectedRecords: 2,
 		})
 	})
 
@@ -341,6 +365,7 @@ func TestMigrationParams(t *testing.T) {
 			fwdLabel:           "forward",
 			filenameExt:        ".sql",
 			expectedDirections: []string{"forward"},
+			numExpectedRecords: 2,
 		})
 	})
 
@@ -353,6 +378,7 @@ func TestMigrationParams(t *testing.T) {
 			revLabel:           "reverse",
 			filenameExt:        ".sql",
 			expectedDirections: []string{"forward"},
+			numExpectedRecords: 2,
 		})
 	})
 
@@ -365,6 +391,7 @@ func TestMigrationParams(t *testing.T) {
 			revLabel:           "down",
 			filenameExt:        ".sql",
 			expectedDirections: []string{"up", "down"},
+			numExpectedRecords: 2,
 		})
 	})
 
