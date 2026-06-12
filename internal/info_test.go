@@ -6,11 +6,14 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"log/slog"
 	"strconv"
 	"testing"
 	"time"
 
 	"github.com/rafaelespinoza/godfish/internal"
+
+	st "github.com/rafaelespinoza/slogtesting"
 )
 
 func TestTSV(t *testing.T) {
@@ -62,8 +65,23 @@ func TestTSV(t *testing.T) {
 
 	t.Run("error", func(t *testing.T) {
 		w := errWriter{writeFn: func(p []byte) (int, error) { return len(p), errors.New("test") }}
-		if err := printMigrations(internal.NewTSV(&w), migrations[:2], migrations[2:]); err != nil {
+		runTest := func(h slog.Handler) error {
+			originalDefaults := slog.Default()
+			t.Cleanup(func() { slog.SetDefault(originalDefaults) })
+			slog.SetDefault(slog.New(h))
+			return printMigrations(internal.NewTSV(&w), migrations[:2], migrations[2:])
+		}
+		gotRecords, err := st.CaptureRecords(nil, runTest)
+		if err != nil {
 			t.Fatal("function should try to print as much as it can without erroring out")
+		}
+		if len(gotRecords) < 1 {
+			t.Fatal("expected at least 1 log")
+		}
+		for _, gotRecord := range gotRecords {
+			if gotRecord.Level != slog.LevelError {
+				t.Errorf("unexpected Level; got %q, expected %q", gotRecord.Level, slog.LevelError)
+			}
 		}
 	})
 }
@@ -121,8 +139,23 @@ func TestJSON(t *testing.T) {
 
 	t.Run("error", func(t *testing.T) {
 		w := errWriter{writeFn: func(p []byte) (int, error) { return len(p), errors.New("test") }}
-		if err := printMigrations(internal.NewJSON(&w), migrations[:2], migrations[2:]); err != nil {
+		runTest := func(h slog.Handler) error {
+			originalDefaults := slog.Default()
+			t.Cleanup(func() { slog.SetDefault(originalDefaults) })
+			slog.SetDefault(slog.New(h))
+			return printMigrations(internal.NewJSON(&w), migrations[:2], migrations[2:])
+		}
+		gotRecords, err := st.CaptureRecords(nil, runTest)
+		if err != nil {
 			t.Fatal("function should try to print as much as it can without erroring out")
+		}
+		if len(gotRecords) < 1 {
+			t.Fatal("expected at least 1 log")
+		}
+		for _, gotRecord := range gotRecords {
+			if gotRecord.Level != slog.LevelError {
+				t.Errorf("unexpected Level; got %q, expected %q", gotRecord.Level, slog.LevelError)
+			}
 		}
 	})
 }
