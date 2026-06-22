@@ -2,9 +2,9 @@
 name: install
 on:
   push:
-    paths: [.github/workflows/setup_install_test.sh, scripts/install.sh]
+    paths: [.github/scripts/setup_install_test.sh, .github/scripts/test_install.sh, .github/workflows/install.yaml, scripts/install.sh]
   pull_request:
-    paths: [.github/workflows/setup_install_test.sh, scripts/install.sh]
+    paths: [.github/scripts/setup_install_test.sh, .github/scripts/test_install.sh, .github/workflows/install.yaml, scripts/install.sh]
   release:
     types: [created, released]
   workflow_dispatch:
@@ -18,38 +18,48 @@ jobs:
       - name: Install shellcheck
         run: sudo apt-get update && sudo apt-get install -y shellcheck
       - name: Run shellcheck
-        run: shellcheck .github/workflows/setup_install_test.sh ./scripts/install.sh
+        run: shellcheck .github/scripts/*.sh ./scripts/install.sh
 
   test:
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest]
-        selected_driver: [all, cassandra, mysql, postgres, sqlite3, sqlserver]
     runs-on: ${{ matrix.os }}
     permissions:
       contents: read
     env:
       LOG_LEVEL: 3
-      INSTALL_BASE_DIR: /tmp/bin
+      BASE_INSTALL_DIR: /tmp/bin
       IS_LINUX: ${{ contains(matrix.os, 'ubuntu') }}
       IS_MACOS: ${{ contains(matrix.os, 'macos') }}
-      DB_DRIVER: ${{ matrix.selected_driver }}
     steps:
       - name: Checkout repo
         uses: actions/checkout@v6
+
+      - name: Setup Bats and bats libs
+        id: setup-bats
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          support-path: "${{ github.workspace }}/.github/bats/bats-support"
+          assert-path: "${{ github.workspace }}/.github/bats/bats-assert"
+          detik-path: "${{ github.workspace }}/.github/bats/bats-detik"
+          file-path: "${{ github.workspace }}/.github/bats/tests/bats-file"
+        uses: bats-core/bats-action@4.0.0
 
       - name: Test using gh
         timeout-minutes: 5
         env:
           WANT_GH: true
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          INSTALL_DIR: ${{ env.INSTALL_BASE_DIR }}/want_gh
+          BASE_INSTALL_DIR: ${{ env.BASE_INSTALL_DIR }}/want_gh
+          BATS_LIB_PATH: ${{ steps.setup-bats.outputs.lib-path }}
         run: |
           echo >&2 "# running setup_install_test.sh"
-          .github/workflows/setup_install_test.sh
+          .github/scripts/setup_install_test.sh
 
-          echo >&2 "# running install.sh"
-          ./scripts/install.sh -d "${DB_DRIVER:?missing DB_DRIVER}" -o "${INSTALL_DIR:?missing INSTALL_DIR}"
+          echo >&2 "# testing install.sh"
+          bats .github/scripts/test_install.sh
 
       - name: Test w/o gh; use curl for downloads; use jq to parse responses
         timeout-minutes: 5
@@ -58,13 +68,14 @@ jobs:
           WANT_CURL: true
           WANT_JQ: true
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          INSTALL_DIR: ${{ env.INSTALL_BASE_DIR }}/no_gh_use_curl
+          BASE_INSTALL_DIR: ${{ env.BASE_INSTALL_DIR }}/no_gh_use_curl
+          BATS_LIB_PATH: ${{ steps.setup-bats.outputs.lib-path }}
         run: |
           echo >&2 "# running setup_install_test.sh"
-          .github/workflows/setup_install_test.sh
+          .github/scripts/setup_install_test.sh
 
-          echo >&2 "# running install.sh"
-          ./scripts/install.sh -d "${DB_DRIVER:?missing DB_DRIVER}" -o "${INSTALL_DIR:?missing INSTALL_DIR}"
+          echo >&2 "# testing install.sh"
+          bats .github/scripts/test_install.sh
 
       - name: Test w/o gh or curl; use wget for downloads; use jq to parse responses
         timeout-minutes: 5
@@ -73,13 +84,14 @@ jobs:
           WANT_CURL: false
           WANT_JQ: true
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          INSTALL_DIR: ${{ env.INSTALL_BASE_DIR }}/no_gh_use_wget
+          BASE_INSTALL_DIR: ${{ env.BASE_INSTALL_DIR }}/no_gh_use_wget
+          BATS_LIB_PATH: ${{ steps.setup-bats.outputs.lib-path }}
         run: |
           echo >&2 "# running setup_install_test.sh"
-          .github/workflows/setup_install_test.sh
+          .github/scripts/setup_install_test.sh
 
-          echo >&2 "# running install.sh"
-          ./scripts/install.sh -d "${DB_DRIVER:?missing DB_DRIVER}" -o "${INSTALL_DIR:?missing INSTALL_DIR}"
+          echo >&2 "# testing install.sh"
+          bats .github/scripts/test_install.sh
 
       - name: Test w/o gh or jq; use curl for downloads; use a pipeline to parse responses
         timeout-minutes: 5
@@ -88,13 +100,14 @@ jobs:
           WANT_CURL: true
           WANT_JQ: false
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          INSTALL_DIR: ${{ env.INSTALL_BASE_DIR }}/no_gh_use_curl_no_jq
+          BASE_INSTALL_DIR: ${{ env.BASE_INSTALL_DIR }}/no_gh_use_curl_no_jq
+          BATS_LIB_PATH: ${{ steps.setup-bats.outputs.lib-path }}
         run: |
           echo >&2 "# running setup_install_test.sh"
-          .github/workflows/setup_install_test.sh
+          .github/scripts/setup_install_test.sh
 
-          echo >&2 "# running install.sh"
-          ./scripts/install.sh -d "${DB_DRIVER:?missing DB_DRIVER}" -o "${INSTALL_DIR:?missing INSTALL_DIR}"
+          echo >&2 "# testing install.sh"
+          bats .github/scripts/test_install.sh
 
       - name: Test w/o gh, curl or jq; use wget for downloads; use a pipeline to parse responses
         timeout-minutes: 5
@@ -103,52 +116,11 @@ jobs:
           WANT_CURL: false
           WANT_JQ: false
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          INSTALL_DIR: ${{ env.INSTALL_BASE_DIR }}/no_gh_use_wget_no_jq
+          BASE_INSTALL_DIR: ${{ env.BASE_INSTALL_DIR }}/no_gh_use_wget_no_jq
+          BATS_LIB_PATH: ${{ steps.setup-bats.outputs.lib-path }}
         run: |
           echo >&2 "# running setup_install_test.sh"
-          .github/workflows/setup_install_test.sh
+          .github/scripts/setup_install_test.sh
 
-          echo >&2 "# running install.sh"
-          ./scripts/install.sh -d "${DB_DRIVER:?missing DB_DRIVER}" -o "${INSTALL_DIR:?missing INSTALL_DIR}"
-
-      - name: Test using gh with specified tagged release
-        timeout-minutes: 5
-        env:
-          WANT_GH: true
-          WANT_JQ: true # for parsing version
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          INSTALL_DIR: ${{ env.INSTALL_BASE_DIR }}/want_gh_tagged
-        run: |
-          echo >&2 "# running setup_install_test.sh"
-          .github/workflows/setup_install_test.sh
-
-          declare -r tag=v0.13.0
-          echo >&2 "# running install.sh"
-          ./scripts/install.sh -d "${DB_DRIVER:?missing DB_DRIVER}" -o "${INSTALL_DIR:?missing INSTALL_DIR}" -t "${tag}"
-
-          echo >&2 "# now checking version"
-          # Invoke the "version" subcommand upon each binary downloaded, and
-          # require that the output matches.
-          find "${INSTALL_DIR}" -type f -exec {} version -json \; |
-            jq --arg tag "${tag}" --compact-output --exit-status 'select(.Tag == $tag)'
-
-      - name: Test without gh with specified tagged release
-        timeout-minutes: 5
-        env:
-          WANT_GH: false
-          WANT_JQ: true # for parsing version
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          INSTALL_DIR: ${{ env.INSTALL_BASE_DIR }}/no_gh_tagged
-        run: |
-          echo >&2 "# running setup_install_test.sh"
-          .github/workflows/setup_install_test.sh
-
-          declare -r tag=v0.13.0
-          echo >&2 "# running install.sh"
-          ./scripts/install.sh -d "${DB_DRIVER:?missing DB_DRIVER}" -o "${INSTALL_DIR:?missing INSTALL_DIR}" -t "${tag}"
-
-          echo >&2 "# now checking version"
-          # Invoke the "version" subcommand upon each binary downloaded, and
-          # require that the Tag matches.
-          find "${INSTALL_DIR}" -type f -exec {} version -json \; |
-            jq --arg tag "${tag}" --compact-output --exit-status 'select(.Tag == $tag)'
+          echo >&2 "# testing install.sh"
+          bats .github/scripts/test_install.sh
