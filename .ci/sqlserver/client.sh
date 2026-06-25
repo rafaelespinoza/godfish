@@ -27,7 +27,7 @@ done
 >&2 echo "db is up"
 
 echo "testing godfish upgrade path"
-./.ci/upgrade_test.sh sqlserver
+DB_DRIVER=sqlserver bats ./.ci/test_upgrade.sh
 go tool covdata textfmt -i="${GOCOVERDIR}" -o="${TEST_COVERAGE_BASE_DIR}/integration.out"
 
 echo "testing godfish against live db"

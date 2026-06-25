@@ -11,7 +11,7 @@ echo "testing godfish"
 just test -v -count=1 -coverprofile="${TEST_COVERAGE_BASE_DIR}/cover.out"
 
 echo "testing godfish upgrade path"
-./.ci/upgrade_test.sh sqlite3
+DB_DRIVER=sqlite3 bats ./.ci/test_upgrade.sh
 go tool covdata textfmt -i="${GOCOVERDIR}" -o="${TEST_COVERAGE_BASE_DIR}/integration.out"
 
 echo "testing godfish against live db"

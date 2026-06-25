@@ -8,7 +8,7 @@ ENV GOCOVERDIR="${TEST_COVERAGE_BASE_DIR}/integration"
 VOLUME "${TEST_COVERAGE_BASE_DIR}"
 
 WORKDIR /src
-RUN apk update && apk --no-cache add gcc g++ git just
+RUN apk update && apk --no-cache add bats gcc g++ git just jq
 COPY go.mod /src
 RUN go mod download && go mod verify && mkdir -pv "${GOCOVERDIR}"
 COPY . /src
