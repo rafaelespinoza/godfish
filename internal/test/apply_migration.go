@@ -172,6 +172,20 @@ func testApplyMigration(t *testing.T, driver godfish.Driver, queries testdataQue
 						errMsgContains:  "version",
 					},
 				},
+				{
+					// This test is meant to demonstrate that the library makes no attempt to
+					// prevent you from migrating an already-migrated version. The expected
+					// result is whatever the DB tells you after executing, or attempting to
+					// execute, the query.
+					name:       "start somewhere...then try to migrate to same version as start ",
+					setupState: testSetupState{migrateTo: "23450102030405", stubs: defaultStubs},
+					input:      testInput{direction: internal.DirForward, version: "23450102030405"},
+					expected: expectedOutput{
+						appliedVersions: []string{"12340102030405", "23450102030405"},
+						err:             internal.ErrExecutingMigration,
+						errMsgContains:  "23450102030405",
+					},
+				},
 			}
 
 			for _, test := range tests {

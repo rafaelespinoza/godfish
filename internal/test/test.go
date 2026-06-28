@@ -17,6 +17,7 @@ import (
 	"github.com/rafaelespinoza/godfish"
 	"github.com/rafaelespinoza/godfish/internal"
 	"github.com/rafaelespinoza/godfish/internal/stub"
+	"github.com/romantomjak/devslog"
 )
 
 // DriverConnector is a godfish.Driver with connection management.
@@ -317,14 +318,35 @@ func collectAppliedMigrations(t *testing.T, driver godfish.Driver, migrationsTab
 func testAppliedMigrations(t *testing.T, actual []internal.Migration, expectedVersions []string) {
 	t.Helper()
 
+	t.Cleanup(func() {
+		if t.Failed() {
+			// cast these values so that they are easier to inspect in the log.
+			enhancedActuals := make([]*internal.Migration, len(actual))
+			for i, m := range actual {
+				enhancedActuals[i] = &m
+			}
+
+			h := devslog.NewHandler(t.Output(), nil)
+			slog.New(h).Info("summary of differing values in failed test",
+				slog.Int("got_len", len(actual)),
+				slog.Int("exp_len", len(expectedVersions)),
+				slog.Any("got_vals", internal.Migrations(enhancedActuals)),
+				slog.Any("exp_vals", expectedVersions),
+			)
+		}
+	})
+
 	if len(actual) != len(expectedVersions) {
-		t.Fatalf(
+		t.Errorf(
 			"wrong number of applied migrations; got %d, expected %d",
 			len(actual), len(expectedVersions),
 		)
 	}
 
 	for i, act := range actual {
+		if i >= len(expectedVersions) {
+			t.Fatal("too many values in actual results")
+		}
 		version := act.Version.String()
 
 		// #nosec G602 -- a length check was done earlier in this func
