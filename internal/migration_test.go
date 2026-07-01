@@ -1,6 +1,7 @@
 package internal_test
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -341,4 +342,61 @@ func TestMigrationParams(t *testing.T) {
 			expectError: true,
 		})
 	})
+}
+
+func TestMigrationContext(t *testing.T) {
+	type testCase struct {
+		name              string
+		setupCtx          func(context.Context) context.Context
+		expectedVersion   int64
+		expectedDirection internal.Direction
+		expectedFound     bool
+	}
+
+	tests := []testCase{
+		{
+			name: "ok",
+			setupCtx: func(c context.Context) context.Context {
+				return internal.SetMigrationContext(c, 23450102030405, internal.DirForward)
+			},
+			expectedVersion:   23450102030405,
+			expectedDirection: internal.DirForward,
+			expectedFound:     true,
+		},
+		{
+			name:              "empty context",
+			setupCtx:          func(c context.Context) context.Context { return c },
+			expectedVersion:   0,
+			expectedDirection: 0,
+			expectedFound:     false,
+		},
+		{
+			name: "partial context - version exists but direction is missing",
+			setupCtx: func(c context.Context) context.Context {
+				return internal.SetMigrationContext(c, 12340102030405, 0)
+			},
+			expectedVersion:   12340102030405,
+			expectedDirection: 0,
+			expectedFound:     true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			ctx := test.setupCtx(t.Context())
+			version, direction, found := internal.GetMigrationContext(ctx)
+
+			if version != test.expectedVersion {
+				t.Errorf("wrong version; got %d, expected %d", version, test.expectedVersion)
+			}
+
+			if direction != test.expectedDirection {
+				t.Errorf("wrong direction; got %v, expected %v", direction, test.expectedDirection)
+			}
+
+			if found != test.expectedFound {
+				t.Errorf("wrong found; got %t, expected %t", found, test.expectedFound)
+			}
+		})
+	}
 }

@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -14,6 +15,7 @@ import (
 
 type Driver struct {
 	appliedVersions godfish.AppliedVersions
+	appliedQueries  map[int64]internal.Direction
 }
 
 func NewDriver() *Driver { return &Driver{} }
@@ -43,6 +45,29 @@ func (d *Driver) Execute(ctx context.Context, q string, a ...any) error {
 	if strings.Contains(q, "invalid SQL") {
 		return errors.New(q)
 	}
+
+	queryVersion, queryDirection, found := internal.GetMigrationContext(ctx)
+	if !found {
+		return nil
+	}
+	slog.Debug("stub: executing migration",
+		slog.String("query", q), slog.Any("args", a),
+		slog.Int64("context_query_version", queryVersion),
+		slog.String("context_query_direction", queryDirection.String()),
+		slog.Any("applied_queries", d.appliedQueries),
+	)
+	if d.appliedQueries == nil {
+		d.appliedQueries = make(map[int64]internal.Direction)
+	}
+	appliedDir, alreadyApplied := d.appliedQueries[queryVersion]
+	if !alreadyApplied {
+		d.appliedQueries[queryVersion] = queryDirection
+		return nil
+	}
+	if queryDirection == appliedDir {
+		return internal.ErrExecutingMigration
+	}
+	d.appliedQueries[queryVersion] = queryDirection
 	return nil
 }
 
@@ -129,6 +154,7 @@ func Teardown(drv godfish.Driver) {
 		return
 	}
 	d.appliedVersions = NewAppliedVersions()
+	d.appliedQueries = nil
 }
 
 func cleanIdentifier(input string) (string, error) {

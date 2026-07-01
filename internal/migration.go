@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"os"
@@ -175,4 +176,31 @@ func (m *MigrationParams) GenerateFiles() (err error) {
 func newMigrationFile(m Migration, baseDir string) (*os.File, error) {
 	name := filepath.Join(baseDir, string(m.ToFilename()))
 	return os.Create(filepath.Clean(name))
+}
+
+type migrationContextKey uint8
+
+const (
+	versionContextKey migrationContextKey = iota + 1
+	directionContextKey
+)
+
+// SetMigrationContext puts the version and direction values on ctx.
+// Use [GetMigrationContext] to read the values.
+func SetMigrationContext(ctx context.Context, version int64, direction Direction) context.Context {
+	ctx = context.WithValue(ctx, versionContextKey, version)
+	ctx = context.WithValue(ctx, directionContextKey, direction)
+	return ctx
+}
+
+// GetMigrationContext retrieves the version int64, the direction and
+// true when the input ctx has values has by [SetMigrationContext]. If the ctx
+// does not have those values then it returns 0, 0, false.
+func GetMigrationContext(ctx context.Context) (int64, Direction, bool) {
+	version, found := ctx.Value(versionContextKey).(int64)
+	if !found {
+		return 0, 0, false
+	}
+	direction, found := ctx.Value(directionContextKey).(Direction)
+	return version, direction, found
 }

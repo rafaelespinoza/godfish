@@ -179,6 +179,11 @@ func runMigration(ctx context.Context, driver Driver, dir fs.FS, pathToFile stri
 		gerund = "rolling back"
 	}
 
+	// Set some metadata about the query to the driver. At this time, it's for
+	// the sake of the stub driver to help it simulate some error handling
+	// situations that occur in real DBs.
+	ctx = internal.SetMigrationContext(ctx, mig.Version.Value(), mig.Indirection.Value)
+
 	lgr := slog.With(slog.String("path_to_file", pathToFile), slog.String("version", mig.Version.String()))
 	lgr.Info(gerund + " ...")
 	startTime := time.Now()
