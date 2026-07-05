@@ -2,7 +2,6 @@
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/rafaelespinoza/godfish.svg)](https://pkg.go.dev/github.com/rafaelespinoza/godfish)
 [![codecov](https://codecov.io/gh/rafaelespinoza/godfish/branch/main/graph/badge.svg?token=EoLelW4qiy)](https://codecov.io/gh/rafaelespinoza/godfish)
-[![Go Report Card](https://goreportcard.com/badge/github.com/rafaelespinoza/godfish)](https://goreportcard.com/report/github.com/rafaelespinoza/godfish)
 
 [![cassandra](https://github.com/rafaelespinoza/godfish/actions/workflows/build-cassandra.yml/badge.svg)](https://github.com/rafaelespinoza/godfish/actions/workflows/build-cassandra.yml)
 [![mysql](https://github.com/rafaelespinoza/godfish/actions/workflows/build-mysql.yml/badge.svg)](https://github.com/rafaelespinoza/godfish/actions/workflows/build-mysql.yml)
@@ -21,23 +20,42 @@ It is a CLI and a library.
 - light on dependencies
 - not terrible error messages
 
-## releases
+## installation
 
-The Releases page of the GitHub repository has pre-built artifacts for supported platforms.
+There are multiple ways to get the CLI.
+
+The [Releases](https://github.com/rafaelespinoza/godfish/releases) page of the GitHub repository
+has pre-built artifacts for supported platforms.
 Each archive file contains an executable binary per driver. Each executable binary will only work
 for the targeted DB. Pick the one(s) you need.
 
-There is also an installation script at [scripts/install.sh](./scripts/install.sh). Check it out.
+Alternatively, install via the [Homebrew tap](https://github.com/rafaelespinoza/homebrew-godfish):
+```sh
+brew tap rafaelespinoza/godfish
+
+# install the binary for your DB
+brew install godfish-cassandra
+brew install godfish-mysql
+brew install godfish-postgres
+brew install godfish-sqlite3
+brew install godfish-sqlserver
+
+# or install all of them
+brew install godfish
+```
+
+For Unix-like environments without Homebrew, there is an installation script at
+[scripts/install.sh](./scripts/install.sh). Check it out.
 
 ## build
 
 An alternative to using a pre-built release to is to build your own.
-NOTE: these require [just](https://just.systems).
+NOTE: these require [just](https://just.systems) and [go](https://go.dev/doc/install).
 
 Make a CLI binary for the DB you want to use. This tool comes with some driver
 implementations. Build one like so:
 
-```
+```sh
 just build-cassandra
 just build-mysql
 just build-postgres
@@ -93,9 +111,9 @@ time, you'll probably want to use it as a CLI.
 ### command line usage
 
 This section describes basic usage of a CLI binary. For details on getting a CLI
-binary, see the [releases](#releases) section. Golang is not required here.
+binary, see the [installation](#installation) section. Golang is not required here.
 
-```
+```sh
 godfish help
 godfish -h
 godfish <command> -h
@@ -175,7 +193,7 @@ godfish version -json
 Though most of the time you'll probably want to use one of the pre-built
 binaries, you could also use this as a golang library.
 
-```
+```sh
 go get github.com/rafaelespinoza/godfish
 ```
 
