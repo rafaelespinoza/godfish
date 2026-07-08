@@ -1,0 +1,56 @@
+---
+name: delegator-script
+on:
+  push:
+    paths: [.github/scripts/test_delegator_script.sh, .github/workflows/test-delegator-script.yaml, scripts/godfish]
+  pull_request:
+    paths: [.github/scripts/test_delegator_script.sh, .github/workflows/test-delegator-script.yaml, scripts/godfish]
+  workflow_dispatch:
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v6
+      - name: Install shellcheck
+        run: sudo apt-get update && sudo apt-get install -y shellcheck
+      - name: Run shellcheck
+        run: shellcheck .github/scripts/*.sh ./scripts/godfish
+
+  test:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v6
+
+      - name: Setup go
+        uses: actions/setup-go@v6
+        with:
+          go-version: 1.24
+
+      - name: Install just
+        uses: extractions/setup-just@v3
+
+      - name: Setup Bats and bats libs
+        id: setup-bats
+        with:
+          support-path: "${{ github.workspace }}/.github/bats/bats-support"
+          assert-path: "${{ github.workspace }}/.github/bats/bats-assert"
+          file-path: "${{ github.workspace }}/.github/bats/tests/bats-file"
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+        uses: bats-core/bats-action@4.0.0
+
+      - name: Build driver binaries
+        run: just build-{cassandra,mysql,postgres,sqlite3,sqlserver}
+
+      - name: Test delegator script
+        env:
+          BASE_TEST_DIR: /tmp/godfish_test/delegator_script
+          BATS_LIB_PATH: ${{ steps.setup-bats.outputs.lib-path }}
+        run: bats .github/scripts/test_delegator_script.sh
