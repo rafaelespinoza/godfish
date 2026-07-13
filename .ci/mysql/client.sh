@@ -8,7 +8,7 @@ set -eu
 dbhost="${1:?missing dbhost}"
 dbuser='godfish'
 
-./bin/godfish_mysql version
+./bin/godfish-mysql version
 
 echo "testing godfish"
 just test -v -count=1 -coverprofile="${TEST_COVERAGE_BASE_DIR}/cover.out"

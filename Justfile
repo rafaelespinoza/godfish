@@ -145,7 +145,7 @@ build-sqlserver-test: (_build_driver "sqlserver_test" (_SQLSERVER_PATH / "godfis
 _build_driver driver_name src_path *build_flags:
     #!/bin/sh
     set -eu
-    bin={{ clean(BIN_DIR / "godfish_" + driver_name) }}
+    bin={{ clean(BIN_DIR / "godfish-" + driver_name) }}
     mkdir -pv {{ BIN_DIR }}
     ldflags="{{ _LDFLAGS }}{{ _LDFLAGS_BASE_PREFIX }}.versionDriver={{ driver_name }}"
     {{ GO }} build -o="${bin}" -v -ldflags="${ldflags}" {{ build_flags }} {{ src_path }}

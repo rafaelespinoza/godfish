@@ -305,7 +305,7 @@ unarchive_and_install() {
 
 	find_expr='godfish*'
 	if [ "${DB_DRIVER}" != 'all' ]; then
-		find_expr="godfish_${DB_DRIVER}"
+		find_expr="godfish*${DB_DRIVER}"
 	fi
 
 	# This invocation of find should work on systems that have BSD-style tooling

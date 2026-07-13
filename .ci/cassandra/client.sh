@@ -7,7 +7,7 @@ set -eu
 
 dbhost="${1:?missing dbhost}"
 
-./bin/godfish_cassandra version
+./bin/godfish-cassandra version
 
 echo "testing godfish"
 just test -v -count=1 -coverprofile="${TEST_COVERAGE_BASE_DIR}/cover.out"

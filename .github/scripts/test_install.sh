@@ -16,10 +16,11 @@ function _test_one_driver() {
 
 	mkdir -pv "${install_dir}"
 
-	local -r binary="${install_dir}/godfish_${driver}"
 	local -r version_file="${install_dir}/version_${driver}"
+	local binary
 
 	run ./scripts/install.sh -d "${driver}" -o "$(realpath "${install_dir}")"
+	binary=$(find "${install_dir}" -type f -name "godfish*${driver}")
 	assert_file_executable "${binary}"
 
 	run bash -c "${binary} version > ${version_file}"
@@ -64,7 +65,8 @@ function _test_one_driver() {
 	local binary version_file
 
 	for driver in cassandra mysql postgres sqlite3 sqlserver; do
-		binary="${install_dir}/godfish_${driver}"
+		# Versions > v0.15.0 may have a different name for the binary.
+		binary=$(find "${install_dir}" -type f -name "godfish*${driver}")
 		version_file="${install_dir}/version_${driver}"
 
 		assert_file_executable "${binary}"
@@ -83,6 +85,7 @@ function _test_one_driver() {
 	local binary version_file
 
 	for driver in cassandra mysql postgres sqlite3 sqlserver; do
+		# NOTE: binaries for versions <= v0.15.0 have the prefix godfish_
 		binary="${install_dir}/godfish_${driver}"
 		version_file="${install_dir}/version_${driver}"
 

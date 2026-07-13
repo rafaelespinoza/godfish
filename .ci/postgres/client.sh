@@ -9,7 +9,7 @@ dbhost="${1:?missing dbhost}"
 dbname='godfish_test'
 dbuser='godfish'
 
-./bin/godfish_postgres version
+./bin/godfish-postgres version
 
 echo "testing godfish"
 just test -v -count=1 -coverprofile="${TEST_COVERAGE_BASE_DIR}/cover.out"

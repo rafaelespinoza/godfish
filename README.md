@@ -113,10 +113,63 @@ time, you'll probably want to use it as a CLI.
 This section describes basic usage of a CLI binary. For details on getting a CLI
 binary, see the [installation](#installation) section. Golang is not required here.
 
+#### execution modes for command line
+
+There are 2 execution modes to pick from, depending on your workflow.
+
+##### delegator script, `godfish`
+
+The first mode is using a delegator script. If you installed godfish via
+Homebrew or you copy [`scripts/godfish`](./scripts/godfish), then `godfish` is
+a wrapper script that dynamically routes commands to a DB driver binary, which
+would be installed nearby; such as the same directory as the script, or in a
+libexec directory.
+
+When using this mode, you must pass in the driver name as the first
+argument, like so:
+
 ```sh
-godfish help
-godfish -h
-godfish <command> -h
+godfish <driver> [...arguments]
+# Where `driver` is one of cassandra, mysql, postgres, sqlite3, sqlserver.
+
+# More examples of the delegator script.
+godfish cassandra version
+godfish mysql init -conf godfish_mysql.json
+godfish postgres -dsn "${DB_DSN}" -files testdata/default -loglevel debug info
+godfish sqlite3 -dsn path/to/db/file create-migration -name create_foos_table
+godfish sqlserver --help
+```
+
+##### direct to DB driver, `godfish-<driver>`
+
+The second mode is running a driver binary directly. Use this if you prefer to
+work with a single, self-container executable without any wrapper scripts.
+As mentioned earlier, each release contains a binary per DB driver. Some usage
+examples of this mode:
+
+```sh
+godfish-<driver> [...arguments]
+# Where `driver` is one of cassandra, mysql, postgres, sqlite3, sqlserver.
+
+# More examples of direct driver. Notice, you're invoking a different
+# executable.
+godfish-cassandra version
+godfish-mysql init -conf godfish_mysql.json
+godfish-postgres -dsn "${DB_DSN}" -files testdata/default -loglevel debug info
+godfish-sqlite3 -dsn path/to/db/file create-migration -name create_foos_table
+godfish-sqlserver --help
+```
+
+#### getting help
+
+The remaining usage examples are written as if you are directly running a driver
+binary. However, if you're using the delegator script mentioned above, then you
+would simply replace `godfish-<driver>` with `godfish <driver>`.
+
+```sh
+godfish-<driver> help
+godfish-<driver> -h
+godfish-<driver> <command> -h
 ```
 
 Configuration options are read from command line flags first. If those are not
@@ -137,17 +190,17 @@ line value will have higher precedence than the environment variable.
 Manually set path to db migration files.
 
 ```sh
-godfish -files db/migrations <command>
+godfish-<driver> -files db/migrations <command>
 ```
 
-Make your life easier by creating a configuration file by invoking `godfish
-init`. This creates a file at `.godfish.json`, where you can configure things.
+Make your life easier by creating a configuration file by invoking the `init`
+subcommand. This creates a file at `.godfish.json`, where configuration may live.
 
 Change the path to the configuration file.
 
 ```sh
 mv .godfish.json foo.json
-godfish -conf foo.json
+godfish-<driver> -conf foo.json <command>
 ```
 
 #### everything else
@@ -156,12 +209,12 @@ godfish -conf foo.json
 cat .godfish.json
 # { "path_to_files": "db/migrations" }
 
-godfish create-migration -name alpha
+godfish-<driver> create-migration -name alpha
 # outputs:
 # db/migrations/forward-20200128070010-alpha.sql
 # db/migrations/reverse-20200128070010-alpha.sql
 
-godfish create-migration -name bravo -reversible=false
+godfish-<driver> create-migration -name bravo -reversible=false
 # outputs:
 # db/migrations/forward-20200128070106-bravo.sql
 
@@ -170,22 +223,22 @@ godfish create-migration -name bravo -reversible=false
 #
 
 # apply migrations
-godfish migrate
+godfish-<driver> migrate
 # apply migrations to up a specific version
-godfish migrate -version 20060102150405
+godfish-<driver> migrate -version 20060102150405
 
 # show status
-godfish info
+godfish-<driver> info
 
 # apply a reverse migration
-godfish rollback
+godfish-<driver> rollback
 
 # rollback and re-apply the last migration
-godfish remigrate
+godfish-<driver> remigrate
 
 # show build metadata
-godfish version
-godfish version -json
+godfish-<driver> version
+godfish-<driver> version -json
 ```
 
 ### library usage

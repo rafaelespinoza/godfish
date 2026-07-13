@@ -5,7 +5,7 @@ set -eu
 : "${TEST_COVERAGE_BASE_DIR:?TEST_COVERAGE_BASE_DIR is required}"
 : "${GOCOVERDIR:?GOCOVERDIR is required}"
 
-./bin/godfish_sqlserver version
+./bin/godfish-sqlserver version
 
 echo "testing godfish"
 just test -v -count=1 -coverprofile="${TEST_COVERAGE_BASE_DIR}/cover.out"

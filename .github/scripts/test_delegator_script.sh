@@ -12,7 +12,7 @@ bats_load_library bats-file
 bats_load_library bats-support
 
 function setup_file() {
-	export DRIVER_BIN_BASENAME=godfish_
+	export DRIVER_BIN_BASENAME=godfish-
 	readonly DRIVER_BIN_BASENAME
 
 	for driver in cassandra mysql postgres sqlite3 sqlserver; do

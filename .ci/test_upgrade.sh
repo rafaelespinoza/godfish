@@ -26,7 +26,7 @@ function setup_file() {
 	prev_bin="${work_bin_dir}/godfish_${DB_DRIVER}"
 	# next_bin is the binary to test for upgrades. It can be created with the
 	# Justfile. $ just build-${DB_DRIVER}-test
-	next_bin="${root_src_dir}/bin/godfish_${DB_DRIVER}_test"
+	next_bin="${root_src_dir}/bin/godfish-${DB_DRIVER}_test"
 	local -r testdata_base_dir="${root_src_dir}/testdata"
 
 	case "${DB_DRIVER}" in

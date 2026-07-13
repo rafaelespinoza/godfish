@@ -40,7 +40,7 @@ main() {
 
 	driver=$1
 	shift
-	_binary_basename="godfish_${driver}"
+	_binary_basename="godfish-${driver}"
 
 	# This value may be replaced with a hardcoded value when doing `brew install`.
 	LIBEXEC_DIR=''
