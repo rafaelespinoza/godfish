@@ -23,7 +23,7 @@ import (
 var (
 	commonArgs commonArguments
 	// bin is the name of the binary.
-	bin = os.Args[0]
+	bin = filepath.Base(os.Args[0])
 	// theDriver is passed in from a Driver's package main.
 	theDriver DriverConnector
 )
