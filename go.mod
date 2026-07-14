@@ -7,8 +7,9 @@ require (
 	github.com/gocql/gocql v1.7.0
 	github.com/lib/pq v1.12.3
 	github.com/microsoft/go-mssqldb v1.9.5
-	github.com/rafaelespinoza/alf v0.2.0
 	github.com/romantomjak/devslog v1.1.0
+	github.com/urfave/cli-altsrc/v3 v3.1.0
+	github.com/urfave/cli/v3 v3.10.1
 	modernc.org/sqlite v1.54.0
 )
 
@@ -31,6 +32,7 @@ require (
 	golang.org/x/crypto v0.45.0 // indirect
 	golang.org/x/sys v0.46.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
+	gopkg.in/yaml.v3 v3.0.1 // indirect
 	modernc.org/libc v1.74.1 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.11.0 // indirect

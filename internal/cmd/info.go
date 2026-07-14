@@ -3,87 +3,101 @@ package cmd
 import (
 	"context"
 	"errors"
-	"flag"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"strings"
 	"time"
 
-	"github.com/rafaelespinoza/alf"
 	"github.com/rafaelespinoza/godfish"
 	"github.com/rafaelespinoza/godfish/internal"
+
+	"github.com/urfave/cli/v3"
 )
 
-func makeInfo(name string) alf.Directive {
-	var direction, format, version string
-	var timeout time.Duration
-
-	return &alf.Command{
-		Description: "output applied migrations, migrations to apply",
-		Setup: func(p flag.FlagSet) *flag.FlagSet {
-			flags := newFlagSet(name)
-			flags.StringVar(
-				&direction,
-				"direction",
-				"forward",
-				"which way to look? (forward|reverse)",
-			)
-			flags.StringVar(
-				&format,
-				"format",
-				"tsv",
-				"output format, one of (json|tsv)",
-			)
-			flags.StringVar(
-				&version,
-				"version",
-				"",
-				fmt.Sprintf("timestamp of migration, format: %s", internal.TimeFormat),
-			)
-			flags.DurationVar(
-				&timeout,
-				"timeout",
-				0,
-				fmt.Sprintf("max duration to run, ignored if non-positive, example vals %q", exampleDurationVals),
-			)
-			flags.Usage = func() {
-				_, _ = fmt.Fprintf(flags.Output(), `Usage: %s [godfish-flags] %s [%s-flags]
-
-	List applied migrations, preview migrations to apply.
-
-	It's an introspection tool that can be used to show exactly which migration
-	versions would be applied, in either a forward or reverse direction, before
-	applying them.
-
-	It also takes a "direction" flag if you want to know what would be applied
-	in a rollback or remigrate operation. The "version" flag can be used to
-	limit or extend the range of migrations to apply.
-`,
-					bin, name, name)
-				printFlagDefaults(&p)
-				printFlagDefaults(flags)
-			}
-			return flags
+func makeInfo(name string) *cli.Command {
+	return &cli.Command{
+		Name:  name,
+		Usage: "Output applied migrations, migrations to apply",
+		Flags: []cli.Flag{
+			&cli.StringFlag{
+				Name:  "direction",
+				Value: "forward",
+				Usage: "which way to look? (forward|reverse)",
+			},
+			&cli.StringFlag{
+				Name:  "format",
+				Value: "tsv",
+				Usage: "output format, one of (json|tsv)",
+			},
+			&cli.StringFlag{
+				Name:  "version",
+				Value: "",
+				Usage: fmt.Sprintf("timestamp of migration, format: %s", internal.TimeFormat),
+			},
+			&cli.DurationFlag{
+				Name:  "timeout",
+				Value: 0,
+				Usage: fmt.Sprintf("max duration to run, ignored if non-positive, example vals %q", exampleDurationVals),
+			},
 		},
-		Run: func(ctx context.Context) error {
-			var cancel func()
-			if timeout > 0 {
-				ctx, cancel = context.WithTimeout(ctx, timeout)
-				defer cancel()
-			}
+		Description: `List applied migrations, preview migrations to apply.
 
-			dirFS := os.DirFS(commonArgs.Files)
-			migrationsTable := commonArgs.MigrationsTable
-			err := withConnection(ctx, "", theDriver, func(ictx context.Context) error {
-				return godfish.Info(ictx, theDriver, dirFS.(fs.ReadDirFS), forward(direction), version, os.Stdout, format, migrationsTable)
-			})
-			if errors.Is(err, godfish.ErrSchemaMigrationsMissingColumns) {
-				err = fmt.Errorf("%w; run the %q command to fix this", err, upgradeCmdName)
-			}
-			return err
+It's an introspection tool that can be used to show exactly which migration
+versions would be applied, in either a forward or reverse direction, before
+applying them.
+
+It also takes a "direction" flag if you want to know what would be applied
+in a rollback or remigrate operation. The "version" flag can be used to
+limit or extend the range of migrations to apply.`,
+		Action: func(ctx context.Context, c *cli.Command) error {
+			timeout := c.Duration("timeout")
+			dirFS := os.DirFS(c.String(pathToFilesFlagname))
+			migrationsTable := c.String(migrationsTableFlagname)
+			direction := c.String("direction")
+			version := c.String("version")
+			format := c.String("format")
+
+			return runInfo(
+				ctx,
+				theDriver,
+				timeout,
+				dirFS,
+				migrationsTable,
+				os.Stdout,
+				format,
+				forward(direction),
+				version,
+			)
 		},
 	}
+}
+
+func runInfo(
+	ctx context.Context,
+	driverConn DriverConnector,
+	timeout time.Duration,
+	dirFS fs.FS,
+	migrationsTable string,
+	w io.Writer,
+	format string,
+	forward bool,
+	version string,
+) error {
+	if timeout > 0 {
+		var cancel func()
+		ctx, cancel = context.WithTimeout(ctx, timeout)
+		defer cancel()
+	}
+
+	err := withConnection(ctx, "", driverConn, func(ictx context.Context) error {
+		return godfish.Info(ictx, driverConn, dirFS.(fs.ReadDirFS), forward, version, w, format, migrationsTable)
+	})
+	if errors.Is(err, godfish.ErrSchemaMigrationsMissingColumns) {
+		err = fmt.Errorf("%w; run the %q command to fix this", err, upgradeCmdName)
+	}
+	return err
 }
 
 func forward(input string) bool {
