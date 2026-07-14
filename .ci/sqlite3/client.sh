@@ -10,8 +10,11 @@ set -eu
 echo "testing godfish"
 just test -v -count=1 -coverprofile="${TEST_COVERAGE_BASE_DIR}/cover.out"
 
-echo "testing godfish upgrade path"
-DB_DRIVER=sqlite3 bats ./.ci/test_upgrade.sh
+echo "testing godfish CLI"
+# run the upgrade test first.
+DB_DRIVER=sqlite3 bats --abort --pretty --print-output-on-failure \
+	./.ci/test_upgrade.sh \
+	./.ci/test_config.sh
 go tool covdata textfmt -i="${GOCOVERDIR}" -o="${TEST_COVERAGE_BASE_DIR}/integration.out"
 
 echo "testing godfish against live db"

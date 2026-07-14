@@ -26,9 +26,13 @@ until /client_check_db ; do
 done
 >&2 echo "db is up"
 
-echo "testing godfish upgrade path"
-DB_DRIVER=sqlserver bats ./.ci/test_upgrade.sh
+echo "testing godfish CLI"
+# run the upgrade test first.
+DB_DRIVER=sqlserver bats --abort --pretty --print-output-on-failure \
+	./.ci/test_upgrade.sh \
+	./.ci/test_config.sh
 go tool covdata textfmt -i="${GOCOVERDIR}" -o="${TEST_COVERAGE_BASE_DIR}/integration.out"
+
 
 echo "testing godfish against live db"
 just test-sqlserver -v -count=1 -coverprofile="${TEST_COVERAGE_BASE_DIR}/cover_driver.out"
