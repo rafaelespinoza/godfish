@@ -16,7 +16,7 @@ jobs:
       - name: Upload code coverage
         uses: codecov/codecov-action@v5
         env:
-          DATADIR: /tmp/godfish_test/mariadb/.test_coverage
+          DATADIR: .ci/.test_coverage/mariadb
         with:
           disable_search: true
           fail_ci_if_error: true

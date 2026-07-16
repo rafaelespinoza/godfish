@@ -13,11 +13,10 @@ services:
             # The schema for a connection string is roughly:
             #   "$db_user:$db_password@tcp($db_host)/$db_name"
             DB_DSN: "godfish:password@tcp(server)/godfish_test"
-        tty: true
         volumes:
             -
                 type: bind
-                source: /tmp/godfish_test/mariadb/.test_coverage
+                source: ../../.ci/.test_coverage/mariadb
                 target: /tmp/test_coverage
     server:
         image: docker.io/mariadb:10.6

@@ -10,11 +10,10 @@ services:
             - env
         environment:
             CGO_ENABLED: 0
-        tty: true
         volumes:
           -
             type: bind
-            source: /tmp/godfish_test/sqlserver/.test_coverage
+            source: ../../.ci/.test_coverage/sqlserver
             target: /tmp/test_coverage
     server:
         image: mcr.microsoft.com/mssql/server:2022-latest

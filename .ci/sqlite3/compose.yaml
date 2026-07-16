@@ -15,9 +15,8 @@ services:
             dockerfile: .ci/sqlite3/Containerfile
         environment:
             DB_DSN: file:/godfish_test.db
-        tty: true
         volumes:
           -
             type: bind
-            source: /tmp/godfish_test/sqlite3/.test_coverage
+            source: ../../.ci/.test_coverage/sqlite3
             target: /tmp/test_coverage

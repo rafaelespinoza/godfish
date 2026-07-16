@@ -16,7 +16,7 @@ jobs:
       - name: Upload code coverage
         uses: codecov/codecov-action@v5
         env:
-          DATADIR: /tmp/godfish_test/cassandra_v4/.test_coverage
+          DATADIR: .ci/.test_coverage/cassandra_v4
         with:
           disable_search: true
           fail_ci_if_error: true
@@ -40,7 +40,7 @@ jobs:
       - name: Upload code coverage
         uses: codecov/codecov-action@v5
         env:
-          DATADIR: /tmp/godfish_test/cassandra_v5/.test_coverage
+          DATADIR: .ci/.test_coverage/cassandra_v5
         with:
           disable_search: true
           fail_ci_if_error: true

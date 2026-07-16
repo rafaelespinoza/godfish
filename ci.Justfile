@@ -110,7 +110,7 @@ make-builder-img driver_basename:
     {{ CONTAINER_TOOL }} image build -f {{ CI_DIR }}/client_base.Containerfile -t {{ BASENAME }}/client_base "${build_dir}"
     # Also make directory for capturing test coverage. The GitHub action will
     # look here for files to copy up to the code coverage service.
-    mkdir -pv "${build_dir}/.test_coverage"
+    mkdir -pv '{{ clean(CI_DIR) / ".test_coverage" }}'
 
 # Remove builder image
 rm-builder-img:
