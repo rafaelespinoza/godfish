@@ -17,6 +17,9 @@ import (
 
 const msgPrefix = "postgres: "
 
+// SampleDSN is an example data source name.
+const SampleDSN = `postgresql://username:password@server_host:5432/db_name?param1=value&paramN=valueN` // #nosec G101 -- not real credentials.
+
 // NewDriver creates a new postgres driver.
 func NewDriver() *Driver { return &Driver{} }
 

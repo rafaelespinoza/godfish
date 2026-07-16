@@ -49,10 +49,14 @@ If that table does not exist yet, then there should be no need to use
 this subcommand. If that table has already been upgraded, then it
 returns early without doing anything else.`,
 		Action: func(ctx context.Context, c *cli.Command) error {
+			driver, err := getDriver(ctx)
+			if err != nil {
+				return fmt.Errorf("getting driver from %s command: %w", name, err)
+			}
 			timeout := c.Duration("timeout")
 			migrationsTable := c.String(migrationsTableFlagname)
 
-			return runUpgrade(ctx, theDriver, timeout, migrationsTable)
+			return runUpgrade(ctx, driver, timeout, migrationsTable)
 		},
 	}
 }

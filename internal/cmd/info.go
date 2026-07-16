@@ -52,6 +52,10 @@ It also takes a "direction" flag if you want to know what would be applied
 in a rollback or remigrate operation. The "version" flag can be used to
 limit or extend the range of migrations to apply.`,
 		Action: func(ctx context.Context, c *cli.Command) error {
+			driver, err := getDriver(ctx)
+			if err != nil {
+				return fmt.Errorf("getting driver from %s command: %w", name, err)
+			}
 			timeout := c.Duration("timeout")
 			dirFS := os.DirFS(c.String(pathToFilesFlagname))
 			migrationsTable := c.String(migrationsTableFlagname)
@@ -61,7 +65,7 @@ limit or extend the range of migrations to apply.`,
 
 			return runInfo(
 				ctx,
-				theDriver,
+				driver,
 				timeout,
 				dirFS,
 				migrationsTable,

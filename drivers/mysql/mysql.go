@@ -18,6 +18,9 @@ import (
 
 const msgPrefix = "mysql: "
 
+// SampleDSN is an example data source name.
+const SampleDSN = `username:password@tcp(server_host)/db_name?param1=value&paramN=valueN` // #nosec G101 -- not real credentials.
+
 // NewDriver creates a new mysql driver.
 func NewDriver() *Driver { return &Driver{} }
 

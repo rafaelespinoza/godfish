@@ -14,7 +14,7 @@ _LDFLAGS_BASE_PREFIX := "-X " + PKG_IMPORT_PATH + "/internal/cmd"
 [private]
 _LDFLAGS_DELIMITER := "\n\t"
 [private]
-_LDFLAGS := ("-extldflags '-static'" + _LDFLAGS_DELIMITER + _LDFLAGS_BASE_PREFIX + ".versionBranchName=" + `git rev-parse --abbrev-ref HEAD` + _LDFLAGS_DELIMITER + _LDFLAGS_BASE_PREFIX + ".versionBuildTime=" + `date -u +%FT%T%z` + _LDFLAGS_DELIMITER + _LDFLAGS_BASE_PREFIX + ".versionCommitHash=" + `git rev-parse --short=7 HEAD` + _LDFLAGS_DELIMITER + _LDFLAGS_BASE_PREFIX + ".versionGoVersion=" + _GO_VERSION + _LDFLAGS_DELIMITER + _LDFLAGS_BASE_PREFIX + ".versionTag=" + `git describe --tag 2>/dev/null || echo 'dev'` + _LDFLAGS_DELIMITER)
+_LDFLAGS := ("-extldflags '-static'" + _LDFLAGS_DELIMITER + _LDFLAGS_BASE_PREFIX + ".versionBranchName=" + `git rev-parse --abbrev-ref HEAD` + _LDFLAGS_DELIMITER + _LDFLAGS_BASE_PREFIX + ".versionBuildTime=" + `date -u +%FT%T%z` + _LDFLAGS_DELIMITER + _LDFLAGS_BASE_PREFIX + ".versionCommitHash=" + `git rev-parse --short=7 HEAD` + _LDFLAGS_DELIMITER + _LDFLAGS_BASE_PREFIX + ".versionGoVersion=" + _GO_VERSION + _LDFLAGS_DELIMITER + _LDFLAGS_BASE_PREFIX + ".versionTag=" + `git describe --tag 2>/dev/null || echo 'dev'`)
 
 # List available recipes
 @default:
@@ -152,7 +152,17 @@ _build_driver driver_name src_path *build_flags:
     set -eu
     bin={{ clean(BIN_DIR / "godfish-" + driver_name) }}
     mkdir -pv {{ BIN_DIR }}
-    ldflags="{{ _LDFLAGS }}{{ _LDFLAGS_BASE_PREFIX }}.versionDriver={{ driver_name }}"
+    ldflags="{{ _LDFLAGS }}"
     {{ GO }} build -o="${bin}" -v -ldflags="${ldflags}" {{ build_flags }} {{ src_path }}
     "${bin}" version
     echo "built {{ driver_name }} to ${bin}"
+
+# Compile binary encompassing each of the supported drivers
+build:
+    #!/bin/sh
+    set -eu
+    bin={{ clean(BIN_DIR / "godfish") }}
+    mkdir -pv {{ BIN_DIR }}
+    ldflags="{{ _LDFLAGS }}"
+    {{ GO }} build -o="${bin}" -v -ldflags="${ldflags}" ./internal/cmd/godfish
+    echo "built godfish to ${bin}"

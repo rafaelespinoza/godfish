@@ -39,12 +39,16 @@ The "files" flag can specify the path to a directory with migration files.`,
 			internal.TimeFormat,
 		),
 		Action: func(ctx context.Context, c *cli.Command) error {
+			driver, err := getDriver(ctx)
+			if err != nil {
+				return fmt.Errorf("getting driver from %s command: %w", name, err)
+			}
 			timeout := c.Duration("timeout")
 			dirFS := os.DirFS(c.String(pathToFilesFlagname))
 			version := c.String("version")
 			migrationsTable := c.String(migrationsTableFlagname)
 
-			return runMigrate(ctx, theDriver, timeout, dirFS, migrationsTable, version)
+			return runMigrate(ctx, driver, timeout, dirFS, migrationsTable, version)
 		},
 	}
 }
@@ -89,11 +93,15 @@ one forward. This could be useful for development.
 
 The "files" flag can specify the path to a directory with migration files.`,
 		Action: func(ctx context.Context, c *cli.Command) error {
+			driver, err := getDriver(ctx)
+			if err != nil {
+				return fmt.Errorf("getting driver from %s command: %w", name, err)
+			}
 			timeout := c.Duration("timeout")
 			dirFS := os.DirFS(c.String(pathToFilesFlagname))
 			migrationsTable := c.String(migrationsTableFlagname)
 
-			return runRemigrate(ctx, theDriver, timeout, dirFS, migrationsTable)
+			return runRemigrate(ctx, driver, timeout, dirFS, migrationsTable)
 		},
 	}
 }
@@ -143,12 +151,16 @@ version. Specify a version in the form: %s.
 The "files" flag can specify the path to a directory with migration files.`,
 			internal.TimeFormat),
 		Action: func(ctx context.Context, c *cli.Command) error {
+			driver, err := getDriver(ctx)
+			if err != nil {
+				return fmt.Errorf("getting driver from %s command: %w", name, err)
+			}
 			timeout := c.Duration("timeout")
 			dirFS := os.DirFS(c.String(pathToFilesFlagname))
 			migrationsTable := c.String(migrationsTableFlagname)
 			version := c.String("version")
 
-			return runRollback(ctx, theDriver, timeout, dirFS, migrationsTable, version)
+			return runRollback(ctx, driver, timeout, dirFS, migrationsTable, version)
 		},
 	}
 }

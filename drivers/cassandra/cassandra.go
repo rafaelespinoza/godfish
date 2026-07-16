@@ -17,6 +17,9 @@ import (
 
 const msgPrefix = "cassandra: "
 
+// SampleDSN is an example data source name.
+const SampleDSN = `cassandra://server_host:9042/keyspace_name?timeout_ms=2000&connect_timeout_ms=2000` // #nosec G101 -- not real credentials.
+
 // NewDriver creates a new cassandra driver.
 func NewDriver() *Driver { return &Driver{} }
 

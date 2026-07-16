@@ -1,0 +1,53 @@
+---
+name: delegator
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions: {}
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v6
+      - name: Install shellcheck
+        run: sudo apt-get update && sudo apt-get install -y shellcheck
+      - name: Run shellcheck
+        run: shellcheck .github/scripts/test_delegator.sh
+
+  test:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    permissions: { contents: read }
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v6
+
+      - name: Setup go
+        uses: actions/setup-go@v6
+        with:
+          go-version: 1.25
+
+      - name: Install just
+        uses: extractions/setup-just@v3
+
+      - name: Setup Bats and bats libs
+        id: setup-bats
+        with:
+          support-path: "${{ github.workspace }}/.github/bats/bats-support"
+          assert-path: "${{ github.workspace }}/.github/bats/bats-assert"
+          file-path: "${{ github.workspace }}/.github/bats/tests/bats-file"
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+        uses: bats-core/bats-action@4.0.0
+
+      - name: Build binary
+        run: just build
+
+      - name: Test delegator binary
+        env:
+          BATS_LIB_PATH: ${{ steps.setup-bats.outputs.lib-path }}
+        run: bats .github/scripts/test_delegator.sh

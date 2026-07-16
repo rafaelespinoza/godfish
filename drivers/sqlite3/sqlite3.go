@@ -17,6 +17,9 @@ import (
 
 const msgPrefix = "sqlite3: "
 
+// SampleDSN is an example data source name.
+const SampleDSN = `file:///path/to/db.sqlite`
+
 // NewDriver creates a new sqlite3 driver.
 func NewDriver() *Driver { return &Driver{} }
 
@@ -25,12 +28,16 @@ type Driver struct {
 	connection *sql.DB
 }
 
-func (d *Driver) Name() string { return "sqlite" }
+func (d *Driver) Name() string { return "sqlite3" }
 func (d *Driver) Connect(dsn string) (err error) {
 	if d.connection != nil {
 		return
 	}
-	conn, err := sql.Open(d.Name(), dsn)
+
+	// The sqlite library uses this name to register with the database/sql package.
+	// The name differs from the value returned by [Driver.Name], which was chosen
+	// to match the name of this package.
+	conn, err := sql.Open("sqlite", dsn)
 	if err != nil {
 		return
 	}

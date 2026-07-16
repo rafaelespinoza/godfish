@@ -3,11 +3,14 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
+	"text/template"
 
 	"github.com/rafaelespinoza/godfish"
 	"github.com/rafaelespinoza/godfish/internal"
@@ -15,13 +18,6 @@ import (
 	altsrc "github.com/urfave/cli-altsrc/v3"
 	jsonsrc "github.com/urfave/cli-altsrc/v3/json"
 	"github.com/urfave/cli/v3"
-)
-
-var (
-	// bin is the name of the binary.
-	bin = filepath.Base(os.Args[0])
-	// theDriver is passed in from a Driver's package main.
-	theDriver DriverConnector
 )
 
 // Root abstracts a top-level command from package main.
@@ -32,13 +28,11 @@ type Root interface {
 
 // New constructs a top-level command with subcommands.
 func New(driver DriverConnector, sampleDSN string) Root {
-	theDriver = driver
-
 	const defaultConfigFilepath = ".godfish.json"
 	pathToConfig := defaultConfigFilepath
 
 	cmd := &cli.Command{
-		Name:  bin,
+		Name:  filepath.Base(os.Args[0]),
 		Usage: fmt.Sprintf("Manage %s DB migrations", driver.Name()),
 		Description: fmt.Sprintf(`godfish is a database migration manager. It tracks the status of migrations
 by recording a timestamp in a table, by default called %q,
@@ -108,7 +102,16 @@ Sample DSN:
 			makeUpgradeSchemaMigrations(upgradeCmdName, &pathToConfig),
 			makeVersion("version"),
 		},
+		CommandNotFound: func(ctx context.Context, c *cli.Command, input string) {
+			if err := renderCommandNotFound(c, input, c.Writer); err != nil {
+				slog.Error("attempting to render not found message", slog.Any("error", err.Error()))
+			}
+			cli.HandleExitCoder(cli.Exit("subcommand not found", 2))
+		},
+		Version: versionTag,
 		Before: func(ctx context.Context, c *cli.Command) (context.Context, error) {
+			ctx = setDriver(ctx, driver)
+
 			handler := newLogHandler(os.Stderr, c.Bool("q"), c.String("loglevel"), c.String("logformat"))
 			slog.SetDefault(slog.New(handler))
 
@@ -161,6 +164,27 @@ type DriverConnector interface {
 	Connector
 }
 
+type driverCtxKey struct{}
+
+// setDriver puts dc on ctx. Use [getDriver] to retrieve it.
+func setDriver(ctx context.Context, dc DriverConnector) context.Context {
+	return context.WithValue(ctx, driverCtxKey{}, dc)
+}
+
+// getDriver retrieves a DriverConnector from the context and nil when
+// a DriverConnector value was previously placed there using [setDriver].
+// If the context does not have this value, then it returns nil and an error
+// reminding you to properly set up the driver.
+func getDriver(ctx context.Context) (DriverConnector, error) {
+	dc, found := ctx.Value(driverCtxKey{}).(DriverConnector)
+	if !found {
+		return nil, errNoDriver
+	}
+	return dc, nil
+}
+
+var errNoDriver = errors.New("driver uninitialized")
+
 // Connector manages DB connections.
 type Connector interface {
 	// Connect should open a connection to the database.
@@ -204,4 +228,36 @@ func getDSN() (dsn string, err error) {
 		err = fmt.Errorf("missing environment variable: %s", internal.DSNKey)
 	}
 	return
+}
+
+const commandNotFoundTemplate = `Subcommand "{{.Input}}" not found.
+
+Available commands:
+{{- range $subcmd := .VisibleCommands}}
+  {{$subcmd.Name}}
+{{- end}}
+
+{{with .Suggestion}}Did you mean "{{.}}"?{{end}}
+`
+
+func renderCommandNotFound(c *cli.Command, input string, w io.Writer) error {
+	tmpl, err := template.New("command not found").Parse(commandNotFoundTemplate)
+	if err != nil {
+		return fmt.Errorf("parsing template: %w", err)
+	}
+
+	var data = struct {
+		Input           string
+		VisibleCommands []*cli.Command
+		Suggestion      string
+	}{
+		Input:           input,
+		VisibleCommands: c.VisibleCommands(),
+		Suggestion:      cli.SuggestCommand(c.Commands, input),
+	}
+
+	if err = tmpl.Execute(w, data); err != nil {
+		return fmt.Errorf("executing template: %w", err)
+	}
+	return nil
 }

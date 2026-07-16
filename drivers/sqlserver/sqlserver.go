@@ -17,6 +17,9 @@ import (
 
 const msgPrefix = "sqlserver: "
 
+// SampleDSN is an example data source name for documentation purposes.
+const SampleDSN = `sqlserver://user:pass@server_host/instance?database=test1` // #nosec G101 -- this is an example to jog the user's memory of the format. Not real credentials.
+
 // NewDriver creates a new Microsoft SQL Server driver.
 func NewDriver() *Driver { return &Driver{} }
 

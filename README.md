@@ -113,6 +113,56 @@ time, you'll probably want to use it as a CLI.
 This section describes basic usage of a CLI binary. For details on getting a CLI
 binary, see the [installation](#installation) section. Golang is not required here.
 
+#### execution modes for command line
+
+There are 2 execution modes to pick from, depending on your workflow.
+
+##### delegator command, `godfish`
+
+The first mode is using a delegator command, where `godfish` is an executable
+compiled with all supported drivers in one command. It dynamically routes
+commands to a DB driver. When using this mode, you must pass in the driver name
+as the first argument, like so:
+
+```sh
+godfish <driver> [...arguments]
+# Where `driver` is one of cassandra, mysql, postgres, sqlite3, sqlserver.
+
+# More examples of the delegator command.
+godfish cassandra version
+godfish mysql init -conf godfish_mysql.json
+godfish postgres -dsn "${DB_DSN}" -files testdata/default -loglevel debug info
+godfish sqlite3 -dsn path/to/db/file create-migration -name create_foos_table
+godfish sqlserver --help
+```
+
+##### direct to DB driver, `godfish-<driver>`
+
+The second mode is running a driver binary directly. Use this if you prefer to
+work with a single, self-container executable without any dependencies on other
+DB clients you know you won't use.
+As mentioned earlier, each release contains a binary per DB driver. Some usage
+examples of this mode:
+
+```sh
+godfish-<driver> [...arguments]
+# Where `driver` is one of cassandra, mysql, postgres, sqlite3, sqlserver.
+
+# More examples of direct driver. Notice, you're invoking a different
+# executable.
+godfish-cassandra version
+godfish-mysql init -conf godfish_mysql.json
+godfish-postgres -dsn "${DB_DSN}" -files testdata/default -loglevel debug info
+godfish-sqlite3 -dsn path/to/db/file create-migration -name create_foos_table
+godfish-sqlserver --help
+```
+
+#### getting help
+
+The remaining usage examples are written as if you are directly running a driver
+binary. However, if you're using the delegator command mentioned above, then you
+would simply replace `godfish-<driver>` with `godfish <driver>`.
+
 ```sh
 godfish-<driver> help
 godfish-<driver> -h

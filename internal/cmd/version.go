@@ -8,6 +8,8 @@ import (
 	"os"
 	"text/tabwriter"
 
+	"github.com/rafaelespinoza/godfish"
+
 	"github.com/urfave/cli/v3"
 )
 
@@ -16,7 +18,6 @@ import (
 var (
 	versionBranchName string
 	versionBuildTime  string
-	versionDriver     string
 	versionCommitHash string
 	versionGoVersion  string
 	versionTag        string
@@ -35,37 +36,39 @@ func makeVersion(name string) *cli.Command {
 		},
 		Description: `Prints some versioning info to stdout. Pass the -json flag to get JSON.`,
 		Action: func(ctx context.Context, c *cli.Command) error {
-			return runVersion(ctx, c.Bool("json"), os.Stdout)
+			driver, err := getDriver(ctx)
+			if err != nil {
+				return fmt.Errorf("getting driver from %s command: %w", name, err)
+			}
+			return runVersion(driver, c.Bool("json"), os.Stdout)
 		},
 	}
 }
 
-func runVersion(_ context.Context, outputJSON bool, w io.Writer) error {
+func runVersion(driver godfish.Driver, outputJSON bool, w io.Writer) error {
+	versionData := []struct{ Key, Val string }{
+		{"BranchName", versionBranchName},
+		{"BuildTime", versionBuildTime},
+		{"Driver", driver.Name()},
+		{"CommitHash", versionCommitHash},
+		{"GoVersion", versionGoVersion},
+		{"Tag", versionTag},
+	}
+
 	if !outputJSON {
 		tw := tabwriter.NewWriter(w, 8, 4, 1, '\t', 0)
-		tuples := []struct{ key, val string }{
-			{"BranchName", versionBranchName},
-			{"BuildTime", versionBuildTime},
-			{"Driver", versionDriver},
-			{"CommitHash", versionCommitHash},
-			{"GoVersion", versionGoVersion},
-			{"Tag", versionTag},
-		}
-		for _, tuple := range tuples {
-			_, _ = fmt.Fprintf(tw, "%s:\t%s\n", tuple.key, tuple.val)
+		for _, tuple := range versionData {
+			_, _ = fmt.Fprintf(tw, "%s:\t%s\n", tuple.Key, tuple.Val)
 		}
 		return tw.Flush()
 	}
-	out, err := json.Marshal(
-		map[string]string{
-			"BranchName": versionBranchName,
-			"BuildTime":  versionBuildTime,
-			"Driver":     versionDriver,
-			"CommitHash": versionCommitHash,
-			"GoVersion":  versionGoVersion,
-			"Tag":        versionTag,
-		},
-	)
+
+	versionDataMap := make(map[string]string, len(versionData))
+	for _, tuple := range versionData {
+		versionDataMap[tuple.Key] = tuple.Val
+	}
+
+	out, err := json.Marshal(versionDataMap)
 	if err != nil {
 		return err
 	}
