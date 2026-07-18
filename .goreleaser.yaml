@@ -30,6 +30,19 @@ env:
 
 builds:
   -
+    id: godfish
+    dir: ./internal/cmd/godfish
+    binary: ./godfish
+    goarch:
+      - amd64
+      - arm64
+    goos:
+      - darwin
+      - linux
+      - windows
+    ldflags:
+      - -s {{ .Env.LDFLAGS }}
+  -
     id: cassandra
     dir: ./drivers/cassandra/godfish
     binary: ./godfish-cassandra
@@ -41,8 +54,7 @@ builds:
       - linux
       - windows
     ldflags:
-      - >
-        -s {{ .Env.LDFLAGS }} -X {{ .Env.PKG_IMPORT_PATH }}/internal/cmd.versionDriver=cassandra
+      - -s {{ .Env.LDFLAGS }}
   -
     id: mysql
     dir: ./drivers/mysql/godfish
@@ -55,8 +67,7 @@ builds:
       - linux
       - windows
     ldflags:
-      - >
-        -s {{ .Env.LDFLAGS }} -X {{ .Env.PKG_IMPORT_PATH }}/internal/cmd.versionDriver=mysql
+      - -s {{ .Env.LDFLAGS }}
   -
     id: postgres
     dir: ./drivers/postgres/godfish
@@ -69,8 +80,7 @@ builds:
       - linux
       - windows
     ldflags:
-      - >
-        -s {{ .Env.LDFLAGS }} -X {{ .Env.PKG_IMPORT_PATH }}/internal/cmd.versionDriver=postgres
+      - -s {{ .Env.LDFLAGS }}
   -
     id: sqlite3
     dir: ./drivers/sqlite3/godfish
@@ -83,8 +93,7 @@ builds:
       - linux
       - windows
     ldflags:
-      - >
-        -s {{ .Env.LDFLAGS }} -X {{ .Env.PKG_IMPORT_PATH }}/internal/cmd.versionDriver=sqlite3
+      - -s {{ .Env.LDFLAGS }}
   -
     id: sqlserver
     dir: ./drivers/sqlserver/godfish
@@ -97,8 +106,19 @@ builds:
       - linux
       - windows
     ldflags:
-      - >
-        -s {{ .Env.LDFLAGS }} -X {{ .Env.PKG_IMPORT_PATH }}/internal/cmd.versionDriver=sqlserver
+      - -s {{ .Env.LDFLAGS }}
+
+archives:
+  -
+    files:
+      # Retain defaults
+      - LICENSE*
+      - README*
+      - CHANGELOG*
+      # Add generated shell completion scripts
+      - src: .assets/completions/*
+        dst: completions
+        strip_parent: true
 
 checksum:
   name_template: checksums.txt
