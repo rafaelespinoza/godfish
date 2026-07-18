@@ -29,6 +29,8 @@ func main() {
 			newDriverCommand(sqlite3.NewDriver(), sqlite3.SampleDSN),
 			newDriverCommand(sqlserver.NewDriver(), sqlserver.SampleDSN),
 		},
+		EnableShellCompletion: true,
+		Suggest:               true,
 		Description: `This is a unified entrypoint for the DB migration manager, godfish.
 Each DB driver binary is compiled within this binary,
 
@@ -48,6 +50,9 @@ func newDriverCommand(dc cmd.DriverConnector, dsn string) *cli.Command {
 	c := cmd.New(dc, dsn).(*cli.Command)
 
 	c.Name = dc.Name()
+	c.Suggest = true
+	// The parent command will enable this feature.
+	c.EnableShellCompletion = false
 
 	return c
 }

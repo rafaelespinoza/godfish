@@ -166,3 +166,19 @@ build:
     ldflags="{{ _LDFLAGS }}"
     {{ GO }} build -o="${bin}" -v -ldflags="${ldflags}" ./internal/cmd/godfish
     echo "built godfish to ${bin}"
+
+# Makes shell completion scripts, writes each to assets dir
+generate-shell-completions: build
+    #!/bin/sh
+    bin={{ clean(BIN_DIR / "godfish") }}
+    assets_dir={{ justfile_directory() / '.assets/completions' }}
+    mkdir -pv "${assets_dir}"
+    bash_dest="${assets_dir}/godfish.bash"
+    fish_dest="${assets_dir}/godfish.fish"
+    zsh_dest="${assets_dir}/godfish.zsh"
+    "${bin}" completion bash > "${bash_dest}"
+    echo "wrote to ${bash_dest}"
+    "${bin}" completion fish > "${fish_dest}"
+    echo "wrote to ${fish_dest}"
+    "${bin}" completion zsh > "${zsh_dest}"
+    echo "wrote to ${zsh_dest}"

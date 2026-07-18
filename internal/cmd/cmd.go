@@ -138,6 +138,8 @@ Sample DSN:
 
 			return ctx, nil
 		},
+		EnableShellCompletion: true,
+		Suggest:               true,
 	}
 
 	return cmd
