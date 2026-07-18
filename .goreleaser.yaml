@@ -32,7 +32,7 @@ builds:
   -
     id: cassandra
     dir: ./drivers/cassandra/godfish
-    binary: ./godfish_cassandra
+    binary: ./godfish-cassandra
     goarch:
       - amd64
       - arm64
@@ -46,7 +46,7 @@ builds:
   -
     id: mysql
     dir: ./drivers/mysql/godfish
-    binary: ./godfish_mysql
+    binary: ./godfish-mysql
     goarch:
       - amd64
       - arm64
@@ -60,7 +60,7 @@ builds:
   -
     id: postgres
     dir: ./drivers/postgres/godfish
-    binary: ./godfish_postgres
+    binary: ./godfish-postgres
     goarch:
       - amd64
       - arm64
@@ -74,7 +74,7 @@ builds:
   -
     id: sqlite3
     dir: ./drivers/sqlite3/godfish
-    binary: ./godfish_sqlite3
+    binary: ./godfish-sqlite3
     goarch:
       - amd64
       - arm64
@@ -88,7 +88,7 @@ builds:
   -
     id: sqlserver
     dir: ./drivers/sqlserver/godfish
-    binary: ./godfish_sqlserver
+    binary: ./godfish-sqlserver
     goarch:
       - amd64
       - arm64
