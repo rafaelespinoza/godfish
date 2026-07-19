@@ -327,8 +327,8 @@ just -f ci.Justfile sqlserver-up
 
 just -f ci.Justfile mariadb-up
 
-just -f ci.Justfile postgres14-up
 just -f ci.Justfile postgres15-up
+just -f ci.Justfile postgres16-up
 
 just -f ci.Justfile sqlite3-up
 ```
@@ -342,8 +342,8 @@ just -f ci.Justfile sqlserver-down
 
 just -f ci.Justfile mariadb-down
 
-just -f ci.Justfile postgres14-down
 just -f ci.Justfile postgres15-down
+just -f ci.Justfile postgres16-down
 
 just -f ci.Justfile sqlite3-down
 ```

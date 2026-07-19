@@ -7,7 +7,7 @@ toolchain go1.24.2
 require (
 	github.com/go-sql-driver/mysql v1.10.0
 	github.com/gocql/gocql v1.7.0
-	github.com/lib/pq v1.10.9
+	github.com/lib/pq v1.12.3
 	github.com/microsoft/go-mssqldb v1.9.5
 	github.com/rafaelespinoza/alf v0.2.0
 	github.com/romantomjak/devslog v1.1.0

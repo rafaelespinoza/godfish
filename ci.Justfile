@@ -52,17 +52,6 @@ mariadb10-down: (_compose_down _MARIA_DB_V10_FILE)
 alias mariadb-down:= mariadb10-down
 
 [private]
-_POSTGRES_V14_FILE := CI_DIR / "postgres" / "v14.yaml"
-
-# Setup, perform integration tests for postgres driver, postgres v14 server
-[group('driver-postgres')]
-postgres14-up: (_up "postgres_v14" _POSTGRES_V14_FILE)
-
-# Cleanup integration test environment for postgres driver, postgres v14 server
-[group('driver-postgres')]
-postgres14-down: (_compose_down _POSTGRES_V14_FILE)
-
-[private]
 _POSTGRES_V15_FILE := CI_DIR / "postgres" / "v15.yaml"
 
 # Setup, perform integration tests for postgres driver, postgres v15 server
@@ -72,6 +61,17 @@ postgres15-up: (_up "postgres_v15" _POSTGRES_V15_FILE)
 # Cleanup integration test environment for postgres driver, postgres v15 server
 [group('driver-postgres')]
 postgres15-down: (_compose_down _POSTGRES_V15_FILE)
+
+[private]
+_POSTGRES_V16_FILE := CI_DIR / "postgres" / "v16.yaml"
+
+# Setup, perform integration tests for postgres driver, postgres v16 server
+[group('driver-postgres')]
+postgres16-up: (_up "postgres_v16" _POSTGRES_V16_FILE)
+
+# Cleanup integration test environment for postgres driver, postgres v16 server
+[group('driver-postgres')]
+postgres16-down: (_compose_down _POSTGRES_V16_FILE)
 
 [private]
 _SQLITE3_FILE := CI_DIR / "sqlite3" / "compose.yaml"

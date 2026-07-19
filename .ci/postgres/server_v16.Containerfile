@@ -1,4 +1,4 @@
-FROM postgres:14-alpine
+FROM postgres:16-alpine
 WORKDIR /var/lib/postgresql
 COPY .ci/postgres/server.sh scripts/
 RUN scripts/server.sh
