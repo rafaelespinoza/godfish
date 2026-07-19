@@ -1,8 +1,8 @@
 name: mysql
 on: [push, pull_request]
 jobs:
-  mariadb:
-    name: mariadb v10.6
+  mariadb_v10:
+    name: mariadb v10
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repo
@@ -12,11 +12,11 @@ jobs:
       - name: Build environment and run tests
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: just -f ci.Justfile mariadb-up
+        run: just -f ci.Justfile mariadb10-up
       - name: Upload code coverage
         uses: codecov/codecov-action@v5
         env:
-          DATADIR: .ci/.test_coverage/mariadb
+          DATADIR: .ci/.test_coverage/mariadb_v10
         with:
           disable_search: true
           fail_ci_if_error: true
@@ -24,4 +24,4 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
           verbose: true
       - name: Teardown
-        run: just -f ci.Justfile mariadb-down
+        run: just -f ci.Justfile mariadb10-down

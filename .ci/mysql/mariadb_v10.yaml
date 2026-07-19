@@ -16,10 +16,10 @@ services:
         volumes:
             -
                 type: bind
-                source: ../../.ci/.test_coverage/mariadb
+                source: ../../.ci/.test_coverage/mariadb_v10
                 target: /tmp/test_coverage
     server:
-        image: docker.io/mariadb:10.6
+        image: docker.io/mariadb:10.11
         env_file: env
         expose:
             - 3306

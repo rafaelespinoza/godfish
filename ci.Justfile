@@ -37,15 +37,19 @@ cassandra5-up: (_up "cassandra_v5" _CASSANDRA_V5_FILE)
 cassandra5-down: (_compose_down _CASSANDRA_V5_FILE)
 
 [private]
-_MARIA_DB_FILE := CI_DIR / "mysql" / "mariadb_v10.yaml"
+_MARIA_DB_V10_FILE := CI_DIR / "mysql" / "mariadb_v10.yaml"
 
 # Setup, perform integration tests for mysql driver, mariadb server
 [group('driver-mysql')]
-mariadb-up: (_up "mariadb" _MARIA_DB_FILE)
+mariadb10-up: (_up "mariadb_v10" _MARIA_DB_V10_FILE)
+
+alias mariadb-up := mariadb10-up
 
 # Cleanup integration test environment for mysql driver, mariadb server
 [group('driver-mysql')]
-mariadb-down: (_compose_down _MARIA_DB_FILE)
+mariadb10-down: (_compose_down _MARIA_DB_V10_FILE)
+
+alias mariadb-down:= mariadb10-down
 
 [private]
 _POSTGRES_V14_FILE := CI_DIR / "postgres" / "v14.yaml"
