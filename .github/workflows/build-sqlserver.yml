@@ -1,8 +1,10 @@
 name: sqlserver
 on: [push, pull_request]
+permissions: {}
 jobs:
   all:
     runs-on: ubuntu-latest
+    permissions: { contents: read }
     steps:
       - name: Checkout repo
         uses: actions/checkout@v6

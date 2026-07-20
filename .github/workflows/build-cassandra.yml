@@ -1,9 +1,11 @@
 name: cassandra
 on: [push, pull_request]
+permissions: {}
 jobs:
   v4:
     name: cassandra_v4
     runs-on: ubuntu-latest
+    permissions: { contents: read }
     steps:
       - name: Checkout repo
         uses: actions/checkout@v6
@@ -28,6 +30,7 @@ jobs:
   v5:
     name: cassandra_v5
     runs-on: ubuntu-latest
+    permissions: { contents: read }
     steps:
       - name: Checkout repo
         uses: actions/checkout@v6

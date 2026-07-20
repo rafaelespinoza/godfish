@@ -1,5 +1,6 @@
 name: static
 on: [push, pull_request]
+permissions: {}
 jobs:
   security_scan:
     runs-on: ubuntu-latest

@@ -1,9 +1,11 @@
 name: mysql
 on: [push, pull_request]
+permissions: {}
 jobs:
   mariadb_v10:
     name: mariadb v10
     runs-on: ubuntu-latest
+    permissions: { contents: read }
     steps:
       - name: Checkout repo
         uses: actions/checkout@v6

@@ -1,9 +1,11 @@
 name: postgres
 on: [push, pull_request]
+permissions: {}
 jobs:
   v15:
     name: postgres v15
     runs-on: ubuntu-latest
+    permissions: { contents: read }
     steps:
       - name: Checkout repo
         uses: actions/checkout@v6
@@ -28,6 +30,7 @@ jobs:
   v16:
     name: postgres v16
     runs-on: ubuntu-latest
+    permissions: { contents: read }
     steps:
       - name: Checkout repo
         uses: actions/checkout@v6

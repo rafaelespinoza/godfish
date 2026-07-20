@@ -8,6 +8,7 @@ on:
   release:
     types: [created, released]
   workflow_dispatch:
+permissions: {}
 
 jobs:
   lint:
@@ -25,8 +26,7 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest]
     runs-on: ${{ matrix.os }}
-    permissions:
-      contents: read
+    permissions: { contents: read }
     env:
       LOG_LEVEL: 3
       BASE_INSTALL_DIR: /tmp/bin
