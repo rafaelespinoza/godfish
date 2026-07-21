@@ -113,59 +113,6 @@ time, you'll probably want to use it as a CLI.
 This section describes basic usage of a CLI binary. For details on getting a CLI
 binary, see the [installation](#installation) section. Golang is not required here.
 
-#### execution modes for command line
-
-There are 2 execution modes to pick from, depending on your workflow.
-
-##### delegator script, `godfish`
-
-The first mode is using a delegator script. If you installed godfish via
-Homebrew or you copy [`scripts/godfish`](./scripts/godfish), then `godfish` is
-a wrapper script that dynamically routes commands to a DB driver binary, which
-would be installed nearby; such as the same directory as the script, or in a
-libexec directory.
-
-When using this mode, you must pass in the driver name as the first
-argument, like so:
-
-```sh
-godfish <driver> [...arguments]
-# Where `driver` is one of cassandra, mysql, postgres, sqlite3, sqlserver.
-
-# More examples of the delegator script.
-godfish cassandra version
-godfish mysql init -conf godfish_mysql.json
-godfish postgres -dsn "${DB_DSN}" -files testdata/default -loglevel debug info
-godfish sqlite3 -dsn path/to/db/file create-migration -name create_foos_table
-godfish sqlserver --help
-```
-
-##### direct to DB driver, `godfish-<driver>`
-
-The second mode is running a driver binary directly. Use this if you prefer to
-work with a single, self-container executable without any wrapper scripts.
-As mentioned earlier, each release contains a binary per DB driver. Some usage
-examples of this mode:
-
-```sh
-godfish-<driver> [...arguments]
-# Where `driver` is one of cassandra, mysql, postgres, sqlite3, sqlserver.
-
-# More examples of direct driver. Notice, you're invoking a different
-# executable.
-godfish-cassandra version
-godfish-mysql init -conf godfish_mysql.json
-godfish-postgres -dsn "${DB_DSN}" -files testdata/default -loglevel debug info
-godfish-sqlite3 -dsn path/to/db/file create-migration -name create_foos_table
-godfish-sqlserver --help
-```
-
-#### getting help
-
-The remaining usage examples are written as if you are directly running a driver
-binary. However, if you're using the delegator script mentioned above, then you
-would simply replace `godfish-<driver>` with `godfish <driver>`.
-
 ```sh
 godfish-<driver> help
 godfish-<driver> -h
