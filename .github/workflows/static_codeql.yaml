@@ -30,21 +30,21 @@ jobs:
             build-mode: autobuild
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Setup go
-        uses: actions/setup-go@v6
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: 1.25
 
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@v4
+        uses: github/codeql-action/init@e58424170fb0262c8d7ed60a2e84b9bffe205c67 # CodeQL Bundle v2.26.1
         with:
           languages: ${{ matrix.language }}
           build-mode: ${{ matrix.build-mode }}
 
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v4
+        uses: github/codeql-action/analyze@e58424170fb0262c8d7ed60a2e84b9bffe205c67 # CodeQL Bundle v2.26.1
         with:
           category: "/language:${{matrix.language}}"
         env:

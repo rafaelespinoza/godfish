@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Install shellcheck
         run: sudo apt-get update && sudo apt-get install -y shellcheck
       - name: Run shellcheck
@@ -34,7 +34,7 @@ jobs:
       IS_MACOS: ${{ contains(matrix.os, 'macos') }}
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Setup Bats and bats libs
         id: setup-bats
@@ -43,7 +43,7 @@ jobs:
           assert-path: "${{ github.workspace }}/.github/bats/bats-assert"
           file-path: "${{ github.workspace }}/.github/bats/tests/bats-file"
           github-token: ${{ secrets.GITHUB_TOKEN }}
-        uses: bats-core/bats-action@4.0.0
+        uses: bats-core/bats-action@77d6fb60505b4d0d1d73e48bd035b55074bbfb43 # 4.0.0
 
       - name: Test using gh
         timeout-minutes: 5
