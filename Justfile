@@ -56,8 +56,13 @@ GORELEASER := "goreleaser"
 #   $ just release '--snapshot=false'
 #
 
-# Automates binary building on many platforms
-release *args:
+# Automates binary building on many platforms, skips signing
+release *args: (_release '--skip sign '+args)
+
+# Same as release but does not skip signing
+release-signed *args: (_release args)
+
+_release *args:
     GOVERSION={{ _GO_VERSION }} PKG_IMPORT_PATH={{ PKG_IMPORT_PATH }} \
         LDFLAGS='{{ _LDFLAGS }}' \
         {{ GORELEASER }} release --clean --snapshot {{ args }}
