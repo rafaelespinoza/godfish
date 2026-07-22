@@ -32,6 +32,7 @@ jobs:
       BASE_INSTALL_DIR: /tmp/bin
       IS_LINUX: ${{ contains(matrix.os, 'ubuntu') }}
       IS_MACOS: ${{ contains(matrix.os, 'macos') }}
+      TERM: xterm # so that bats can pretty-print error messages.
     steps:
       - name: Checkout repo
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -57,7 +58,7 @@ jobs:
           .github/scripts/setup_install_test.sh
 
           echo >&2 "# testing install.sh"
-          bats .github/scripts/test_install.sh
+          bats --abort --pretty --print-output-on-failure .github/scripts/test_install.sh
 
       - name: Test w/o gh; use curl for downloads; use jq to parse responses
         timeout-minutes: 5
@@ -73,7 +74,7 @@ jobs:
           .github/scripts/setup_install_test.sh
 
           echo >&2 "# testing install.sh"
-          bats .github/scripts/test_install.sh
+          bats --abort --pretty --print-output-on-failure .github/scripts/test_install.sh
 
       - name: Test w/o gh or curl; use wget for downloads; use jq to parse responses
         timeout-minutes: 5
@@ -89,7 +90,7 @@ jobs:
           .github/scripts/setup_install_test.sh
 
           echo >&2 "# testing install.sh"
-          bats .github/scripts/test_install.sh
+          bats --abort --pretty --print-output-on-failure .github/scripts/test_install.sh
 
       - name: Test w/o gh or jq; use curl for downloads; use a pipeline to parse responses
         timeout-minutes: 5
@@ -105,7 +106,7 @@ jobs:
           .github/scripts/setup_install_test.sh
 
           echo >&2 "# testing install.sh"
-          bats .github/scripts/test_install.sh
+          bats --abort --pretty --print-output-on-failure .github/scripts/test_install.sh
 
       - name: Test w/o gh, curl or jq; use wget for downloads; use a pipeline to parse responses
         timeout-minutes: 5
@@ -121,4 +122,4 @@ jobs:
           .github/scripts/setup_install_test.sh
 
           echo >&2 "# testing install.sh"
-          bats .github/scripts/test_install.sh
+          bats --abort --pretty --print-output-on-failure .github/scripts/test_install.sh

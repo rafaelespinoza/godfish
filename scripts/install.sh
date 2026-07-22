@@ -203,11 +203,15 @@ download_release_assets() {
 
 	# Figure out what the remote filenames are.
 	if has_command jq; then
-		remote_checksums="$(jq --arg pattern "${checksums_file}" --raw-output '.assets[].browser_download_url | select(contains($pattern))' <"${release_info}")"
+		remote_checksums="$(jq --arg pattern "${checksums_file}\$" --raw-output '.assets[].browser_download_url | select(test($pattern))' <"${release_info}")"
 	else
 		# NOTE: should github minify the JSON response body, this would break.
 		# It relies on each attribute to be on its own line.
-		remote_checksums="$(grep "browser_download_url.*${checksums_file}" <"${release_info}" | cut -d ':' -f 2,3 | tr -d '"' | tr -d ' ')"
+		# Sample of target string:
+		# 	 "browser_download_url": "https://github.com/rafaelespinoza/godfish/releases/download/v0.16.0/checksums.txt"
+		# You'd want to avoid a filename like this:
+		# 	"checksums.txt.sigstore.json"
+		remote_checksums="$(grep "browser_download_url.*${checksums_file}\"$" <"${release_info}" | cut -d ':' -f 2,3 | tr -d '"' | tr -d ' ')"
 	fi
 	print_debug "remote_checksums='${remote_checksums}'"
 
