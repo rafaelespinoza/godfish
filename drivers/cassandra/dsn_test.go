@@ -1,6 +1,7 @@
 package cassandra
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -9,9 +10,10 @@ import (
 
 func TestNewClusterConfig(t *testing.T) {
 	type testCase struct {
-		input    string
-		expected *gocql.ClusterConfig
-		expErr   bool
+		name      string
+		input     string
+		expected  *gocql.ClusterConfig
+		expErrMsg *string
 	}
 	const defaultExpectedTimeout = 11 * time.Second
 
@@ -19,11 +21,18 @@ func TestNewClusterConfig(t *testing.T) {
 		t.Helper()
 
 		got, err := newClusterConfig(test.input)
-		if !test.expErr && err != nil {
+		if test.expErrMsg == nil && err != nil {
 			t.Error(err)
-		} else if test.expErr && err == nil {
+		} else if test.expErrMsg != nil && err == nil {
 			t.Error("expected error, got nil")
-		} else if test.expErr && err != nil {
+		} else if test.expErrMsg != nil && err != nil {
+			if got != nil {
+				t.Errorf("expected to get a non-empty result, got %v", got)
+			}
+			gotErrMsg, expErrMsg := err.Error(), *test.expErrMsg
+			if !strings.Contains(gotErrMsg, expErrMsg) {
+				t.Errorf("expected error (%v) to contain %q", gotErrMsg, expErrMsg)
+			}
 			return
 		}
 
@@ -173,14 +182,36 @@ func TestNewClusterConfig(t *testing.T) {
 
 	// These are example inputs that are not expected to work at all.
 	t.Run("err", func(t *testing.T) {
-		runTest(t, testCase{
-			input:  "foo/bar",
-			expErr: true, // missing schema
-		})
+		pointTo := func(in string) *string { return &in }
 
-		runTest(t, testCase{
-			input:  "cassandra://foo",
-			expErr: true, // missing keyspace
-		})
+		for _, test := range []testCase{
+			{
+				name:      "no scheme",
+				input:     "foo/bar",
+				expErrMsg: pointTo("scheme"),
+			},
+			{
+				name:      "no keyspace",
+				input:     "cassandra://foo",
+				expErrMsg: pointTo("keyspace"),
+			},
+			{
+				name:      "bad protocol_version",
+				input:     "cassandra://foo/bar?protocol_version=bad",
+				expErrMsg: pointTo("protocol_version"),
+			},
+			{
+				name:      "bad timeout_ms",
+				input:     "cassandra://foo/bar?timeout_ms=bad",
+				expErrMsg: pointTo("timeout_ms"),
+			},
+			{
+				name:      "bad connect_timeout_ms",
+				input:     "cassandra://foo/bar?connect_timeout_ms=bad",
+				expErrMsg: pointTo("connect_timeout_ms"),
+			},
+		} {
+			t.Run(test.name, func(t *testing.T) { runTest(t, test) })
+		}
 	})
 }

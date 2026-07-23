@@ -1,0 +1,7 @@
+FROM godfish_test/client_base:latest
+
+WORKDIR /src
+RUN just build-test
+
+ENTRYPOINT ["bats"]
+CMD ["--abort", "--pretty", "--print-output-on-failure", ".ci/delegator_cmd/tests.sh"]

@@ -1,0 +1,11 @@
+services:
+    # To maintain compatibility with how the tests are run, name the service, client.
+    client:
+        build:
+            context: ../..
+            dockerfile: .ci/delegator_cmd/Containerfile
+        volumes:
+          -
+            type: bind
+            source: ../../.ci/.test_coverage/delegator_cmd
+            target: /tmp/test_coverage

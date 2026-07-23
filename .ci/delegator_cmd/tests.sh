@@ -5,6 +5,9 @@
 
 set -eu -o pipefail
 
+: "${GOCOVERDIR:?env var GOCOVERDIR is required}"
+: "${TEST_COVERAGE_BASE_DIR:?env var COVERAGE_OUTDIR is required}"
+
 bats_load_library bats-assert
 bats_load_library bats-file
 bats_load_library bats-support
@@ -12,6 +15,13 @@ bats_load_library bats-support
 function setup_file() {
 	export BIN=bin/godfish
 	readonly BIN
+
+	mkdir -pv "${GOCOVERDIR}"
+}
+
+function teardown_file() {
+	mkdir -pv "${TEST_COVERAGE_BASE_DIR}"
+	go tool covdata textfmt -i="${GOCOVERDIR}" -o="${TEST_COVERAGE_BASE_DIR}/cover.out"
 }
 
 @test 'outputs a Usage message' {

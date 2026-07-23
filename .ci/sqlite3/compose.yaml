@@ -15,6 +15,7 @@ services:
             dockerfile: .ci/sqlite3/Containerfile
         environment:
             DB_DSN: file:/godfish_test.db
+            GITHUB_TOKEN: # Mitigate rate limits.
         volumes:
           -
             type: bind

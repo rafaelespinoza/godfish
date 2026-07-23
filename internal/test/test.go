@@ -154,7 +154,11 @@ func teardown(t *testing.T, driver godfish.Driver, path string, migrationsTable 
 	// Use a context with its own timeout, rather than directly use the test's
 	// context to ensure that the caller's test cleanup does not prevent
 	// this function from completing.
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	//
+	// Choosing a timeout value that is longer than the configured timeout for
+	// Cassandra DB tests at this time, which tends to timeout every now and then.
+	// It's currently set to 11 seconds and is configured via the test DB_DSN.
+	ctx, cancel := context.WithTimeout(context.Background(), 12*time.Second)
 	t.Cleanup(cancel)
 
 	for _, table := range tablesToDrop {

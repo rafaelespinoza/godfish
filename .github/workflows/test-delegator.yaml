@@ -7,47 +7,25 @@ on:
 permissions: {}
 
 jobs:
-  lint:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repo
-        uses: actions/checkout@v6
-      - name: Install shellcheck
-        run: sudo apt-get update && sudo apt-get install -y shellcheck
-      - name: Run shellcheck
-        run: shellcheck .github/scripts/test_delegator.sh
-
   test:
-    strategy:
-      matrix:
-        os: [ubuntu-latest, macos-latest]
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
     permissions: { contents: read }
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v6
-
-      - name: Setup go
-        uses: actions/setup-go@v6
-        with:
-          go-version: 1.25
-
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Install just
-        uses: extractions/setup-just@v3
-
-      - name: Setup Bats and bats libs
-        id: setup-bats
-        with:
-          support-path: "${{ github.workspace }}/.github/bats/bats-support"
-          assert-path: "${{ github.workspace }}/.github/bats/bats-assert"
-          file-path: "${{ github.workspace }}/.github/bats/tests/bats-file"
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-        uses: bats-core/bats-action@4.0.0
-
-      - name: Build binary
-        run: just build
-
-      - name: Test delegator binary
+        uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4
+      - name: Build environment and run tests
+        run: just -f ci.Justfile delegator-up
+      - name: Upload code coverage
+        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
         env:
-          BATS_LIB_PATH: ${{ steps.setup-bats.outputs.lib-path }}
-        run: bats .github/scripts/test_delegator.sh
+          DATADIR: .ci/.test_coverage/delegator_cmd
+        with:
+          disable_search: true
+          fail_ci_if_error: true
+          files: ${{ env.DATADIR }}/cover.out
+          token: ${{ secrets.CODECOV_TOKEN }}
+          verbose: true
+      - name: Teardown
+        run: just -f ci.Justfile delegator-down

@@ -11,6 +11,7 @@ services:
         environment:
             CGO_ENABLED: 0
             DB_DSN: "postgresql://godfish:password@server:5432/godfish_test?sslmode=disable"
+            GITHUB_TOKEN: # Mitigate rate limits.
         volumes:
             -
                 type: bind

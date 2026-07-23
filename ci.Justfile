@@ -97,8 +97,23 @@ sqlserver-down: (_compose_down _SQLSERVER_FILE)
 
 _up driver_basename compose_file: (make-builder-img driver_basename) (_compose_up compose_file)
 
+# In a GitHub actions environemnt, use this env var to mitigate rate limiting
+# effects for tests that need to call the GitHub API. In order to propagate this
+# value to the container at runtime, set a placeholder env var in the compose
+# yaml file like this:
+#
+#     environment:
+#       GITHUB_TOKEN:
+#
+# That is, declare the variable and leave it to the environment to resolve the
+# value. If a value is unresolved, then it's unset and removed from the service
+# container's environment; which should be OK for adhoc one-off invocations
+# when testing locally.
+[private]
+_GITHUB_TOKEN := env("GITHUB_TOKEN", "")
+
 _compose_up compose_file:
-    {{ CONTAINER_TOOL }} compose -f {{ compose_file }} up --build --exit-code-from client
+    GITHUB_TOKEN={{ _GITHUB_TOKEN }} {{ CONTAINER_TOOL }} compose -f {{ compose_file }} up --build --exit-code-from client
 
 _compose_down compose_file:
     {{ CONTAINER_TOOL }} compose -f {{ compose_file }} down --rmi all --volumes
@@ -119,3 +134,12 @@ make-builder-img driver_basename:
 # Remove builder image
 rm-builder-img:
     {{ CONTAINER_TOOL }} image rmi $({{ CONTAINER_TOOL }} image ls -aq {{ BASENAME }}/client_base)
+
+[private]
+_DELEGATOR_CMD_FILE := CI_DIR / "delegator_cmd" / "compose.yaml"
+
+# Setup, perform integration tests for the delegator command
+delegator-up: (_up "delegator_cmd" _DELEGATOR_CMD_FILE)
+
+# Cleanup integration test environment for the delegator command
+delegator-down: (_compose_down _DELEGATOR_CMD_FILE)

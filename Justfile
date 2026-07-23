@@ -158,13 +158,18 @@ _build_driver driver_name src_path *build_flags:
     echo "built {{ driver_name }} to ${bin}"
 
 # Compile binary encompassing each of the supported drivers
-build:
+build: _build_delegator_cmd
+
+# Compile binary encompassing each of the supported drivers, integration test coverage
+build-test: (_build_delegator_cmd "-cover")
+
+_build_delegator_cmd *build_flags:
     #!/bin/sh
     set -eu
     bin={{ clean(BIN_DIR / "godfish") }}
     mkdir -pv {{ BIN_DIR }}
     ldflags="{{ _LDFLAGS }}"
-    {{ GO }} build -o="${bin}" -v -ldflags="${ldflags}" ./internal/cmd/godfish
+    {{ GO }} build -o="${bin}" -v -ldflags="${ldflags}" {{ build_flags }} ./internal/cmd/godfish
     echo "built godfish to ${bin}"
 
 # Makes shell completion scripts, writes each to assets dir

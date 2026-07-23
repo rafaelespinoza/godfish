@@ -13,6 +13,7 @@ services:
             # The schema for a connection string is roughly:
             #   "$db_user:$db_password@tcp($db_host)/$db_name"
             DB_DSN: "godfish:password@tcp(server)/godfish_test"
+            GITHUB_TOKEN: # Mitigate rate limits.
         volumes:
             -
                 type: bind
