@@ -37,10 +37,18 @@ func CreateMigrationFiles(migrationName string, reversible bool, dirpath, fwdlab
 }
 
 // Migrate executes all migrations at the directory dirFS in the specified
-// direction. When forward is true, it will seek migrations with a forward
-// direction and apply them up to and including the one with a version matching
-// finishAtVersion. Likewise, when forward is false, then it seeks migrations
-// with a reverse direction and runs them.
+// direction.
+//
+// When forward is true, it will seek migrations with a forward direction
+// and apply them up to and including the one with a version matching
+// finishAtVersion. If finishAtVersion is empty and forward is true, then it
+// will apply all available migrations.
+//
+// When forward is false, then it seeks migrations with a reverse direction and
+// runs them. Unlike the forward mode, when finishAtVersion is empty then only
+// the closest previous is targeted and run. In other words, you would roll back
+// by 1 migration. If you want to rollback multiple migrations, then specify
+// finishAtVersion.
 //
 // The migrationsTable input sets the DB table for storing the current DB
 // migration state. If empty, then it's set to a default value of
@@ -83,9 +91,22 @@ func Migrate(ctx context.Context, driver Driver, dirFS fs.FS, forward bool, fini
 var ErrSchemaMigrationsDoesNotExist = errors.New("schema migrations table does not exist")
 
 // ApplyMigration runs a migration at the directory dirFS with the specified
-// version and direction. When forward is true, it will target a migration with
-// a forward direction. Likewise when forward is false, then it targets a
-// migration with a reverse direction.
+// version and direction. This function could be used for cherry-picking
+// one migration to apply; even if the targeted migration is not the next
+// available one. It will not attempt to run migrations in between the current
+// version and the targeted version.
+//
+// When forward is true, it will target a migration with a forward direction.
+// If forward is true and version is empty, then it migrates forward by 1.
+// If forward is true and version is non-empty, then it seeks a migration in
+// the forward direction and applies it. It does not need to be the "next"
+// available migration; it could be any available migration with a higher
+// version than the current.
+//
+// When forward is false, then it targets a migration in the reverse direction.
+// If forward is false and version is empty, then it rolls back by 1.
+// If forward is false and version is non-empty, then it seeks a migration in
+// the reverse (rollback) direction with a matching version and applies it.
 //
 // The migrationsTable input sets the DB table for storing the current DB
 // migration state. If empty, then it's set to a default value of
@@ -221,6 +242,21 @@ func makeDurationMSAttr(startedAt time.Time) slog.Attr {
 // "schema_migrations". Unlike other functions that use the DB table to check
 // the migration state, this function does not create a new table, nor does it
 // have the need to.
+//
+// # Example of tsv format
+//
+// (seems to look better in a terminal emulator)
+//
+//	i	version	applied	executed_at		label
+//	0	1234	true	2026-06-21 15:04:05	alpha
+//	1	2345	true	2026-07-01 03:40:50	bravo
+//	2	3456	false	-			charlie
+//
+// # Example of json format
+//
+//	{"i":0,"version":"1234","applied":true,"executed_at":"2026-06-21 15:04:05","label":"alpha"}
+//	{"i":1,"version":"2345","applied":true,"executed_at":"2026-07-01 03:40:50","label":"bravo"}
+//	{"i":2,"version":"3456","applied":false,"executed_at":"","label":"charlie"}
 func Info(ctx context.Context, driver Driver, directory fs.FS, forward bool, finishAtVersion string, w io.Writer, format string, migrationsTable string) (err error) {
 	migrationsTable = cmp.Or(migrationsTable, internal.DefaultMigrationsTableName)
 

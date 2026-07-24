@@ -9,7 +9,10 @@ import (
 	"path/filepath"
 
 	"github.com/rafaelespinoza/godfish"
+	"github.com/rafaelespinoza/godfish/drivers/mysql"
+	"github.com/rafaelespinoza/godfish/drivers/postgres"
 	"github.com/rafaelespinoza/godfish/drivers/sqlite3"
+	"github.com/rafaelespinoza/godfish/drivers/sqlserver"
 )
 
 // migrationsFS is the embedded readonly file system.
@@ -67,4 +70,95 @@ func Example_embed() {
 		fmt.Println("getting, showing info", err)
 		return
 	}
+}
+
+// How to migrate to apply all available migrations.
+func ExampleMigrate_migrateToLatestVersion() {
+	ctx := context.Background()
+
+	// driver can be one of the drivers in this project, see drivers/.
+	driver := mysql.NewDriver()
+	if err := driver.Connect(mysql.SampleDSN); err != nil {
+		fmt.Println("connecting to DB", err)
+		return
+	}
+	defer func() { _ = driver.Close() }()
+
+	migrationsDir := os.DirFS("path/to/migration/files")
+
+	// version may match the "version" part of the migration filename
+	// ie: YYYYMMDDHHmmss. When version is empty, then this function will apply
+	// all available migrations.
+	var version string
+
+	// migrationsTable when empty, will use the default value, "schema_migrations".
+	// This is where versioning is kept.
+	var migrationsTable string
+
+	err := godfish.Migrate(ctx, driver, migrationsDir, true, version, migrationsTable)
+	if err != nil {
+		fmt.Printf("attempting to migrate to latest version: %s", err.Error())
+		return
+	}
+	fmt.Println("ok")
+}
+
+// How to rollback one migration.
+func ExampleMigrate_rollbackOne() {
+	ctx := context.Background()
+
+	// driver can be one of the drivers in this project, see drivers/.
+	driver := postgres.NewDriver()
+	if err := driver.Connect(postgres.SampleDSN); err != nil {
+		fmt.Println("connecting to DB", err)
+		return
+	}
+	defer func() { _ = driver.Close() }()
+
+	migrationsDir := os.DirFS("path/to/migration/files")
+
+	// version when empty, tells this function to apply the nearest available
+	// migration with a lower version than the current.
+	// In other words, you rollback by 1 migration.
+	var version string
+
+	// migrationsTable when empty, will use the default value, "schema_migrations".
+	// This is where versioning is kept.
+	var migrationsTable string
+
+	err := godfish.Migrate(ctx, driver, migrationsDir, false, version, migrationsTable)
+	if err != nil {
+		fmt.Printf("attempting to migrate to latest version: %s", err.Error())
+		return
+	}
+	fmt.Println("ok")
+}
+
+// How to rollback 1 migration and reapply it.
+func ExampleApplyMigration_remigrate() {
+	ctx := context.Background()
+
+	// driver can be one of the drivers in this project, see drivers/.
+	driver := sqlserver.NewDriver()
+	if err := driver.Connect(sqlserver.SampleDSN); err != nil {
+		fmt.Println("connecting to DB", err)
+		return
+	}
+	defer func() { _ = driver.Close() }()
+
+	migrationsDir := os.DirFS("path/to/migration/files")
+
+	// migrationsTable when empty, will use the default value, "schema_migrations".
+	// This is where versioning is kept.
+	var migrationsTable string
+
+	if err := godfish.ApplyMigration(ctx, driver, migrationsDir, false, "", migrationsTable); err != nil {
+		fmt.Printf("attempting to rollback during remigration operation: %s", err.Error())
+		return
+	}
+	if err := godfish.ApplyMigration(ctx, driver, migrationsDir, true, "", migrationsTable); err != nil {
+		fmt.Printf("attempting to migrate forward during remigration operation: %s", err.Error())
+		return
+	}
+	fmt.Println("ok")
 }
