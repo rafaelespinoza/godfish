@@ -50,7 +50,20 @@ applying them.
 
 It also takes a "direction" flag if you want to know what would be applied
 in a rollback or remigrate operation. The "version" flag can be used to
-limit or extend the range of migrations to apply.`,
+limit or extend the range of migrations to apply.
+
+  Example tsv:
+
+    i	version	applied	executed_at	label
+    0	1234	true	2026-06-21 15:04:05	alpha
+    1	2345	true	2026-07-01 03:40:50	bravo
+    2	3456	false	-	charlie
+
+  Example json:
+
+    {"i":0,"version":"1234","applied":true,"executed_at":"2026-06-21 15:04:05","label":"alpha"}
+    {"i":1,"version":"2345","applied":true,"executed_at":"2026-07-01 03:40:50","label":"bravo"}
+    {"i":2,"version":"3456","applied":false,"executed_at":"","label":"charlie"}`,
 		Action: func(ctx context.Context, c *cli.Command) error {
 			driver, err := getDriver(ctx)
 			if err != nil {
