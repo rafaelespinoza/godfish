@@ -64,4 +64,6 @@ const (
 	// DefaultMigrationsTableName is the default name of the database table for
 	// storing database migration state.
 	DefaultMigrationsTableName = "schema_migrations"
+
+	msgPrefix = "godfish/internal"
 )

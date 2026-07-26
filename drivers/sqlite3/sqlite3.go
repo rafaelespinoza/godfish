@@ -15,7 +15,7 @@ import (
 	_ "modernc.org/sqlite" // register driver with database/sql
 )
 
-const msgPrefix = "sqlite3: "
+const msgPrefix = "godfish/sqlite3"
 
 // SampleDSN is an example data source name.
 const SampleDSN = `file:///path/to/db.sqlite`
@@ -86,10 +86,10 @@ func (d *Driver) AppliedVersions(ctx context.Context, migrationsTable string) (o
 	if err != nil {
 		return
 	} else if !metadata.hasTable {
-		err = driver.ErrSchemaMigrationsDoesNotExist
+		err = fmt.Errorf("%s.%s: %w", msgPrefix, "AppliedVersions", driver.ErrSchemaMigrationsDoesNotExist)
 		return
 	} else if !metadata.hasColLabel || !metadata.hasColExecutedAt {
-		err = driver.ErrSchemaMigrationsMissingColumns
+		err = fmt.Errorf("%s.%s: %w", msgPrefix, "AppliedVersions", driver.ErrSchemaMigrationsMissingColumns)
 		return
 	}
 
@@ -126,11 +126,11 @@ func (d *Driver) UpgradeSchemaMigrations(ctx context.Context, migrationsTable st
 	if err != nil {
 		return err
 	}
-	const errMsgPrefix = msgPrefix + "upgrading schema migrations table"
+	const errMsgPrefix = msgPrefix + ".UpgradeSchemaMigrations: "
 
 	tx, terr := d.connection.BeginTx(ctx, nil)
 	if terr != nil {
-		return fmt.Errorf(errMsgPrefix+", beginning transaction; %w", terr)
+		return fmt.Errorf(errMsgPrefix+"beginning transaction; %w", terr)
 	}
 
 	// sqlite3 can do transaction DDL, but each column must be added in its own query.
@@ -145,15 +145,15 @@ func (d *Driver) UpgradeSchemaMigrations(ctx context.Context, migrationsTable st
 		_, xerr := tx.ExecContext(ctx, q)
 		if xerr != nil {
 			if rerr := tx.Rollback(); rerr != nil {
-				return fmt.Errorf(errMsgPrefix+", exec and rollback failed, exec error (%w), rollback error (%w) ", xerr, rerr)
+				return fmt.Errorf(errMsgPrefix+"exec and rollback failed, exec error (%w), rollback error (%w) ", xerr, rerr)
 			}
-			return fmt.Errorf(errMsgPrefix+", exec failed but fortunately the rollback was OK; exec error %w", xerr)
+			return fmt.Errorf(errMsgPrefix+"exec failed but fortunately the rollback was OK; exec error %w", xerr)
 		}
 	}
 
 	cerr := tx.Commit()
 	if cerr != nil {
-		cerr = fmt.Errorf(errMsgPrefix+", during commit; %w", cerr)
+		cerr = fmt.Errorf(errMsgPrefix+"during commit; %w", cerr)
 	}
 	return cerr
 }
@@ -183,7 +183,7 @@ WHERE m.type = 'table'
   AND m.name = ?`
 	args := []any{"label", "executed_at", tableName}
 	lgr.Debug(
-		msgPrefix+"checking for table, column existence",
+		msgPrefix+": checking for table, column existence",
 		slog.String("query", query), slog.Any("args", args),
 	)
 	rows, err := d.connection.QueryContext(ctx, query, args...)

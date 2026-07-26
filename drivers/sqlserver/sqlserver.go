@@ -15,7 +15,7 @@ import (
 	_ "github.com/microsoft/go-mssqldb" // register driver with database/sql
 )
 
-const msgPrefix = "sqlserver: "
+const msgPrefix = "godfish/sqlserver"
 
 // SampleDSN is an example data source name for documentation purposes.
 const SampleDSN = `sqlserver://user:pass@server_host/instance?database=test1` // #nosec G101 -- this is an example to jog the user's memory of the format. Not real credentials.
@@ -90,10 +90,10 @@ func (d *Driver) AppliedVersions(ctx context.Context, migrationsTable string) (o
 	if err != nil {
 		return
 	} else if !metadata.hasTable {
-		err = driver.ErrSchemaMigrationsDoesNotExist
+		err = fmt.Errorf("%s.%s: %w", msgPrefix, "AppliedVersions", driver.ErrSchemaMigrationsDoesNotExist)
 		return
 	} else if !metadata.hasColLabel || !metadata.hasColExecutedAt {
-		err = driver.ErrSchemaMigrationsMissingColumns
+		err = fmt.Errorf("%s.%s: %w", msgPrefix, "AppliedVersions", driver.ErrSchemaMigrationsMissingColumns)
 		return
 	}
 
@@ -130,11 +130,11 @@ func (d *Driver) UpgradeSchemaMigrations(ctx context.Context, migrationsTable st
 	if err != nil {
 		return err
 	}
-	const errMsgPrefix = msgPrefix + "upgrading schema migrations table"
+	const errMsgPrefix = msgPrefix + ".UpgradeSchemaMigrations: "
 
 	tx, terr := d.connection.BeginTx(ctx, nil)
 	if terr != nil {
-		return fmt.Errorf(errMsgPrefix+", beginning transaction; %w", terr)
+		return fmt.Errorf(errMsgPrefix+"beginning transaction; %w", terr)
 	}
 
 	// In order to let existing data have a default value of '' or 0, add some named constraints.
@@ -158,14 +158,14 @@ func (d *Driver) UpgradeSchemaMigrations(ctx context.Context, migrationsTable st
 	_, xerr := tx.ExecContext(ctx, q)
 	if xerr != nil {
 		if rerr := tx.Rollback(); rerr != nil {
-			return fmt.Errorf(errMsgPrefix+", exec and rollback failed, exec error (%w), rollback error (%w) ", xerr, rerr)
+			return fmt.Errorf(errMsgPrefix+"exec and rollback failed, exec error (%w), rollback error (%w) ", xerr, rerr)
 		}
-		return fmt.Errorf(errMsgPrefix+", exec failed but fortunately the rollback was OK; exec error %w", xerr)
+		return fmt.Errorf(errMsgPrefix+"exec failed but fortunately the rollback was OK; exec error %w", xerr)
 	}
 
 	cerr := tx.Commit()
 	if cerr != nil {
-		cerr = fmt.Errorf(errMsgPrefix+", during commit; %w", cerr)
+		cerr = fmt.Errorf(errMsgPrefix+"during commit; %w", cerr)
 	}
 	return cerr
 }
@@ -194,7 +194,7 @@ WHERE t.table_catalog = DB_NAME()
 `
 	args := []any{"label", "executed_at", tableName}
 	lgr.Debug(
-		msgPrefix+"checking for table, column existence",
+		msgPrefix+": checking for table, column existence",
 		slog.String("query", query), slog.Any("args", args),
 	)
 	rows, err := d.connection.QueryContext(ctx, query, args...)

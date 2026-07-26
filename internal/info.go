@@ -37,7 +37,7 @@ func (p *tsvPrinter) PrintInfo(in []*Migration) error {
 	// headers
 	_, err := fmt.Fprintf(p.tw, format+"\n", "i", "version", "applied", "executed_at", "label", "filename")
 	if err != nil {
-		slog.Error("internal: printing TSV headers", slog.Any("error", err))
+		slog.Error("printing TSV headers", slog.Any("error", err))
 	}
 
 	// body
@@ -59,13 +59,13 @@ func (p *tsvPrinter) PrintInfo(in []*Migration) error {
 		)
 		if err != nil {
 			slog.Error(
-				"internal: printing TSV body",
+				"printing TSV body",
 				slog.Any("error", err), slog.String("version", mig.Version.String()), slog.String("label", label), slog.String("filename", mig.Filename),
 			)
 		}
 	}
 	if err = p.tw.Flush(); err != nil {
-		slog.Error("internal: flushing TSV", slog.Any("error", err))
+		slog.Error("flushing TSV", slog.Any("error", err))
 	}
 	return nil
 }
@@ -93,7 +93,7 @@ func (p *jsonPrinter) PrintInfo(in []*Migration) error {
 		})
 		if err != nil {
 			slog.Error(
-				"internal: printing JSON item",
+				"printing JSON item",
 				slog.Any("error", err), slog.String("version", mig.Version.String()), slog.String("label", mig.Label), slog.String("filename", mig.Filename),
 			)
 		}

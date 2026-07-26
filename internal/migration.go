@@ -159,18 +159,18 @@ func (m *MigrationParams) GenerateFiles() (err error) {
 		return
 	}
 
-	slog.Info("created forward file", slog.String("filename", forwardFile.Name()))
+	slog.Info(msgPrefix+": created forward file", slog.String("filename", forwardFile.Name()))
 	defer func() { _ = forwardFile.Close() }()
 
 	if !m.Reversible {
-		slog.Info("migration marked irreversible, did not create reverse file")
+		slog.Info(msgPrefix + ": migration marked irreversible, did not create reverse file")
 		return
 	}
 
 	if reverseFile, err = newMigrationFile(m.Reverse, m.Dirpath, m.FilenameExtension); err != nil {
 		return
 	}
-	slog.Info("created reverse file", slog.String("filename", reverseFile.Name()))
+	slog.Info(msgPrefix+": created reverse file", slog.String("filename", reverseFile.Name()))
 	defer func() { _ = reverseFile.Close() }()
 	return
 }

@@ -16,7 +16,7 @@ import (
 	_ "github.com/go-sql-driver/mysql" // register driver with database/sql
 )
 
-const msgPrefix = "mysql: "
+const msgPrefix = "godfish/mysql"
 
 // SampleDSN is an example data source name.
 const SampleDSN = `username:password@tcp(server_host)/db_name?param1=value&paramN=valueN` // #nosec G101 -- not real credentials.
@@ -107,10 +107,10 @@ func (d *Driver) AppliedVersions(ctx context.Context, migrationsTable string) (o
 	if err != nil {
 		return
 	} else if !metadata.hasTable {
-		err = driver.ErrSchemaMigrationsDoesNotExist
+		err = fmt.Errorf("%s.%s: %w", msgPrefix, "AppliedVersions", driver.ErrSchemaMigrationsDoesNotExist)
 		return
 	} else if !metadata.hasColLabel || !metadata.hasColExecutedAt {
-		err = driver.ErrSchemaMigrationsMissingColumns
+		err = fmt.Errorf("%s.%s: %w", msgPrefix, "AppliedVersions", driver.ErrSchemaMigrationsMissingColumns)
 		return
 	}
 
@@ -147,7 +147,7 @@ func (d *Driver) UpgradeSchemaMigrations(ctx context.Context, migrationsTable st
 	if err != nil {
 		return err
 	}
-	const errMsgPrefix = msgPrefix + "upgrading schema migrations table"
+	const errMsgPrefix = msgPrefix + ".UpgradeSchemaMigrations: "
 
 	// #nosec G202 -- table name was sanitized
 	q := `ALTER TABLE ` + cleanedTableName + `
@@ -155,7 +155,7 @@ func (d *Driver) UpgradeSchemaMigrations(ctx context.Context, migrationsTable st
 	ADD COLUMN executed_at BIGINT DEFAULT 0`
 
 	if _, err = d.connection.ExecContext(ctx, q); err != nil {
-		err = fmt.Errorf(errMsgPrefix+", exec failed; %w", err)
+		err = fmt.Errorf(errMsgPrefix+"exec failed; %w", err)
 	}
 
 	return err
@@ -186,7 +186,7 @@ WHERE t.table_schema = DATABASE()
 `
 	args := []any{"label", "executed_at", tableName}
 	lgr.Debug(
-		msgPrefix+"checking for table, column existence",
+		msgPrefix+": checking for table, column existence",
 		slog.String("query", query), slog.Any("args", args),
 	)
 	rows, err := d.connection.QueryContext(ctx, query, args...)
