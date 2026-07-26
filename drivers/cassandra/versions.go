@@ -36,7 +36,7 @@ func execAllAscending(query *gocql.Query) *appliedVersions {
 		}
 		av.versions = append(av.versions, migration{version, label, executedAt})
 		slog.Debug(
-			msgPrefix+"scanned version",
+			logMsgPrefix+"scanned version",
 			slog.String("version", version), slog.String("label", label), slog.Int64("executed_at", executedAt),
 		)
 	}
