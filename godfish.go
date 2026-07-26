@@ -62,7 +62,7 @@ const msgPrefix = "godfish"
 //     the filename extension.
 //     When this option is omitted, then this function will use the default,
 //     which is ".sql".
-func CreateMigrationFilesWith(migrationName string, reversible bool, dirpath string, opts ...Opter) (err error) {
+func CreateMigrationFilesWith(migrationName string, reversible bool, dirpath string, opts ...Opter) error {
 	o, err := setOptions(opts...)
 	if err != nil {
 		return fmt.Errorf("%s.%s: %w", msgPrefix, "CreateMigrationFilesWith", err)
@@ -81,7 +81,7 @@ func CreateMigrationFilesWith(migrationName string, reversible bool, dirpath str
 // Deprecated: This function will be removed in a future release.
 // New code should use [CreateMigrationFilesWith].
 // Current code is encouraged to adjust as well.
-func CreateMigrationFiles(migrationName string, reversible bool, dirpath, fwdlabel, revlabel string) (err error) {
+func CreateMigrationFiles(migrationName string, reversible bool, dirpath, fwdlabel, revlabel string) error {
 	return createMigrationFiles(migrationName, reversible, dirpath, fwdlabel, revlabel, ".sql")
 }
 
@@ -344,17 +344,18 @@ func runMigration(ctx context.Context, driver driver.Driver, dir fs.FS, mig *int
 		gerund = "rolling back"
 	}
 
+	const logMsgPrefix = msgPrefix + ": "
 	lgr := slog.With(slog.String("path_to_file", mig.Filename), slog.String("version", mig.Version.String()))
-	lgr.Info(gerund + " ...")
+	lgr.Info(logMsgPrefix + gerund + " ...")
 	startTime := time.Now()
 
 	if err = driver.Execute(ctx, string(data)); err != nil {
 		err = fmt.Errorf("%w; path_to_file: %s; %w", internal.ErrExecutingMigration, mig.Filename, err)
-		lgr.Error("executing migration", slog.Any("error", err), makeDurationMSAttr(startTime))
+		lgr.Error(logMsgPrefix+"executing migration", slog.Any("error", err), makeDurationMSAttr(startTime))
 		return
 	}
 	if err = driver.CreateSchemaMigrationsTable(ctx, migrationsTable); err != nil {
-		lgr.Error("creating schema migrations table", slog.Any("error", err), makeDurationMSAttr(startTime))
+		lgr.Error(logMsgPrefix+"creating schema migrations table", slog.Any("error", err), makeDurationMSAttr(startTime))
 		return
 	}
 	err = driver.UpdateSchemaMigrations(
@@ -365,9 +366,9 @@ func runMigration(ctx context.Context, driver driver.Driver, dir fs.FS, mig *int
 		mig.Label,
 	)
 	if err != nil {
-		lgr.Error("updating schema migrations table", slog.Any("error", err), makeDurationMSAttr(startTime))
+		lgr.Error(logMsgPrefix+"updating schema migrations table", slog.Any("error", err), makeDurationMSAttr(startTime))
 	} else {
-		lgr.Info("ok", makeDurationMSAttr(startTime))
+		lgr.Info(logMsgPrefix+"ok", makeDurationMSAttr(startTime))
 	}
 	return
 }
@@ -460,7 +461,7 @@ func choosePrinter(format string, w io.Writer) (out internal.InfoPrinter) {
 	}
 
 	if format != "tsv" && format != "" {
-		slog.Warn("unknown format, defaulting to tsv", slog.String("format", format))
+		slog.Warn(msgPrefix+": unknown format, defaulting to tsv", slog.String("format", format))
 	}
 	out = internal.NewTSV(w)
 	return
@@ -470,7 +471,7 @@ func choosePrinter(format string, w io.Writer) (out internal.InfoPrinter) {
 func Init(pathToFile string) (err error) {
 	_, err = os.Stat(pathToFile)
 	if err == nil {
-		slog.Info("config file already present", slog.String("path_to_file", pathToFile))
+		slog.Info(msgPrefix+".Init: config file already present", slog.String("path_to_file", pathToFile))
 		return nil
 	}
 	if !os.IsNotExist(err) {
@@ -560,6 +561,7 @@ type migrationFinder struct {
 
 // query returns a list of Migrations to apply.
 func (m *migrationFinder) query(ctx context.Context, d driver.Driver, migrationsTable string) (out []*internal.Migration, err error) {
+	const logMsgPrefix = msgPrefix + ": "
 	lgr := slog.With(slog.String("func", "(*migrationFinder).query"))
 
 	availableByVersion, orderedAvailableVersions, err := m.available()
@@ -570,7 +572,7 @@ func (m *migrationFinder) query(ctx context.Context, d driver.Driver, migrations
 	for i, version := range orderedAvailableVersions {
 		available[i] = availableByVersion[version]
 	}
-	lgr.Debug("found available migrations",
+	lgr.Debug(logMsgPrefix+"found available migrations",
 		slog.Int("count", len(availableByVersion)),
 		slog.Any("available", internal.Migrations(available)),
 	)
@@ -586,7 +588,7 @@ func (m *migrationFinder) query(ctx context.Context, d driver.Driver, migrations
 	} else if err != nil {
 		return
 	}
-	lgr.Debug("scanned applied migrations",
+	lgr.Debug(logMsgPrefix+"scanned applied migrations",
 		slog.Int("count", len(applied)),
 		slog.Any("applied", internal.Migrations(applied)),
 	)
@@ -597,11 +599,11 @@ func (m *migrationFinder) query(ctx context.Context, d driver.Driver, migrations
 		}
 
 		if perr := printMigrations(m.infoPrinter, applied, out); perr != nil {
-			slog.Error("printing migrations", slog.Any("error", perr))
+			slog.Error(msgPrefix+": printing migrations", slog.Any("error", perr))
 		}
 	}()
 
-	lgr.Debug("about to filter migrations", slog.Group("migration_finder",
+	lgr.Debug(logMsgPrefix+"about to filter migrations", slog.Group("migration_finder",
 		slog.String("direction", m.direction.String()),
 		slog.String("finish_at_version", m.finishAtVersion),
 	))
@@ -610,7 +612,7 @@ func (m *migrationFinder) query(ctx context.Context, d driver.Driver, migrations
 	if err != nil {
 		return
 	}
-	lgr.Debug("filtered migrations toApply", slog.Group("to_apply",
+	lgr.Debug(logMsgPrefix+"filtered migrations toApply", slog.Group("to_apply",
 		slog.Int("count", len(toApply)),
 		slog.Any("vals", internal.Migrations(toApply)),
 	))
@@ -629,7 +631,7 @@ func (m *migrationFinder) query(ctx context.Context, d driver.Driver, migrations
 	if finish, err = internal.ParseVersion(m.finishAtVersion); err != nil {
 		return
 	}
-	lgr.Debug("about to collect migrations to apply in a loop",
+	lgr.Debug(logMsgPrefix+"about to collect migrations to apply in a loop",
 		slog.String("finish_at_version", finish.String()),
 		slog.String("direction", m.direction.String()),
 		slog.Bool("use_default_rollback_version", useDefaultRollbackVersion),
@@ -638,7 +640,7 @@ func (m *migrationFinder) query(ctx context.Context, d driver.Driver, migrations
 
 	for i, mig := range toApply {
 		version := mig.Version
-		lgr.Debug("considering migration to apply", slog.Int("i", i), slog.String("version", version.String()))
+		lgr.Debug(logMsgPrefix+"considering migration to apply", slog.Int("i", i), slog.String("version", version.String()))
 		if m.direction == internal.DirForward && finish.Before(version) {
 			break
 		}
@@ -650,7 +652,7 @@ func (m *migrationFinder) query(ctx context.Context, d driver.Driver, migrations
 				break
 			}
 		}
-		lgr.Debug("collected migration to apply", slog.Int("i", i), slog.String("version", version.String()))
+		lgr.Debug(logMsgPrefix+"collected migration to apply", slog.Int("i", i), slog.String("version", version.String()))
 		out = append(out, mig)
 	}
 	return
@@ -665,8 +667,9 @@ func (m *migrationFinder) query(ctx context.Context, d driver.Driver, migrations
 func (m *migrationFinder) available() (map[int64]*internal.Migration, []int64, error) {
 	dirEntries, err := fs.ReadDir(m.dirFS, ".")
 	if err != nil {
-		return nil, nil, fmt.Errorf("reading directory entries: %w", err)
+		return nil, nil, fmt.Errorf("%s: reading directory entries: %w", msgPrefix, err)
 	}
+	const logMsgPrefix = msgPrefix + ": "
 	if m.direction != internal.DirForward {
 		slices.Reverse(dirEntries)
 	}
@@ -677,13 +680,13 @@ func (m *migrationFinder) available() (map[int64]*internal.Migration, []int64, e
 	for _, dirEntry := range dirEntries {
 		name := dirEntry.Name()
 		if dirEntry.IsDir() {
-			slog.Info("searching for available migrations and found directory, skipping", slog.String("path", name))
+			slog.Info(logMsgPrefix+"searching for available migrations and found directory, skipping", slog.String("path", name))
 			continue
 		}
 
 		mig, ierr := internal.ParseMigration(internal.Filename(name))
 		if internal.IsInvalidDataError(ierr) {
-			slog.Warn("parsing migration filename, skipping over this one", slog.String("filename", name), slog.String("error", ierr.Error()))
+			slog.Warn(logMsgPrefix+"parsing migration filename, skipping over this one", slog.String("filename", name), slog.String("error", ierr.Error()))
 			continue
 		} else if ierr != nil {
 			return nil, nil, ierr
@@ -720,13 +723,14 @@ func (m *migrationFinder) available() (map[int64]*internal.Migration, []int64, e
 // But if you only you want to check if the DB table needs to be upgraded, then
 // it's ok to pass an empty map.
 func scanAppliedVersions(ctx context.Context, d driver.Driver, migrationsTable string, availableByVersion map[int64]*internal.Migration) (out []*internal.Migration, err error) {
+	const logMsgPrefix = msgPrefix + ": "
 	var rows driver.AppliedVersions
 	if rows, err = d.AppliedVersions(ctx, migrationsTable); err != nil {
 		return
 	}
 	defer func() {
 		if cerr := rows.Close(); cerr != nil {
-			slog.Warn("closing rows from func scanAppliedVersions", slog.Any("error", cerr))
+			slog.Warn(logMsgPrefix+"closing rows from func scanAppliedVersions", slog.Any("error", cerr))
 		}
 	}()
 	for rows.Next() {
@@ -738,7 +742,10 @@ func scanAppliedVersions(ctx context.Context, d driver.Driver, migrationsTable s
 
 		ver, verr := internal.ParseVersion(version)
 		if verr != nil {
-			err = fmt.Errorf("%w; while scanning applied versions, parsing version (%v) from DB: %w", internal.ErrDataInvalid, version, verr)
+			err = fmt.Errorf(
+				"%s: %w; while scanning applied versions, parsing version (%v) from DB: %w",
+				msgPrefix, internal.ErrDataInvalid, version, verr,
+			)
 			return
 		}
 		var executedAtTime time.Time
@@ -911,6 +918,7 @@ func UpgradeSchemaMigrations(ctx context.Context, driver driver.Driver, migratio
 func upgradeSchemaMigrations(ctx context.Context, d driver.Driver, migrationsTable string) (err error) {
 	migrationsTable = cmp.Or(migrationsTable, internal.DefaultMigrationsTableName)
 
+	const logMsgPrefix = msgPrefix + ".UpgradeSchemaMigrations: "
 	lgr := slog.With(slog.String("migrations_table", migrationsTable))
 
 	// Check if table exists but needs an upgrade
@@ -919,7 +927,7 @@ func upgradeSchemaMigrations(ctx context.Context, d driver.Driver, migrationsTab
 	// at this time. We want to test if the DB table can be read at all w/o error.
 	var dummyMigrationMap map[int64]*internal.Migration
 	if _, err = scanAppliedVersions(ctx, d, migrationsTable, dummyMigrationMap); err != nil {
-		lgr.Debug("from UpgradeSchemaMigrations", slog.Any("error", err))
+		lgr.Debug(logMsgPrefix+"from UpgradeSchemaMigrations", slog.Any("error", err))
 		if errors.Is(err, driver.ErrSchemaMigrationsDoesNotExist) {
 			err = fmt.Errorf("%w; cannot upgrade if it does not exist yet", err)
 			return
@@ -929,16 +937,16 @@ func upgradeSchemaMigrations(ctx context.Context, d driver.Driver, migrationsTab
 
 		err = nil // Table exists but is missing columns
 	} else {
-		lgr.Info("schema migrations table appears to be in expected shape, no need to upgrade")
+		lgr.Info(logMsgPrefix + "schema migrations table appears to be in expected shape, no need to upgrade")
 		return
 	}
 
 	startTime := time.Now()
-	lgr.Info("upgrading schema migrations table...")
+	lgr.Info(logMsgPrefix + "starting upgrade ...")
 	if err = d.UpgradeSchemaMigrations(ctx, migrationsTable); err != nil {
-		lgr.Error("failed to upgrade schema migrations table", slog.Any("error", err), makeDurationMSAttr(startTime))
+		lgr.Error(logMsgPrefix+"failed to upgrade schema migrations table", slog.Any("error", err), makeDurationMSAttr(startTime))
 		return err
 	}
-	lgr.Info("schema migrations table upgrade complete", makeDurationMSAttr(startTime))
+	lgr.Info(logMsgPrefix+"upgrade complete", makeDurationMSAttr(startTime))
 	return nil
 }

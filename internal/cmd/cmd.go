@@ -104,7 +104,7 @@ Sample DSN:
 		},
 		CommandNotFound: func(ctx context.Context, c *cli.Command, input string) {
 			if err := renderCommandNotFound(c, input, c.Writer); err != nil {
-				slog.Error("attempting to render not found message", slog.Any("error", err.Error()))
+				slog.Error(msgPrefix+": attempting to render not found message", slog.Any("error", err.Error()))
 			}
 			cli.HandleExitCoder(cli.Exit("subcommand not found", 2))
 		},
@@ -122,7 +122,7 @@ Sample DSN:
 				}
 			}
 
-			slog.Debug("input args before running command",
+			slog.Debug(msgPrefix+": input args before running command",
 				slog.Any("args", c.Args().Slice()),
 				slog.Int("num_flags_set", c.NumFlags()),
 				slog.GroupAttrs("flags",
@@ -217,7 +217,7 @@ func withConnection(ctx context.Context, dsn string, conn Connector, f func(cont
 	}
 	defer func() {
 		if cerr := conn.Close(); cerr != nil {
-			slog.Warn("closing driver", slog.Any("error", cerr))
+			slog.Warn(msgPrefix+": closing driver", slog.Any("error", cerr))
 		}
 	}()
 
@@ -264,3 +264,5 @@ func renderCommandNotFound(c *cli.Command, input string, w io.Writer) error {
 	}
 	return nil
 }
+
+const msgPrefix = "godfish/cmd"
