@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/rafaelespinoza/godfish"
 	"github.com/rafaelespinoza/godfish/internal"
 	"github.com/rafaelespinoza/godfish/internal/stub"
 )
@@ -45,6 +46,7 @@ func TestRoot(t *testing.T) {
 	}
 	for _, cmdAndArgs := range args {
 		t.Run(strings.Join(cmdAndArgs, " "), func(t *testing.T) {
+			conn := makeNoopConnector()
 			godfishFlags := []string{
 				"dummy_bin_value",
 				"-conf", filepath.Join(testdir, ".godfish.json"),
@@ -52,7 +54,7 @@ func TestRoot(t *testing.T) {
 			}
 			combinedArgs := append(godfishFlags, cmdAndArgs...)
 
-			err := New(stub.NewDriver(), "test").Run(ctx, combinedArgs)
+			err := New(conn, "test").Run(ctx, combinedArgs)
 			t.Log(err)
 		})
 	}
@@ -99,13 +101,14 @@ func TestDBDSN(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Setenv(internal.DSNKey, test.envVal)
 
+			conn := makeNoopConnector()
 			godfishFlags := []string{"dummy_bin_value", "-files", testdir}
 			if test.flagVal != "" {
 				godfishFlags = append(godfishFlags, "-dsn", test.flagVal)
 			}
 			combinedArgs := append(godfishFlags, "info")
 
-			err := New(stub.NewDriver(), "test").Run(t.Context(), combinedArgs)
+			err := New(conn, "test").Run(t.Context(), combinedArgs)
 			if !test.expErr && err != nil {
 				t.Fatal(err)
 			} else if test.expErr && err == nil {
@@ -267,7 +270,25 @@ func TestWithConnection(t *testing.T) {
 	}
 }
 
+func makeNoopConnector() *connector {
+	conn := connector{
+		Double: &stub.Double{
+			NameFn: func() string { return "test" },
+			AppliedVersionsFn: func(context.Context, string) (godfish.AppliedVersions, error) {
+				return stub.NewAppliedVersions(), nil
+			},
+			ExecuteFn:                func(context.Context, string, ...any) error { return nil },
+			CreateSchemaMigrationsFn: func(context.Context, string) error { return nil },
+			UpdateSchemaMigrationsFn: func(context.Context, string, bool, string, string) error { return nil },
+		},
+		ConnectFn: func(d string) error { return nil },
+		CloseFn:   func() error { return nil },
+	}
+	return &conn
+}
+
 type connector struct {
+	*stub.Double
 	ConnectFn func(d string) error
 	CloseFn   func() error
 }

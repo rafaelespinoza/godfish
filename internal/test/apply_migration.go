@@ -1,15 +1,59 @@
 package test
 
 import (
+	"context"
+	"io/fs"
 	"os"
 	"strings"
 	"testing"
 
 	"github.com/rafaelespinoza/godfish"
 	"github.com/rafaelespinoza/godfish/internal"
+	"github.com/rafaelespinoza/godfish/internal/compat"
 )
 
 func testApplyMigration(t *testing.T, driver godfish.Driver, queries testdataQueries) {
+	tests := []struct {
+		name     string
+		migrate  compat.MigrateFunc
+		rollback compat.RollbackFunc
+	}{
+		{
+			name: "Deprecated APIs",
+			migrate: func(ctx context.Context, d godfish.Driver, fsys fs.FS, v, tbl string) error {
+				return godfish.ApplyMigration(ctx, d, fsys, true, v, tbl)
+			},
+			rollback: func(ctx context.Context, d godfish.Driver, fsys fs.FS, v, tbl string) error {
+				return godfish.ApplyMigration(ctx, d, fsys, false, v, tbl)
+			},
+		},
+		{
+			name: "Replacement APIs",
+			migrate: func(ctx context.Context, d godfish.Driver, fsys fs.FS, v, tbl string) error {
+				opts := compat.MakeMigrationOpts(compat.MigrationOptParams{
+					TargetVersion:   v,
+					MigrationsTable: tbl,
+				})
+				return godfish.ApplyMigrationWith(ctx, d, fsys, opts...)
+			},
+			rollback: func(ctx context.Context, d godfish.Driver, fsys fs.FS, v, tbl string) error {
+				opts := compat.MakeMigrationOpts(compat.MigrationOptParams{
+					TargetVersion:   v,
+					MigrationsTable: tbl,
+				})
+				return godfish.ApplyRollbackWith(ctx, d, fsys, opts...)
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			runApplyMigrationTests(t, driver, queries, test.migrate, test.rollback)
+		})
+	}
+}
+
+func runApplyMigrationTests(t *testing.T, driver godfish.Driver, queries testdataQueries, migrate compat.MigrateFunc, rollback compat.RollbackFunc) {
 	// testSetupState is the database state before calling ApplyMigration.
 	type testSetupState struct {
 		// migrateTo is the version that the DB should be at.
@@ -59,7 +103,12 @@ func testApplyMigration(t *testing.T, driver godfish.Driver, queries testdataQue
 		pathToFiles := setup(t, driver, setupState.stubs, setupState.migrateTo, setupState.migrationsTable)
 		t.Cleanup(func() { teardown(t, driver, pathToFiles, setupState.migrationsTable, "foos", "bars") })
 
-		err := godfish.ApplyMigration(t.Context(), driver, os.DirFS(pathToFiles), input.direction == internal.DirForward, input.version, input.migrationsTable)
+		var err error
+		if input.direction == internal.DirForward {
+			err = migrate(t.Context(), driver, os.DirFS(pathToFiles), input.version, input.migrationsTable)
+		} else {
+			err = rollback(t.Context(), driver, os.DirFS(pathToFiles), input.version, input.migrationsTable)
+		}
 		if expected.err == nil && err != nil {
 			t.Errorf("unexpected error %v", err)
 		} else if expected.err != nil && err == nil {

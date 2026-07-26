@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -15,8 +16,8 @@ import (
 
 	"github.com/rafaelespinoza/godfish"
 	"github.com/rafaelespinoza/godfish/internal"
+	"github.com/rafaelespinoza/godfish/internal/compat"
 	"github.com/rafaelespinoza/godfish/internal/stub"
-	"github.com/rafaelespinoza/godfish/internal/test"
 	"github.com/rafaelespinoza/godfish/testdata"
 )
 
@@ -56,6 +57,47 @@ func TestCreateMigrationFiles(t *testing.T) {
 }
 
 func TestMigrate(t *testing.T) {
+	tests := []struct {
+		name string
+		up   compat.MigrateFunc
+		down compat.RollbackFunc
+	}{
+		{
+			name: "Deprecated APIs",
+			up: func(ctx context.Context, d godfish.Driver, fsys fs.FS, v, tbl string) error {
+				return godfish.Migrate(ctx, d, fsys, true, v, tbl)
+			},
+			down: func(ctx context.Context, d godfish.Driver, fsys fs.FS, v, tbl string) error {
+				return godfish.Migrate(ctx, d, fsys, false, v, tbl)
+			},
+		},
+		{
+			name: "Replacement APIs",
+			up: func(ctx context.Context, d godfish.Driver, fsys fs.FS, v, tbl string) error {
+				opts := compat.MakeMigrationOpts(compat.MigrationOptParams{
+					TargetVersion:   v,
+					MigrationsTable: tbl,
+				})
+				return godfish.MigrateWith(ctx, d, fsys, opts...)
+			},
+			down: func(ctx context.Context, d godfish.Driver, fsys fs.FS, v, tbl string) error {
+				opts := compat.MakeMigrationOpts(compat.MigrationOptParams{
+					TargetVersion:   v,
+					MigrationsTable: tbl,
+				})
+				return godfish.RollbackWith(ctx, d, fsys, opts...)
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			testMigrate(t, test.up, test.down)
+		})
+	}
+}
+
+func testMigrate(t *testing.T, up compat.MigrateFunc, down compat.RollbackFunc) {
 	// There are more detailed tests in the internal/test package.
 	dirFS, err := fs.Sub(testdata.Migrations, "default")
 	if err != nil {
@@ -63,20 +105,32 @@ func TestMigrate(t *testing.T) {
 	}
 
 	t.Run("all the way up and down", func(t *testing.T) {
-		driver := stub.NewDriver()
+		driver := stub.Double{
+			AppliedVersionsFn:        makeScanApplied(t, "1234", "2345", "3456"),
+			ExecuteFn:                func(ctx context.Context, q string, a ...any) error { return nil },
+			CreateSchemaMigrationsFn: func(ctx context.Context, migrationsTable string) error { return nil },
+			UpdateSchemaMigrationsFn: func(ctx context.Context, migrationsTable string, forward bool, version, label string) error {
+				return nil
+			},
+		}
 		var err error
-		if err = godfish.Migrate(t.Context(), driver, dirFS, true, "", ""); err != nil {
+		if err = up(t.Context(), &driver, dirFS, "", ""); err != nil {
 			t.Fatal(err)
 		}
 
-		if err = godfish.Migrate(t.Context(), driver, dirFS, false, "", ""); err != nil {
+		if err = down(t.Context(), &driver, dirFS, "", ""); err != nil {
 			t.Fatal(err)
 		}
 	})
 
 	t.Run("bad version", func(t *testing.T) {
-		driver := stub.NewDriver()
-		err := godfish.Migrate(t.Context(), driver, dirFS, true, "bad", "")
+		driver := stub.Double{
+			AppliedVersionsFn:        makeScanApplied(t, "1234", "2345", "3456"),
+			ExecuteFn:                makeExecuteFn(nil),
+			CreateSchemaMigrationsFn: makeCreateSchemaMigrationsFn(nil),
+			UpdateSchemaMigrationsFn: makeUpdatSchemaMigrationsFn(nil),
+		}
+		err := up(t.Context(), &driver, dirFS, "bad", "")
 		if err == nil {
 			t.Fatal("expected error")
 		}
@@ -85,9 +139,226 @@ func TestMigrate(t *testing.T) {
 			t.Errorf("expected for error (%v) to mention %q", m, "version")
 		}
 	})
+
+	t.Run("error executing migration", func(t *testing.T) {
+		var calledUpdateFn bool
+		driver := &stub.Double{
+			AppliedVersionsFn: makeScanApplied(t, "1234"),
+			ExecuteFn:         makeExecuteFn(errors.New("OOF")),
+			UpdateSchemaMigrationsFn: func(ctx context.Context, migrationsTable string, forward bool, version, label string) error {
+				calledUpdateFn = true
+				return nil
+			},
+		}
+		err := up(t.Context(), driver, dirFS, "2345", "test")
+		expErr := internal.ErrExecutingMigration
+		if !errors.Is(err, expErr) {
+			t.Errorf("expected error (%v) to be %v", err, expErr)
+		}
+		if calledUpdateFn {
+			t.Errorf("did not expect to call the update method")
+		}
+	})
+
+	t.Run("error creating migrations table", func(t *testing.T) {
+		oof := errors.New("oof")
+		var calledUpdateFn bool
+		driver := &stub.Double{
+			AppliedVersionsFn:        makeScanApplied(t),
+			ExecuteFn:                makeExecuteFn(nil),
+			CreateSchemaMigrationsFn: makeCreateSchemaMigrationsFn(oof),
+			UpdateSchemaMigrationsFn: func(ctx context.Context, migrationsTable string, forward bool, version, label string) error {
+				calledUpdateFn = true
+				return nil
+			},
+		}
+		err := up(t.Context(), driver, dirFS, "2345", "test")
+		if !errors.Is(err, oof) {
+			t.Errorf("expected error (%v) to be %v", err, oof)
+		}
+		if calledUpdateFn {
+			t.Errorf("did not expect to call the update method")
+		}
+	})
+
+	t.Run("error updating migrations table", func(t *testing.T) {
+		oof := errors.New("oof")
+		driver := &stub.Double{
+			AppliedVersionsFn:        makeScanApplied(t, "1234"),
+			ExecuteFn:                makeExecuteFn(nil),
+			CreateSchemaMigrationsFn: makeCreateSchemaMigrationsFn(nil),
+			UpdateSchemaMigrationsFn: func(ctx context.Context, migrationsTable string, forward bool, version, label string) error {
+				return oof
+			},
+		}
+		err := up(t.Context(), driver, dirFS, "2345", "test")
+		if !errors.Is(err, oof) {
+			t.Errorf("expected error (%v) to be %v", err, oof)
+		}
+	})
+
+	t.Run("schema migrations table does not exist", func(t *testing.T) {
+		// Check that when the table does not exist, in the happy path, the
+		// "database" will handle the error by creating the table and updating it.
+		var updateCalls int
+		driver := &stub.Double{
+			AppliedVersionsFn: func(ctx context.Context, migrationsTable string) (godfish.AppliedVersions, error) {
+				return nil, godfish.ErrSchemaMigrationsDoesNotExist
+			},
+			ExecuteFn:                makeExecuteFn(nil),
+			CreateSchemaMigrationsFn: makeCreateSchemaMigrationsFn(nil),
+			UpdateSchemaMigrationsFn: func(ctx context.Context, migrationsTable string, forward bool, version, label string) error {
+				updateCalls++
+				return nil
+			},
+		}
+		err := up(t.Context(), driver, dirFS, "2345", "test")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if expNumCalls := 2; updateCalls != expNumCalls {
+			t.Errorf("number of calls to UpdateSchemaMigrations; got %d, expected %d", updateCalls, expNumCalls)
+		}
+	})
+
+	t.Run("other error scanning for migrations", func(t *testing.T) {
+		oof := errors.New("oof")
+		var calledUpdate bool
+		driver := &stub.Double{
+			AppliedVersionsFn: func(ctx context.Context, migrationsTable string) (godfish.AppliedVersions, error) {
+				return nil, oof
+			},
+			ExecuteFn:                makeExecuteFn(nil),
+			CreateSchemaMigrationsFn: makeCreateSchemaMigrationsFn(nil),
+			UpdateSchemaMigrationsFn: func(ctx context.Context, migrationsTable string, forward bool, version, label string) error {
+				calledUpdate = true
+				return nil
+			},
+		}
+		err := up(t.Context(), driver, dirFS, "2345", "test")
+		if !errors.Is(err, oof) {
+			t.Errorf("expected error (%v) to be %v", err, oof)
+		}
+		if calledUpdate {
+			t.Errorf("did not expect to call UpdateSchemaMigrations")
+		}
+	})
+}
+
+func TestMigrateWith(t *testing.T) {
+	t.Run("error - non-zero value required", func(t *testing.T) {
+		dirFS, err := fs.Sub(testdata.Migrations, "default")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		tests := []struct {
+			name string
+			opt  godfish.Opter
+		}{
+			{
+				name: "WithTargetVersion empty string",
+				opt:  godfish.WithTargetVersion(""),
+			},
+			{
+				name: "WithMigrationsTable empty string",
+				opt:  godfish.WithMigrationsTable(""),
+			},
+		}
+
+		for _, test := range tests {
+			t.Run(test.name, func(t *testing.T) {
+				driver := makeNoCallDriver(t)
+				err := godfish.MigrateWith(t.Context(), driver, dirFS, test.opt)
+				if err == nil {
+					t.Fatal("expected error but got nil")
+				}
+				if m := err.Error(); !strings.Contains(m, "zero value") {
+					t.Errorf("expected for error message (%q) to contain %q", m, "zero value")
+				}
+			})
+		}
+	})
+}
+
+func TestRollbackWith(t *testing.T) {
+	t.Run("error - non-zero value required", func(t *testing.T) {
+		dirFS, err := fs.Sub(testdata.Migrations, "default")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		tests := []struct {
+			name string
+			opt  godfish.Opter
+		}{
+			{
+				name: "WithTargetVersion empty string",
+				opt:  godfish.WithTargetVersion(""),
+			},
+			{
+				name: "WithMigrationsTable empty string",
+				opt:  godfish.WithMigrationsTable(""),
+			},
+		}
+
+		for _, test := range tests {
+			t.Run(test.name, func(t *testing.T) {
+				driver := makeNoCallDriver(t)
+				err := godfish.RollbackWith(t.Context(), driver, dirFS, test.opt)
+				if err == nil {
+					t.Fatal("expected error but got nil")
+				}
+				if m := err.Error(); !strings.Contains(m, "zero value") {
+					t.Errorf("expected for error message (%q) to contain %q", m, "zero value")
+				}
+			})
+		}
+	})
 }
 
 func TestApplyMigration(t *testing.T) {
+	tests := []struct {
+		name string
+		up   compat.MigrateFunc
+		down compat.RollbackFunc
+	}{
+		{
+			name: "Deprecated APIs",
+			up: func(ctx context.Context, d godfish.Driver, fsys fs.FS, v, tbl string) error {
+				return godfish.ApplyMigration(ctx, d, fsys, true, v, tbl)
+			},
+			down: func(ctx context.Context, d godfish.Driver, fsys fs.FS, v, tbl string) error {
+				return godfish.ApplyMigration(ctx, d, fsys, false, v, tbl)
+			},
+		},
+		{
+			name: "Replacement APIs",
+			up: func(ctx context.Context, d godfish.Driver, fsys fs.FS, v, tbl string) error {
+				opts := compat.MakeMigrationOpts(compat.MigrationOptParams{
+					TargetVersion:   v,
+					MigrationsTable: tbl,
+				})
+				return godfish.ApplyMigrationWith(ctx, d, fsys, opts...)
+			},
+			down: func(ctx context.Context, d godfish.Driver, fsys fs.FS, v, tbl string) error {
+				opts := compat.MakeMigrationOpts(compat.MigrationOptParams{
+					TargetVersion:   v,
+					MigrationsTable: tbl,
+				})
+				return godfish.ApplyRollbackWith(ctx, d, fsys, opts...)
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			testApplyMigration(t, test.up, test.down)
+		})
+	}
+}
+
+func testApplyMigration(t *testing.T, up compat.MigrateFunc, down compat.RollbackFunc) {
 	// There are more detailed tests in the internal/test package.
 	okFS, err := fs.Sub(testdata.Migrations, "default")
 	if err != nil {
@@ -95,21 +366,28 @@ func TestApplyMigration(t *testing.T) {
 	}
 
 	t.Run("all the way up and down", func(t *testing.T) {
-		driver := stub.NewDriver()
+		driver := stub.Double{
+			AppliedVersionsFn:        makeScanApplied(t, "1234"),
+			ExecuteFn:                makeExecuteFn(nil),
+			CreateSchemaMigrationsFn: makeCreateSchemaMigrationsFn(nil),
+			UpdateSchemaMigrationsFn: makeUpdatSchemaMigrationsFn(nil),
+		}
 		var err error
-		if err = godfish.ApplyMigration(t.Context(), driver, okFS, true, "", ""); err != nil {
+		if err = up(t.Context(), &driver, okFS, "", ""); err != nil {
 			t.Fatal(err)
 		}
 
-		if err = godfish.ApplyMigration(t.Context(), driver, okFS, false, "", ""); err != nil {
+		if err = down(t.Context(), &driver, okFS, "", ""); err != nil {
 			t.Fatal(err)
 		}
 	})
 
 	t.Run("version empty, not found", func(t *testing.T) {
-		driver := stub.NewDriver()
+		driver := stub.Double{
+			AppliedVersionsFn: makeScanApplied(t),
+		}
 		fsys := fstest.MapFS{}
-		err := godfish.ApplyMigration(t.Context(), driver, fsys, true, "", "")
+		err := up(t.Context(), &driver, fsys, "", "")
 		if err == nil {
 			t.Fatal("expected an error but got nil")
 		}
@@ -120,8 +398,8 @@ func TestApplyMigration(t *testing.T) {
 	})
 
 	t.Run("version specified, not found", func(t *testing.T) {
-		driver := stub.NewDriver()
-		err := godfish.ApplyMigration(t.Context(), driver, okFS, true, "1111", "")
+		driver := stub.Double{}
+		err := up(t.Context(), &driver, okFS, "1111", "")
 		if err == nil {
 			t.Fatal("expected an error but got nil")
 		}
@@ -130,17 +408,200 @@ func TestApplyMigration(t *testing.T) {
 			t.Errorf("expected for error (%v) to be %v", err, internal.ErrNotFound)
 		}
 	})
+
+	// TODO: add test case for error executing migration
+	// TODO: add test case for error creating the schema migrations table
+	// TODO: add test case for error updating the schema migrations table
+	// TODO: add test case for when the schema migrations table does not exist
+
+	t.Run("other error scanning for migrations", func(t *testing.T) {
+		oof := errors.New("oof")
+		var calledUpdate bool
+		driver := &stub.Double{
+			AppliedVersionsFn: func(ctx context.Context, migrationsTable string) (godfish.AppliedVersions, error) {
+				return nil, oof
+			},
+			ExecuteFn:                makeExecuteFn(nil),
+			CreateSchemaMigrationsFn: makeCreateSchemaMigrationsFn(nil),
+			UpdateSchemaMigrationsFn: func(ctx context.Context, migrationsTable string, forward bool, version, label string) error {
+				calledUpdate = true
+				return nil
+			},
+		}
+		err := up(t.Context(), driver, okFS, "", "test")
+		if !errors.Is(err, oof) {
+			t.Errorf("expected error (%v) to be %v", err, oof)
+		}
+		if calledUpdate {
+			t.Errorf("did not expect to call UpdateSchemaMigrations")
+		}
+	})
+
+	t.Run("rollback - error no migrations found", func(t *testing.T) {
+		var calledExec, calledUpdate bool
+		driver := &stub.Double{
+			AppliedVersionsFn: func(ctx context.Context, migrationsTable string) (godfish.AppliedVersions, error) {
+				return stub.NewAppliedVersions(), nil
+			},
+			ExecuteFn: func(ctx context.Context, q string, a ...any) error {
+				calledExec = true
+				return nil
+			},
+			CreateSchemaMigrationsFn: makeCreateSchemaMigrationsFn(nil),
+			UpdateSchemaMigrationsFn: func(ctx context.Context, migrationsTable string, forward bool, version, label string) error {
+				calledUpdate = true
+				return nil
+			},
+		}
+		err := down(t.Context(), driver, okFS, "", "test")
+		expErr := internal.ErrNotFound
+		if !errors.Is(err, expErr) {
+			t.Fatalf("expected error (%v) to be %v", err, expErr)
+		}
+		if !strings.Contains(err.Error(), "version") {
+			t.Errorf("expected error (%v) to contain %q", err.Error(), "version")
+		}
+		if calledExec {
+			t.Errorf("did not expect to call Execute")
+		}
+		if calledUpdate {
+			t.Errorf("did not expect to call UpdateSchemaMigrations")
+		}
+	})
+}
+
+func TestApplyMigrationWith(t *testing.T) {
+	t.Run("error - non-zero value required", func(t *testing.T) {
+		dirFS, err := fs.Sub(testdata.Migrations, "default")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		tests := []struct {
+			name string
+			opt  godfish.Opter
+		}{
+			{
+				name: "WithTargetVersion empty string",
+				opt:  godfish.WithTargetVersion(""),
+			},
+			{
+				name: "WithMigrationsTable empty string",
+				opt:  godfish.WithMigrationsTable(""),
+			},
+		}
+
+		for _, test := range tests {
+			t.Run(test.name, func(t *testing.T) {
+				driver := makeNoCallDriver(t)
+				err := godfish.ApplyMigrationWith(t.Context(), driver, dirFS, test.opt)
+				if err == nil {
+					t.Fatal("expected error but got nil")
+				}
+				if m := err.Error(); !strings.Contains(m, "zero value") {
+					t.Errorf("expected for error message (%q) to contain %q", m, "zero value")
+				}
+			})
+		}
+	})
+}
+
+func TestApplyRollbackWith(t *testing.T) {
+	t.Run("error - non-zero value required", func(t *testing.T) {
+		dirFS, err := fs.Sub(testdata.Migrations, "default")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		tests := []struct {
+			name string
+			opt  godfish.Opter
+		}{
+			{
+				name: "WithTargetVersion empty string",
+				opt:  godfish.WithTargetVersion(""),
+			},
+			{
+				name: "WithMigrationsTable empty string",
+				opt:  godfish.WithMigrationsTable(""),
+			},
+		}
+
+		for _, test := range tests {
+			t.Run(test.name, func(t *testing.T) {
+				driver := makeNoCallDriver(t)
+				err := godfish.ApplyRollbackWith(t.Context(), driver, dirFS, test.opt)
+				if err == nil {
+					t.Fatal("expected error but got nil")
+				}
+				if m := err.Error(); !strings.Contains(m, "zero value") {
+					t.Errorf("expected for error message (%q) to contain %q", m, "zero value")
+				}
+			})
+		}
+	})
 }
 
 func TestInfo(t *testing.T) {
+	tests := []struct {
+		name string
+		info compat.InfoFunc
+	}{
+		{
+			name: "Deprecated APIs",
+			info: func(
+				ctx context.Context,
+				driver godfish.Driver,
+				dirFS fs.FS,
+				fwd bool,
+				version string,
+				w io.Writer,
+				format string,
+				table string,
+			) error {
+				return godfish.Info(ctx, driver, dirFS, fwd, version, w, format, table)
+			},
+		},
+		{
+			name: "Replacement APIs",
+			info: func(
+				ctx context.Context,
+				driver godfish.Driver,
+				dirFS fs.FS,
+				fwd bool,
+				version string,
+				w io.Writer,
+				format string,
+				table string,
+			) error {
+				opts := compat.MakeMigrationOpts(compat.MigrationOptParams{
+					Format:          format,
+					MigrationsTable: table,
+					Writer:          w,
+				})
+				return godfish.InfoWith(ctx, driver, dirFS, opts...)
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			testInfo(t, test.info)
+		})
+	}
+}
+
+func testInfo(t *testing.T, info compat.InfoFunc) {
 	okFS, err := fs.Sub(testdata.Migrations, "default")
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	t.Run("unknown format does not error out", func(t *testing.T) {
-		driver := stub.NewDriver()
-		err := godfish.Info(t.Context(), driver, okFS, false, "", os.Stderr, "tea_ess_vee", "")
+		driver := stub.Double{
+			AppliedVersionsFn: makeScanApplied(t, "1234", "2345", "3456"),
+		}
+		err := info(t.Context(), &driver, okFS, false, "", t.Output(), "tea_ess_vee", "")
 		if err != nil {
 			t.Fatalf("unexpected error, %v", err)
 		}
@@ -150,20 +611,12 @@ func TestInfo(t *testing.T) {
 		// Check that applied migrations inserted prior to a schema upgrade can have
 		// there Label fields inferred by inspecting matching filenames.
 
-		driver := &Driver{
-			appliedVersionsFn: func(ctx context.Context, migrationsTable string) (godfish.AppliedVersions, error) {
-				// The migrations in the "database" have empty Label fields.
-				applied := stub.NewAppliedVersions(
-					internal.Migration{Indirection: internal.Indirection{}, Version: mustParseVersion(t, "1234")},
-					internal.Migration{Indirection: internal.Indirection{}, Version: mustParseVersion(t, "2345")},
-					internal.Migration{Indirection: internal.Indirection{}, Version: mustParseVersion(t, "3456")},
-				)
-				return applied, nil
-			},
+		driver := &stub.Double{
+			AppliedVersionsFn: makeScanApplied(t, "1234", "2345", "3456"),
 		}
 
 		var buf bytes.Buffer
-		err := godfish.Info(t.Context(), driver, okFS, true, "3456", &buf, "json", "")
+		err := info(t.Context(), driver, okFS, true, "3456", &buf, "json", "")
 		if err != nil {
 			t.Fatalf("unexpected error, %v", err)
 		}
@@ -179,6 +632,59 @@ func TestInfo(t *testing.T) {
 			if got := item.Label; got != expLabel {
 				t.Errorf("item %d, got %q, expected %q", i, got, expLabel)
 			}
+		}
+	})
+
+	t.Run("error scanning migraions", func(t *testing.T) {
+		oof := errors.New("OOF")
+		driver := stub.Double{
+			AppliedVersionsFn: func(ctx context.Context, migrationsTable string) (godfish.AppliedVersions, error) {
+				return nil, oof
+			},
+		}
+		err := info(t.Context(), &driver, okFS, true, "", t.Output(), "tsv", "")
+		if !errors.Is(err, oof) {
+			t.Errorf("expected error (%v) to be %v", err, oof)
+		}
+	})
+}
+
+func TestInfoWith(t *testing.T) {
+	t.Run("error - non-zero value required", func(t *testing.T) {
+		dirFS, err := fs.Sub(testdata.Migrations, "default")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		tests := []struct {
+			name string
+			opt  godfish.Opter
+		}{
+			{
+				name: "WithWriter nil writer",
+				opt:  godfish.WithWriter(nil),
+			},
+			{
+				name: "WithFormat empty string",
+				opt:  godfish.WithFormat(""),
+			},
+			{
+				name: "WithMigrationsTable empty string",
+				opt:  godfish.WithMigrationsTable(""),
+			},
+		}
+
+		for _, test := range tests {
+			t.Run(test.name, func(t *testing.T) {
+				driver := makeNoCallDriver(t)
+				err := godfish.InfoWith(t.Context(), driver, dirFS, test.opt)
+				if err == nil {
+					t.Fatal("expected error but got nil")
+				}
+				if m := err.Error(); !strings.Contains(m, "zero value") {
+					t.Errorf("expected for error message (%q) to contain %q", m, "zero value")
+				}
+			})
 		}
 	})
 }
@@ -242,17 +748,44 @@ func TestAppliedVersions(t *testing.T) {
 }
 
 func TestUpgradeSchemaMigrations(t *testing.T) {
+	tests := []struct {
+		name    string
+		upgrade compat.UpgradeSchemaFunc
+	}{
+		{
+			name: "Deprecated APIs",
+			upgrade: func(ctx context.Context, driver godfish.Driver, table string) error {
+				return godfish.UpgradeSchemaMigrations(t.Context(), driver, table)
+			},
+		},
+		{
+			name: "Replacement APIs",
+			upgrade: func(ctx context.Context, driver godfish.Driver, table string) error {
+				opts := compat.MakeMigrationOpts(compat.MigrationOptParams{MigrationsTable: table})
+				return godfish.UpgradeSchemaMigrationsWith(t.Context(), driver, opts...)
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			testUpgradeSchemaMigrations(t, test.upgrade)
+		})
+	}
+}
+
+func testUpgradeSchemaMigrations(t *testing.T, upgrade compat.UpgradeSchemaFunc) {
 	t.Run("error running UpgradeSchemaMigrations", func(t *testing.T) {
 		oof := errors.New("OOF")
-		driver := &Driver{
-			appliedVersionsFn: func(ctx context.Context, migrationsTable string) (godfish.AppliedVersions, error) {
+		driver := &stub.Double{
+			AppliedVersionsFn: func(ctx context.Context, migrationsTable string) (godfish.AppliedVersions, error) {
 				return nil, godfish.ErrSchemaMigrationsMissingColumns
 			},
-			upgradeSchemaMigrationsFn: func(ctx context.Context, migrationsTable string) error {
+			UpgradeSchemaMigrationsFn: func(ctx context.Context, migrationsTable string) error {
 				return oof
 			},
 		}
-		err := godfish.UpgradeSchemaMigrations(t.Context(), driver, "test")
+		err := upgrade(t.Context(), driver, "test")
 		if !errors.Is(err, oof) {
 			t.Errorf("expected error (%v) to be %v", err, oof)
 		}
@@ -260,16 +793,16 @@ func TestUpgradeSchemaMigrations(t *testing.T) {
 
 	t.Run("ok", func(t *testing.T) {
 		var calledUpgradeFn bool
-		driver := &Driver{
-			appliedVersionsFn: func(ctx context.Context, migrationsTable string) (godfish.AppliedVersions, error) {
+		driver := &stub.Double{
+			AppliedVersionsFn: func(ctx context.Context, migrationsTable string) (godfish.AppliedVersions, error) {
 				return nil, godfish.ErrSchemaMigrationsMissingColumns
 			},
-			upgradeSchemaMigrationsFn: func(ctx context.Context, migrationsTable string) error {
+			UpgradeSchemaMigrationsFn: func(ctx context.Context, migrationsTable string) error {
 				calledUpgradeFn = true
 				return nil
 			},
 		}
-		err := godfish.UpgradeSchemaMigrations(t.Context(), driver, "test")
+		err := upgrade(t.Context(), driver, "test")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -277,33 +810,129 @@ func TestUpgradeSchemaMigrations(t *testing.T) {
 			t.Errorf("expected to call the upgrade method")
 		}
 	})
+
+	t.Run("ok - upgrade already done", func(t *testing.T) {
+		var calledUpgradeFn bool
+		driver := &stub.Double{
+			AppliedVersionsFn: func(ctx context.Context, migrationsTable string) (godfish.AppliedVersions, error) {
+				migs := makeMigrations(t, "1234")
+				return stub.NewAppliedVersions(migs...), nil
+			},
+			UpgradeSchemaMigrationsFn: func(ctx context.Context, migrationsTable string) error {
+				calledUpgradeFn = true
+				return nil
+			},
+		}
+		err := upgrade(t.Context(), driver, "test")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if calledUpgradeFn {
+			t.Errorf("did not expect to call the upgrade method")
+		}
+	})
+
+	t.Run("ErrSchemaMigrationsDoesNotExist", func(t *testing.T) {
+		var calledUpgradeFn bool
+		driver := &stub.Double{
+			AppliedVersionsFn: func(ctx context.Context, migrationsTable string) (godfish.AppliedVersions, error) {
+				return nil, godfish.ErrSchemaMigrationsDoesNotExist
+			},
+			UpgradeSchemaMigrationsFn: func(ctx context.Context, migrationsTable string) error {
+				calledUpgradeFn = true
+				return nil
+			},
+		}
+		err := upgrade(t.Context(), driver, "test")
+		expErr := godfish.ErrSchemaMigrationsDoesNotExist
+		if !errors.Is(err, expErr) {
+			t.Errorf("expected error (%v) to be %v", err, expErr)
+		}
+		if calledUpgradeFn {
+			t.Errorf("did not expect to call the upgrade method")
+		}
+	})
+
+	t.Run("other error while scanning for applied migrations", func(t *testing.T) {
+		var calledUpgradeFn bool
+		oof := errors.New("OOF")
+		driver := &stub.Double{
+			AppliedVersionsFn: func(ctx context.Context, migrationsTable string) (godfish.AppliedVersions, error) {
+				return nil, oof
+			},
+			UpgradeSchemaMigrationsFn: func(ctx context.Context, migrationsTable string) error {
+				calledUpgradeFn = true
+				return nil
+			},
+		}
+		err := upgrade(t.Context(), driver, "test")
+		if !errors.Is(err, oof) {
+			t.Errorf("expected error (%v) to be %v", err, oof)
+		}
+		if calledUpgradeFn {
+			t.Errorf("did not expect to call the upgrade method")
+		}
+	})
 }
 
-type Driver struct {
-	*stub.Driver
-	appliedVersionsFn         func(ctx context.Context, migrationsTable string) (godfish.AppliedVersions, error)
-	upgradeSchemaMigrationsFn func(ctx context.Context, migrationsTable string) error
+func TestUpgradeSchemaMigrationsWith(t *testing.T) {
+	t.Run("error - non-zero value required", func(t *testing.T) {
+		tests := []struct {
+			name string
+			opt  godfish.Opter
+		}{
+			{
+				name: "WithMigrationsTable empty string",
+				opt:  godfish.WithMigrationsTable(""),
+			},
+		}
+
+		for _, test := range tests {
+			t.Run(test.name, func(t *testing.T) {
+				driver := makeNoCallDriver(t)
+				err := godfish.UpgradeSchemaMigrationsWith(t.Context(), driver, test.opt)
+				if err == nil {
+					t.Fatal("expected error but got nil")
+				}
+				if m := err.Error(); !strings.Contains(m, "zero value") {
+					t.Errorf("expected for error message (%q) to contain %q", m, "zero value")
+				}
+			})
+		}
+	})
 }
 
-func (d *Driver) AppliedVersions(ctx context.Context, migrationsTable string) (godfish.AppliedVersions, error) {
-	if d.appliedVersionsFn == nil {
-		panic("define appliedVersionsFn")
+func makeExecuteFn(e error) func(context.Context, string, ...any) error {
+	return func(context.Context, string, ...any) error { return e }
+}
+
+func makeCreateSchemaMigrationsFn(e error) func(context.Context, string) error {
+	return func(context.Context, string) error { return e }
+}
+
+func makeUpdatSchemaMigrationsFn(e error) func(context.Context, string, bool, string, string) error {
+	return func(context.Context, string, bool, string, string) error {
+		return e
 	}
-	return d.appliedVersionsFn(ctx, migrationsTable)
 }
 
-func (d *Driver) UpgradeSchemaMigrations(ctx context.Context, migrationsTable string) error {
-	if d.upgradeSchemaMigrationsFn == nil {
-		panic("define upgradeSchemaMigrationsFn")
+func makeScanApplied(t *testing.T, versions ...string) func(ctx context.Context, migrationsTable string) (godfish.AppliedVersions, error) {
+	return func(ctx context.Context, migrationsTable string) (godfish.AppliedVersions, error) {
+		// The migrations in the "database" have empty Label fields.
+		migs := makeMigrations(t, versions...)
+		return stub.NewAppliedVersions(migs...), nil
 	}
-	return d.upgradeSchemaMigrationsFn(ctx, migrationsTable)
 }
 
-func TestDriver(t *testing.T) {
-	// These tests also run in the stub package. They are duplicated here to
-	// make test coverage tool consider the tests in godfish.go as covered.
-	t.Setenv(internal.DSNKey, "stub_dsn")
-	test.RunDriverTests(t, stub.NewDriver())
+func makeMigrations(t *testing.T, versions ...string) []internal.Migration {
+	migs := make([]internal.Migration, len(versions))
+	for i, v := range versions {
+		migs[i] = internal.Migration{
+			Indirection: internal.Indirection{},
+			Version:     mustParseVersion(t, v),
+		}
+	}
+	return migs
 }
 
 func mustParseVersion(t *testing.T, v string) internal.Version {
@@ -312,4 +941,37 @@ func mustParseVersion(t *testing.T, v string) internal.Version {
 		t.Fatal(err)
 	}
 	return out
+}
+
+// makeNoCallDriver constructs a Driver that fails the test immediately
+// whenever a [godfish.Driver] method is invoked.
+func makeNoCallDriver(t *testing.T) *stub.Double {
+	t.Helper()
+
+	return &stub.Double{
+		NameFn: func() string {
+			t.Fatal("should not call Name")
+			return ""
+		},
+		AppliedVersionsFn: func(_ context.Context, _ string) (godfish.AppliedVersions, error) {
+			t.Fatal("should not call AppliedVersions")
+			return nil, nil
+		},
+		CreateSchemaMigrationsFn: func(_ context.Context, _ string) error {
+			t.Fatal("should not call CreateSchemaMigrations")
+			return nil
+		},
+		ExecuteFn: func(_ context.Context, _ string, _ ...any) error {
+			t.Fatal("should not call Execute")
+			return nil
+		},
+		UpdateSchemaMigrationsFn: func(_ context.Context, _ string, _ bool, _, _ string) error {
+			t.Fatal("should not call UpdateSchemaMigrations")
+			return nil
+		},
+		UpgradeSchemaMigrationsFn: func(_ context.Context, _ string) error {
+			t.Fatal("should not call UpgradeSchemaMigrationsFn")
+			return nil
+		},
+	}
 }

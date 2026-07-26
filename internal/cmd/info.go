@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"io/fs"
 	"os"
 	"strings"
@@ -12,6 +11,7 @@ import (
 
 	"github.com/rafaelespinoza/godfish"
 	"github.com/rafaelespinoza/godfish/internal"
+	"github.com/rafaelespinoza/godfish/internal/compat"
 
 	"github.com/urfave/cli/v3"
 )
@@ -58,37 +58,17 @@ limit or extend the range of migrations to apply.`,
 			}
 			timeout := c.Duration("timeout")
 			dirFS := os.DirFS(c.String(pathToFilesFlagname))
-			migrationsTable := c.String(migrationsTableFlagname)
-			direction := c.String("direction")
-			version := c.String("version")
-			format := c.String("format")
 
-			return runInfo(
-				ctx,
-				driver,
-				timeout,
-				dirFS,
-				migrationsTable,
-				os.Stdout,
-				format,
-				forward(direction),
-				version,
-			)
+			return runInfo(ctx, driver, timeout, dirFS, compat.MigrationOptParams{
+				MigrationsTable: c.String(migrationsTableFlagname),
+				Format:          c.String("format"),
+				Writer:          os.Stdout,
+			})
 		},
 	}
 }
 
-func runInfo(
-	ctx context.Context,
-	driverConn DriverConnector,
-	timeout time.Duration,
-	dirFS fs.FS,
-	migrationsTable string,
-	w io.Writer,
-	format string,
-	forward bool,
-	version string,
-) error {
+func runInfo(ctx context.Context, driverConn DriverConnector, timeout time.Duration, dirFS fs.FS, migOpts compat.MigrationOptParams) error {
 	if timeout > 0 {
 		var cancel func()
 		ctx, cancel = context.WithTimeout(ctx, timeout)
@@ -96,7 +76,8 @@ func runInfo(
 	}
 
 	err := withConnection(ctx, "", driverConn, func(ictx context.Context) error {
-		return godfish.Info(ictx, driverConn, dirFS.(fs.ReadDirFS), forward, version, w, format, migrationsTable)
+		opts := compat.MakeMigrationOpts(migOpts)
+		return godfish.InfoWith(ictx, driverConn, dirFS.(fs.ReadDirFS), opts...)
 	})
 	if errors.Is(err, godfish.ErrSchemaMigrationsMissingColumns) {
 		err = fmt.Errorf("%w; run the %q command to fix this", err, upgradeCmdName)

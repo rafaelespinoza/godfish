@@ -16,6 +16,7 @@ import (
 
 	"github.com/rafaelespinoza/godfish"
 	"github.com/rafaelespinoza/godfish/internal"
+	"github.com/rafaelespinoza/godfish/internal/compat"
 	"github.com/rafaelespinoza/godfish/internal/stub"
 )
 
@@ -135,7 +136,11 @@ func setup(t *testing.T, driver godfish.Driver, stubs []testDriverStub, migrateT
 	generateMigrationFiles(t, path, stubs)
 
 	if migrateTo != skipMigration {
-		err := godfish.Migrate(t.Context(), driver, os.DirFS(path), true, migrateTo, migrationsTable)
+		opts := compat.MakeMigrationOpts(compat.MigrationOptParams{
+			TargetVersion:   migrateTo,
+			MigrationsTable: migrationsTable,
+		})
+		err := godfish.MigrateWith(t.Context(), driver, os.DirFS(path), opts...)
 		if err != nil {
 			t.Fatalf("Migrate failed during setup: %v", err)
 		}
@@ -169,9 +174,6 @@ func teardown(t *testing.T, driver godfish.Driver, path string, migrationsTable 
 
 	var truncate string
 	switch driver.Name() {
-	case "stub":
-		stub.Teardown(driver)
-		truncate = `TRUNCATE TABLE ` + migrationsTable
 	case "sqlite", "sqlite3":
 		truncate = `DELETE FROM ` + migrationsTable
 	default:

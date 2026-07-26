@@ -4,6 +4,8 @@ coverage:
     patch: false
 
 ignore:
+  # This is a test util package
+  - ./internal/stub
   # This package tests implementations of Driver. Shouldn't be counted in coverage.
   - ./internal/test
 

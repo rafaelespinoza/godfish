@@ -1,8 +1,9 @@
 package test
 
 import (
-	"bytes"
+	"context"
 	"errors"
+	"io"
 	"io/fs"
 	"os"
 	"strings"
@@ -10,10 +11,58 @@ import (
 
 	"github.com/rafaelespinoza/godfish"
 	"github.com/rafaelespinoza/godfish/internal"
+	"github.com/rafaelespinoza/godfish/internal/compat"
 	"github.com/rafaelespinoza/godfish/testdata"
 )
 
 func testInfo(t *testing.T, driver godfish.Driver, queries testdataQueries) {
+	tests := []struct {
+		name string
+		info compat.InfoFunc
+	}{
+		{
+			name: "Deprecated APIs",
+			info: func(
+				ctx context.Context,
+				driver godfish.Driver,
+				dirFS fs.FS,
+				fwd bool,
+				version string,
+				w io.Writer,
+				format string,
+				table string,
+			) error {
+				return godfish.Info(ctx, driver, dirFS, fwd, version, w, format, table)
+			},
+		},
+		{
+			name: "Replacement APIs",
+			info: func(
+				ctx context.Context,
+				driver godfish.Driver,
+				dirFS fs.FS,
+				fwd bool,
+				version string,
+				w io.Writer,
+				format string,
+				table string,
+			) error {
+				opts := compat.MakeMigrationOpts(compat.MigrationOptParams{
+					Format:          format,
+					MigrationsTable: table,
+					Writer:          w,
+				})
+				return godfish.InfoWith(ctx, driver, dirFS, opts...)
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) { runInfoTests(t, driver, queries, test.info) })
+	}
+}
+
+func runInfoTests(t *testing.T, driver godfish.Driver, queries testdataQueries, info compat.InfoFunc) {
 	t.Run("migrations on filesystem", func(t *testing.T) {
 		stubs := []testDriverStub{
 			{
@@ -37,7 +86,7 @@ func testInfo(t *testing.T, driver godfish.Driver, queries testdataQueries) {
 
 				t.Run("forward", func(t *testing.T) {
 					dirFS := os.DirFS(path)
-					err := godfish.Info(t.Context(), driver, dirFS, true, "", os.Stderr, "tsv", test.migrationsTable)
+					err := info(t.Context(), driver, dirFS, true, "", t.Output(), "tsv", test.migrationsTable)
 					if err != nil {
 						t.Errorf(
 							"could not output info in %s Direction; %v",
@@ -48,7 +97,7 @@ func testInfo(t *testing.T, driver godfish.Driver, queries testdataQueries) {
 
 				t.Run("reverse", func(t *testing.T) {
 					dirFS := os.DirFS(path)
-					err := godfish.Info(t.Context(), driver, dirFS, false, "", os.Stderr, "json", test.migrationsTable)
+					err := info(t.Context(), driver, dirFS, false, "", t.Output(), "json", test.migrationsTable)
 					if err != nil {
 						t.Errorf(
 							"could not output info in %s Direction; %v",
@@ -69,16 +118,13 @@ func testInfo(t *testing.T, driver godfish.Driver, queries testdataQueries) {
 
 		for _, test := range okMigrationsTableTestCases {
 			t.Run(test.name, func(t *testing.T) {
-				var buf bytes.Buffer
-				if err = godfish.Info(t.Context(), driver, dirFS, true, "", &buf, "json", test.migrationsTable); err != nil {
+				if err = info(t.Context(), driver, dirFS, true, "", t.Output(), "json", test.migrationsTable); err != nil {
 					t.Fatal(err)
 				}
-				t.Log(buf.String())
 
-				if err = godfish.Info(t.Context(), driver, dirFS, false, "", &buf, "json", test.migrationsTable); err != nil {
+				if err = info(t.Context(), driver, dirFS, false, "", t.Output(), "json", test.migrationsTable); err != nil {
 					t.Fatal(err)
 				}
-				t.Log(buf.String())
 			})
 		}
 	})
@@ -92,7 +138,7 @@ func testInfo(t *testing.T, driver godfish.Driver, queries testdataQueries) {
 
 		for _, test := range invalidMigrationsTableTestCases {
 			t.Run(test.name, func(t *testing.T) {
-				err = godfish.Info(t.Context(), driver, dirFS, true, "", nil, "json", test.migrationsTable)
+				err = info(t.Context(), driver, dirFS, true, "", nil, "json", test.migrationsTable)
 				if !errors.Is(err, internal.ErrDataInvalid) {
 					t.Fatalf("expected error (%v) to match %v", err, internal.ErrDataInvalid)
 				}

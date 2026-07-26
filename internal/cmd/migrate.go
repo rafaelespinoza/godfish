@@ -10,6 +10,7 @@ import (
 
 	"github.com/rafaelespinoza/godfish"
 	"github.com/rafaelespinoza/godfish/internal"
+	"github.com/rafaelespinoza/godfish/internal/compat"
 
 	"github.com/urfave/cli/v3"
 )
@@ -45,15 +46,16 @@ The "files" flag can specify the path to a directory with migration files.`,
 			}
 			timeout := c.Duration("timeout")
 			dirFS := os.DirFS(c.String(pathToFilesFlagname))
-			version := c.String("version")
-			migrationsTable := c.String(migrationsTableFlagname)
 
-			return runMigrate(ctx, driver, timeout, dirFS, migrationsTable, version)
+			return runMigrate(ctx, driver, timeout, dirFS, compat.MigrationOptParams{
+				TargetVersion:   c.String("version"),
+				MigrationsTable: c.String(migrationsTableFlagname),
+			})
 		},
 	}
 }
 
-func runMigrate(ctx context.Context, driverConn DriverConnector, timeout time.Duration, dirFS fs.FS, migrationsTable, version string) error {
+func runMigrate(ctx context.Context, driverConn DriverConnector, timeout time.Duration, dirFS fs.FS, migOpts compat.MigrationOptParams) error {
 	if timeout > 0 {
 		var cancel func()
 		ctx, cancel = context.WithTimeout(ctx, timeout)
@@ -61,14 +63,8 @@ func runMigrate(ctx context.Context, driverConn DriverConnector, timeout time.Du
 	}
 
 	err := withConnection(ctx, "", driverConn, func(ictx context.Context) error {
-		return godfish.Migrate(
-			ictx,
-			driverConn,
-			dirFS,
-			true,
-			version,
-			migrationsTable,
-		)
+		opts := compat.MakeMigrationOpts(migOpts)
+		return godfish.MigrateWith(ictx, driverConn, dirFS, opts...)
 	})
 
 	if errors.Is(err, godfish.ErrSchemaMigrationsMissingColumns) {
@@ -99,14 +95,14 @@ The "files" flag can specify the path to a directory with migration files.`,
 			}
 			timeout := c.Duration("timeout")
 			dirFS := os.DirFS(c.String(pathToFilesFlagname))
-			migrationsTable := c.String(migrationsTableFlagname)
+			migOpts := compat.MigrationOptParams{MigrationsTable: c.String(migrationsTableFlagname)}
 
-			return runRemigrate(ctx, driver, timeout, dirFS, migrationsTable)
+			return runRemigrate(ctx, driver, timeout, dirFS, migOpts)
 		},
 	}
 }
 
-func runRemigrate(ctx context.Context, driverConn DriverConnector, timeout time.Duration, dirFS fs.FS, migrationsTable string) error {
+func runRemigrate(ctx context.Context, driverConn DriverConnector, timeout time.Duration, dirFS fs.FS, migOpts compat.MigrationOptParams) error {
 	if timeout > 0 {
 		var cancel func()
 		ctx, cancel = context.WithTimeout(ctx, timeout)
@@ -114,11 +110,11 @@ func runRemigrate(ctx context.Context, driverConn DriverConnector, timeout time.
 	}
 
 	err := withConnection(ctx, "", driverConn, func(ictx context.Context) error {
-		err := godfish.ApplyMigration(ictx, driverConn, dirFS, false, "", migrationsTable)
-		if err != nil {
-			return err
+		opts := compat.MakeMigrationOpts(migOpts)
+		if ierr := godfish.ApplyRollbackWith(ctx, driverConn, dirFS, opts...); ierr != nil {
+			return ierr
 		}
-		return godfish.ApplyMigration(ictx, driverConn, dirFS, true, "", migrationsTable)
+		return godfish.ApplyMigrationWith(ictx, driverConn, dirFS, opts...)
 	})
 
 	if errors.Is(err, godfish.ErrSchemaMigrationsMissingColumns) {
@@ -157,49 +153,38 @@ The "files" flag can specify the path to a directory with migration files.`,
 			}
 			timeout := c.Duration("timeout")
 			dirFS := os.DirFS(c.String(pathToFilesFlagname))
-			migrationsTable := c.String(migrationsTableFlagname)
-			version := c.String("version")
 
-			return runRollback(ctx, driver, timeout, dirFS, migrationsTable, version)
+			return runRollback(ctx, driver, timeout, dirFS, compat.MigrationOptParams{
+				MigrationsTable: c.String(migrationsTableFlagname),
+				TargetVersion:   c.String("version"),
+			})
 		},
 	}
 }
 
-func runRollback(ctx context.Context, driverConn DriverConnector, timeout time.Duration, dirFS fs.FS, migrationsTable, version string) error {
+func runRollback(ctx context.Context, driverConn DriverConnector, timeout time.Duration, dirFS fs.FS, migOpts compat.MigrationOptParams) error {
 	if timeout > 0 {
 		var cancel func()
 		ctx, cancel = context.WithTimeout(ctx, timeout)
 		defer cancel()
 	}
 
-	var f func(context.Context) error
-
-	if version == "" {
-		f = func(ictx context.Context) error {
-			return godfish.ApplyMigration(
-				ictx,
-				driverConn,
-				dirFS,
-				false,
-				version,
-				migrationsTable,
-			)
-		}
-
+	var rollbackFn func(context.Context, godfish.Driver, fs.FS, ...godfish.Opter) error
+	if migOpts.TargetVersion == "" {
+		rollbackFn = godfish.ApplyRollbackWith
 	} else {
-		f = func(ictx context.Context) error {
-			return godfish.Migrate(
-				ictx,
-				driverConn,
-				dirFS,
-				false,
-				version,
-				migrationsTable,
-			)
-		}
+		rollbackFn = godfish.RollbackWith
 	}
 
-	err := withConnection(ctx, "", driverConn, f)
+	err := withConnection(ctx, "", driverConn, func(ictx context.Context) error {
+		return rollbackFn(
+			ictx,
+			driverConn,
+			dirFS,
+			compat.MakeMigrationOpts(migOpts)...,
+		)
+	})
+
 	if errors.Is(err, godfish.ErrSchemaMigrationsMissingColumns) {
 		err = fmt.Errorf("%w; run the %q command to fix this", err, upgradeCmdName)
 	}

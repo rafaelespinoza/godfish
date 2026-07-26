@@ -1,6 +1,7 @@
 package test
 
 import (
+	"context"
 	"errors"
 	"io/fs"
 	"os"
@@ -9,12 +10,54 @@ import (
 
 	"github.com/rafaelespinoza/godfish"
 	"github.com/rafaelespinoza/godfish/internal"
+	"github.com/rafaelespinoza/godfish/internal/compat"
 	"github.com/rafaelespinoza/godfish/testdata"
 )
 
 func testMigrate(t *testing.T, driver godfish.Driver, queries testdataQueries) {
+	tests := []struct {
+		name     string
+		migrate  compat.MigrateFunc
+		rollback compat.RollbackFunc
+	}{
+		{
+			name: "Deprecated APIs",
+			migrate: func(ctx context.Context, d godfish.Driver, fsys fs.FS, v, tbl string) error {
+				return godfish.Migrate(ctx, d, fsys, true, v, tbl)
+			},
+			rollback: func(ctx context.Context, d godfish.Driver, fsys fs.FS, v, tbl string) error {
+				return godfish.Migrate(ctx, d, fsys, false, v, tbl)
+			},
+		},
+		{
+			name: "Replacement APIs",
+			migrate: func(ctx context.Context, d godfish.Driver, fsys fs.FS, v, tbl string) error {
+				opts := compat.MakeMigrationOpts(compat.MigrationOptParams{
+					TargetVersion:   v,
+					MigrationsTable: tbl,
+				})
+				return godfish.MigrateWith(ctx, d, fsys, opts...)
+			},
+			rollback: func(ctx context.Context, d godfish.Driver, fsys fs.FS, v, tbl string) error {
+				opts := compat.MakeMigrationOpts(compat.MigrationOptParams{
+					TargetVersion:   v,
+					MigrationsTable: tbl,
+				})
+				return godfish.RollbackWith(ctx, d, fsys, opts...)
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			runMigrateTests(t, driver, queries, test.migrate, test.rollback)
+		})
+	}
+}
+
+func runMigrateTests(t *testing.T, driver godfish.Driver, queries testdataQueries, migrate compat.MigrateFunc, rollback compat.RollbackFunc) {
 	runTest := func(t *testing.T, driver godfish.Driver, dirFS fs.FS, migrationsTable string, expectedVersions []string) {
-		err := godfish.Migrate(t.Context(), driver, dirFS, true, "", migrationsTable)
+		err := migrate(t.Context(), driver, dirFS, "", migrationsTable)
 		if err != nil {
 			t.Fatalf("could not Migrate in %s Direction; %v", internal.DirForward, err)
 		}
@@ -22,7 +65,7 @@ func testMigrate(t *testing.T, driver godfish.Driver, queries testdataQueries) {
 		appliedVersions := collectAppliedMigrations(t, driver, migrationsTable)
 		testAppliedMigrations(t, appliedVersions, expectedVersions)
 
-		err = godfish.Migrate(t.Context(), driver, dirFS, false, expectedVersions[0], migrationsTable)
+		err = rollback(t.Context(), driver, dirFS, expectedVersions[0], migrationsTable)
 		if err != nil {
 			t.Fatalf("could not Migrate in %s Direction; %v", internal.DirReverse, err)
 		}
@@ -89,7 +132,7 @@ func testMigrate(t *testing.T, driver godfish.Driver, queries testdataQueries) {
 				appliedVersions := collectAppliedMigrations(t, driver, internal.DefaultMigrationsTableName)
 				testAppliedMigrations(t, appliedVersions, []string{})
 
-				err := godfish.Migrate(t.Context(), driver, dirFS, true, "", test.migrationsTable)
+				err := migrate(t.Context(), driver, dirFS, "", test.migrationsTable)
 				if !errors.Is(err, internal.ErrDataInvalid) {
 					t.Fatalf("expected error (%v) to match %v", err, internal.ErrDataInvalid)
 				}

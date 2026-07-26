@@ -3,6 +3,7 @@ package test
 import (
 	"bytes"
 	"cmp"
+	"context"
 	"errors"
 	"log/slog"
 	"strings"
@@ -10,11 +11,40 @@ import (
 
 	"github.com/rafaelespinoza/godfish"
 	"github.com/rafaelespinoza/godfish/internal"
-	"github.com/rafaelespinoza/godfish/internal/stub"
+	"github.com/rafaelespinoza/godfish/internal/compat"
 )
 
 func testUpgradeSchemaMigrations(t *testing.T, driver godfish.Driver, queries testdataQueries) {
-	// The happy path for the library func, UpgradeSchemaMigrations, is not easy
+	tests := []struct {
+		name    string
+		upgrade compat.UpgradeSchemaFunc
+	}{
+		{
+			name: "Deprecated APIs",
+			upgrade: func(ctx context.Context, driver godfish.Driver, table string) error {
+				return godfish.UpgradeSchemaMigrations(t.Context(), driver, table)
+			},
+		},
+		{
+			name: "Replacement APIs",
+			upgrade: func(ctx context.Context, driver godfish.Driver, table string) error {
+				opts := compat.MakeMigrationOpts(compat.MigrationOptParams{
+					MigrationsTable: table,
+				})
+				return godfish.UpgradeSchemaMigrationsWith(t.Context(), driver, opts...)
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			runUpgradeSchemaMigrationsTests(t, driver, queries, test.upgrade)
+		})
+	}
+}
+
+func runUpgradeSchemaMigrationsTests(t *testing.T, driver godfish.Driver, queries testdataQueries, upgrade compat.UpgradeSchemaFunc) {
+	// The happy path for the library func, UpgradeSchemaMigrations*, is not easy
 	// to test from here because it would require an older version of the library
 	// to set up the upgradable state and then use a newer library version to
 	// perform the upgrade. However there is an integration test for it elsewhere
@@ -34,14 +64,10 @@ func testUpgradeSchemaMigrations(t *testing.T, driver godfish.Driver, queries te
 					if err := driver.Execute(t.Context(), "DROP TABLE IF EXISTS "+migrationsTable); err != nil {
 						t.Fatalf("dropping migrations table: %v", err)
 					}
-					if driver.Name() == "stub" {
-						// This driver only has in-memory data. Like the other drivers, reset everything.
-						driver = stub.NewDriver()
-					}
 				}
 
 				// Expect to be unable to upgrade when the DB table is not there.
-				err := godfish.UpgradeSchemaMigrations(t.Context(), driver, test.migrationsTable)
+				err := upgrade(t.Context(), driver, test.migrationsTable)
 				if !errors.Is(err, godfish.ErrSchemaMigrationsDoesNotExist) {
 					t.Fatalf("expected for error (%v) to be %v", err, godfish.ErrSchemaMigrationsDoesNotExist)
 				}
@@ -65,7 +91,7 @@ func testUpgradeSchemaMigrations(t *testing.T, driver godfish.Driver, queries te
 				defer slog.SetDefault(originalSlogger)
 				slog.SetDefault(slog.New(slog.NewTextHandler(&buf, nil)))
 
-				err = godfish.UpgradeSchemaMigrations(t.Context(), driver, test.migrationsTable)
+				err = upgrade(t.Context(), driver, test.migrationsTable)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -84,7 +110,7 @@ func testUpgradeSchemaMigrations(t *testing.T, driver godfish.Driver, queries te
 	t.Run("invalid migrations table", func(t *testing.T) {
 		for _, test := range invalidMigrationsTableTestCases {
 			t.Run(test.name, func(t *testing.T) {
-				err := godfish.UpgradeSchemaMigrations(t.Context(), driver, test.migrationsTable)
+				err := upgrade(t.Context(), driver, test.migrationsTable)
 				if !errors.Is(err, internal.ErrDataInvalid) {
 					t.Fatalf("expected error (%v) to match %v", err, internal.ErrDataInvalid)
 				}

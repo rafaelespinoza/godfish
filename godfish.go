@@ -21,6 +21,8 @@ import (
 	"github.com/rafaelespinoza/godfish/internal"
 )
 
+const msgPrefix = "godfish"
+
 // CreateMigrationFiles takes care of setting up a new DB migration by
 // generating empty migration files in a directory at dirpath. Passing in true
 // for reversible means that a complementary file will be made for rollbacks.
@@ -36,6 +38,52 @@ func CreateMigrationFiles(migrationName string, reversible bool, dirpath, fwdlab
 	return
 }
 
+// MigrateWith applies one or more available migrations in the forward direction.
+//
+// # Relevant opts
+//
+//   - [WithTargetVersion]. If passed in with a non-zero value, then this
+//     function will apply up to and including the target migration.
+//     When passed in with a zero value, then an error is returned.
+//     When this option is omitted, then this function will apply all available
+//     migrations.
+//   - [WithMigrationsTable]. If passed in with a non-zero value, then this
+//     function will override the default value of "schema_migrations".
+//     When passed in with a zero value, then an error is returned.
+//     When this option is omitted, then this function will use the default.
+//     This DB table will be automatically created unless it already exists.
+func MigrateWith(ctx context.Context, driver Driver, dirFS fs.FS, opts ...Opter) error {
+	o, err := setOptions(opts...)
+	if err != nil {
+		return fmt.Errorf("%s.%s: %w", msgPrefix, "MigrateWith", err)
+	}
+
+	return migrate(ctx, driver, dirFS, true, o.targetVersion, o.migrationsTable)
+}
+
+// RollbackWith applies one or more available migrations in the reverse direction.
+//
+// # Relevant opts
+//
+//   - [WithTargetVersion]. If passed in with a non-zero value, then this
+//     function will rollback down to and including the target migration.
+//     When passed in with a zero value, then an error is returned.
+//     When this option is omitted, then this function will only apply the
+//     one closest available rollback migration.
+//   - [WithMigrationsTable]. If passed in with a non-zero value, then this
+//     function will override the default value of "schema_migrations".
+//     When passed in with a zero value, then an error is returned.
+//     When this option is omitted, then this function will use the default.
+//     This DB table will be automatically created unless it already exists.
+func RollbackWith(ctx context.Context, driver Driver, dirFS fs.FS, opts ...Opter) error {
+	o, err := setOptions(opts...)
+	if err != nil {
+		return fmt.Errorf("%s.%s: %w", msgPrefix, "RollbackWith", err)
+	}
+
+	return migrate(ctx, driver, dirFS, false, o.targetVersion, o.migrationsTable)
+}
+
 // Migrate executes all migrations at the directory dirFS in the specified
 // direction. When forward is true, it will seek migrations with a forward
 // direction and apply them up to and including the one with a version matching
@@ -46,7 +94,16 @@ func CreateMigrationFiles(migrationName string, reversible bool, dirpath, fwdlab
 // migration state. If empty, then it's set to a default value of
 // "schema_migrations". The named DB table will be automatically created unless
 // it already exists.
+//
+// Deprecated: This function will be removed in a future release.
+// New code should use [MigrateWith] or [RollbackWith], depending the direction
+// of the migration(s) to apply.
+// Current code is encouraged to adjust as well.
 func Migrate(ctx context.Context, driver Driver, dirFS fs.FS, forward bool, finishAtVersion string, migrationsTable string) (err error) {
+	return migrate(ctx, driver, dirFS, forward, finishAtVersion, migrationsTable)
+}
+
+func migrate(ctx context.Context, driver Driver, dirFS fs.FS, forward bool, finishAtVersion string, migrationsTable string) (err error) {
 	migrationsTable = cmp.Or(migrationsTable, internal.DefaultMigrationsTableName)
 	var migrations []*internal.Migration
 	direction := internal.DirReverse
@@ -82,6 +139,64 @@ func Migrate(ctx context.Context, driver Driver, dirFS fs.FS, forward bool, fini
 // record migration status.
 var ErrSchemaMigrationsDoesNotExist = errors.New("schema migrations table does not exist")
 
+// ApplyMigrationWith runs one forward migration at the directory dirFS with
+// the specified version.
+// This function could be used for cherry-picking one forward migration to
+// apply, even if the targeted migration is not the next available one. It will
+// not attempt to run migrations in between the current version and the target
+// version.
+//
+// # Relevant opts
+//
+//   - [WithTargetVersion]. If passed in with a non-zero value, then this
+//     function will seek the targeted migration in the forward direction and
+//     apply it. The targeted version may be any greater than the current.
+//     When passed in with a zero value, then an error is returned.
+//     When this option is omitted, then this function will apply the closest
+//     available forward migration.
+//   - [WithMigrationsTable]. If passed in with a non-zero value, then this
+//     function will override the default value of "schema_migrations".
+//     When passed in with a zero value, then an error is returned.
+//     When this option is omitted, then this function will use the default.
+//     This DB table will be automatically created unless it already exists.
+func ApplyMigrationWith(ctx context.Context, driver Driver, dirFS fs.FS, opts ...Opter) error {
+	o, err := setOptions(opts...)
+	if err != nil {
+		return fmt.Errorf("%s.%s: %w", msgPrefix, "ApplyMigrationWith", err)
+	}
+
+	return applyMigration(ctx, driver, dirFS, true, o.targetVersion, o.migrationsTable)
+}
+
+// ApplyRollbackWith runs one rollback migration at the directory dirFS with
+// the specified version.
+// This function could be used for cherry-picking one rollback migration to
+// apply, even if the targeted rollback is not the closest available one. It
+// will not attempt to run migrations in between the current and the target
+// version.
+//
+// # Relevant opts
+//
+//   - [WithTargetVersion]. If passed in with a non-zero value, then this
+//     function will seek the targeted migration in the reverse direction and
+//     apply it. The targeted version may be any less than the current.
+//     When passed in with a zero value, then an error is returned.
+//     When this option is omitted, then this function will apply the closest
+//     available rollback migration.
+//   - [WithMigrationsTable]. If passed in with a non-zero value, then this
+//     function will override the default value of "schema_migrations".
+//     When passed in with a zero value, then an error is returned.
+//     When this option is omitted, then this function will use the default.
+//     This DB table will be automatically created unless it already exists.
+func ApplyRollbackWith(ctx context.Context, driver Driver, dirFS fs.FS, opts ...Opter) error {
+	o, err := setOptions(opts...)
+	if err != nil {
+		return fmt.Errorf("%s.%s: %w", msgPrefix, "ApplyRollbackWith", err)
+	}
+
+	return applyMigration(ctx, driver, dirFS, false, o.targetVersion, o.migrationsTable)
+}
+
 // ApplyMigration runs a migration at the directory dirFS with the specified
 // version and direction. When forward is true, it will target a migration with
 // a forward direction. Likewise when forward is false, then it targets a
@@ -91,7 +206,16 @@ var ErrSchemaMigrationsDoesNotExist = errors.New("schema migrations table does n
 // migration state. If empty, then it's set to a default value of
 // "schema_migrations". The named DB table will be automatically created unless
 // it already exists.
+//
+// Deprecated: This function will be removed in a future release.
+// New code should use [ApplyMigrationWith] or [ApplyRollbackWith], depending
+// the direction of the migration to apply.
+// Current code is encouraged to adjust as well.
 func ApplyMigration(ctx context.Context, driver Driver, dirFS fs.FS, forward bool, version, migrationsTable string) (err error) {
+	return applyMigration(ctx, driver, dirFS, forward, version, migrationsTable)
+}
+
+func applyMigration(ctx context.Context, driver Driver, dirFS fs.FS, forward bool, version, migrationsTable string) (err error) {
 	migrationsTable = cmp.Or(migrationsTable, internal.DefaultMigrationsTableName)
 	var (
 		pathToFile string
@@ -115,7 +239,7 @@ func ApplyMigration(ctx context.Context, driver Driver, dirFS fs.FS, forward boo
 			finishAtVersion: limit,
 		}
 		if toApply, ierr := finder.query(ctx, driver, migrationsTable); ierr != nil {
-			err = fmt.Errorf("specified no version; error attempting to find one; %v", ierr)
+			err = fmt.Errorf("specified no version; error attempting to find one; %w", ierr)
 			return
 		} else if len(toApply) < 1 {
 			err = fmt.Errorf("version %w", internal.ErrNotFound)
@@ -214,6 +338,45 @@ func makeDurationMSAttr(startedAt time.Time) slog.Attr {
 	return slog.Int64("duration_ms", dur.Milliseconds())
 }
 
+// InfoWith outputs migration status.
+//
+// # Example of tsv format
+//
+// (seems to look better in a terminal emulator)
+//
+//	i	version	applied	executed_at		label
+//	0	1234	true	2026-06-21 15:04:05	alpha
+//	1	2345	true	2026-07-01 03:40:50	bravo
+//	2	3456	false	-			charlie
+//
+// # Example of json format
+//
+//	{"i":0,"version":"1234","applied":true,"executed_at":"2026-06-21 15:04:05","label":"alpha"}
+//	{"i":1,"version":"2345","applied":true,"executed_at":"2026-07-01 03:40:50","label":"bravo"}
+//	{"i":2,"version":"3456","applied":false,"executed_at":"","label":"charlie"}
+//
+// # Relevant opts
+//   - [WithWriter]. If passed in with a non-zero value, then it will set the
+//     output writer.
+//     When passed in with a zero value, then an error is returned.
+//     When this option is omitted, then it will write to standard output.
+//   - [WithFormat]. If passed in with a non-zero value, then it will set the
+//     output format. Supported formats at this time are JSON, TSV.
+//     When passed in with a zero value, then an error is returned.
+//     When this option is omitted then it will write in TSV format.
+//   - [WithMigrationsTable]. If passed in with a non-zero value, then this
+//     function will override the default value of "schema_migrations".
+//     When passed in with a zero value, then an error is returned.
+//     When this option is omitted, then this function will use the default.
+//     This DB table will be automatically created unless it already exists.
+func InfoWith(ctx context.Context, driver Driver, directory fs.FS, opts ...Opter) error {
+	o, err := setOptions(opts...)
+	if err != nil {
+		return fmt.Errorf("%s.%s: %w", msgPrefix, "InfoWith", err)
+	}
+	return Info(ctx, driver, directory, true, "", o.writer, o.format, o.migrationsTable)
+}
+
 // Info writes status of migrations to w in formats json or tsv.
 //
 // The migrationsTable input sets the DB table for storing the current DB
@@ -221,7 +384,15 @@ func makeDurationMSAttr(startedAt time.Time) slog.Attr {
 // "schema_migrations". Unlike other functions that use the DB table to check
 // the migration state, this function does not create a new table, nor does it
 // have the need to.
+//
+// Deprecated: This function will be removed in a future release.
+// New code should use [InfoWith].
+// Current code is encouraged to adjust as well.
 func Info(ctx context.Context, driver Driver, directory fs.FS, forward bool, finishAtVersion string, w io.Writer, format string, migrationsTable string) (err error) {
+	return info(ctx, driver, directory, forward, finishAtVersion, w, format, migrationsTable)
+}
+
+func info(ctx context.Context, driver Driver, directory fs.FS, forward bool, finishAtVersion string, w io.Writer, format string, migrationsTable string) (err error) {
 	migrationsTable = cmp.Or(migrationsTable, internal.DefaultMigrationsTableName)
 
 	direction := internal.DirReverse
@@ -596,13 +767,42 @@ func printMigrations(p internal.InfoPrinter, applied, toApply []*internal.Migrat
 // but is missing some extra metadata columns.
 var ErrSchemaMigrationsMissingColumns = errors.New("schema migrations table is missing columns")
 
+// UpgradeSchemaMigrationsWith may alter an existing schema migrations table, to
+// have newer metadata columns. If the table was created with v0.14.0 or lower,
+// then it likely could be upgraded. If the driver detects that the columns
+// already exist in the designated migrations table, then the upgrade is avoided
+// without error.
+//
+// # Relevant opts
+//
+//   - [WithMigrationsTable]. If passed in with a non-zero value, then this
+//     function will override the default value of "schema_migrations".
+//     When passed in with a zero value, then an error is returned.
+//     When this option is omitted, then this function will use the default.
+//     This DB table will be automatically created unless it already exists.
+func UpgradeSchemaMigrationsWith(ctx context.Context, driver Driver, opts ...Opter) error {
+	o, err := setOptions(opts...)
+	if err != nil {
+		return fmt.Errorf("%s.%s: %w", msgPrefix, "UpgradeSchemaMigrationsWith", err)
+	}
+	return UpgradeSchemaMigrations(ctx, driver, o.migrationsTable)
+}
+
 // UpgradeSchemaMigrations may alter an existing schema migrations table,
 // migrationsTable, to have newer metadata columns. If the table was created
 // with v0.14.0 or lower, then it likely could be upgraded. If the driver
 // detects that the columns already exist in migrationsTable, then the upgrade
 // is avoided without error. If migrationsTable is empty, then it's set to a
 // default value of "schema_migrations".
+//
+// Deprecated: This function will be removed in a future release.
+// New code should use [UpgradeSchemaMigrationsWith].
+// Current code is encouraged to adjust as well.
 func UpgradeSchemaMigrations(ctx context.Context, driver Driver, migrationsTable string) (err error) {
+	return upgradeSchemaMigrations(ctx, driver, migrationsTable)
+}
+
+func upgradeSchemaMigrations(ctx context.Context, driver Driver, migrationsTable string) (err error) {
 	migrationsTable = cmp.Or(migrationsTable, internal.DefaultMigrationsTableName)
 
 	lgr := slog.With(slog.String("migrations_table", migrationsTable))

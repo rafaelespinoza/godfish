@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/rafaelespinoza/godfish"
+	"github.com/rafaelespinoza/godfish/internal/compat"
 
 	"github.com/urfave/cli/v3"
 )
@@ -54,14 +55,14 @@ returns early without doing anything else.`,
 				return fmt.Errorf("getting driver from %s command: %w", name, err)
 			}
 			timeout := c.Duration("timeout")
-			migrationsTable := c.String(migrationsTableFlagname)
+			migOpts := compat.MigrationOptParams{MigrationsTable: c.String(migrationsTableFlagname)}
 
-			return runUpgrade(ctx, driver, timeout, migrationsTable)
+			return runUpgrade(ctx, driver, timeout, migOpts)
 		},
 	}
 }
 
-func runUpgrade(ctx context.Context, driverConn DriverConnector, timeout time.Duration, migrationsTable string) error {
+func runUpgrade(ctx context.Context, driverConn DriverConnector, timeout time.Duration, migOpts compat.MigrationOptParams) error {
 	if timeout > 0 {
 		var cancel func()
 		ctx, cancel = context.WithTimeout(ctx, timeout)
@@ -69,6 +70,7 @@ func runUpgrade(ctx context.Context, driverConn DriverConnector, timeout time.Du
 	}
 
 	return withConnection(ctx, "", driverConn, func(ictx context.Context) error {
-		return godfish.UpgradeSchemaMigrations(ictx, driverConn, migrationsTable)
+		opts := compat.MakeMigrationOpts(migOpts)
+		return godfish.UpgradeSchemaMigrationsWith(ictx, driverConn, opts...)
 	})
 }

@@ -9,7 +9,11 @@ import (
 	"path/filepath"
 
 	"github.com/rafaelespinoza/godfish"
+	"github.com/rafaelespinoza/godfish/drivers/cassandra"
+	"github.com/rafaelespinoza/godfish/drivers/mysql"
+	"github.com/rafaelespinoza/godfish/drivers/postgres"
 	"github.com/rafaelespinoza/godfish/drivers/sqlite3"
+	"github.com/rafaelespinoza/godfish/drivers/sqlserver"
 )
 
 // migrationsFS is the embedded readonly file system.
@@ -66,5 +70,185 @@ func Example_embed() {
 	if err = godfish.Info(ctx, driver, migrationsDir, forward, "", os.Stdout, "tsv", migrationsTable); err != nil {
 		fmt.Println("getting, showing info", err)
 		return
+	}
+}
+
+// Run one or more migrations in the forward direction.
+func ExampleMigrateWith() {
+	ctx := context.Background()
+	var err error
+
+	// driver can be one of the drivers in this project, see drivers/.
+	driver := cassandra.NewDriver()
+	if err := driver.Connect(mysql.SampleDSN); err != nil {
+		fmt.Println("connecting to DB", err)
+		return
+	}
+	defer func() { _ = driver.Close() }()
+
+	// migrationsDir is an fs.FS directory with the migrations files.
+	migrationsDir := os.DirFS("path/to/migration/files")
+
+	// This will apply all available migrations in the forward direction,
+	// relative to the current. If successful, it records the results in the
+	// default schema_migrations table.
+	err = godfish.MigrateWith(ctx, driver, migrationsDir)
+	if err != nil {
+		// Handle error
+	}
+
+	// version may match the "version" part of the migration filename,
+	// ie: YYYYMMDDHHmmss. Each migration greater than the current, and up to and
+	// including the target migration version, is applied.
+	version := godfish.WithTargetVersion("20380119031408")
+
+	err = godfish.MigrateWith(ctx, driver, migrationsDir, version)
+	if err != nil {
+		// Handle error
+	}
+
+	// migrationsTable may be changed from its default, "schema_migrations".
+	// This table is where versioning is kept.
+	migrationsTable := godfish.WithMigrationsTable("migration_versions")
+
+	err = godfish.MigrateWith(ctx, driver, migrationsDir, migrationsTable)
+	if err != nil {
+		// Handle error
+	}
+}
+
+// Run one or more rollbacks.
+// In this library, these are considered to have a reverse direction.
+func ExampleRollbackWith() {
+	ctx := context.Background()
+	var err error
+
+	// driver can be one of the drivers in this project, see drivers/.
+	driver := postgres.NewDriver()
+	if err := driver.Connect(postgres.SampleDSN); err != nil {
+		fmt.Println("connecting to DB", err)
+		return
+	}
+	defer func() { _ = driver.Close() }()
+
+	// migrationsDir is an fs.FS directory with the migrations files.
+	migrationsDir := os.DirFS("path/to/migration/files")
+
+	// This will apply the closest available rollback migration relative to the
+	// current. If successful, it records the results in the default
+	// schema_migrations table.
+	err = godfish.RollbackWith(ctx, driver, migrationsDir)
+	if err != nil {
+		// Handle error
+	}
+
+	// version may match the "version" part of the migration filename,
+	// ie: YYYYMMDDHHmmss. This will apply all migrations between the current and
+	// the targeted version.
+	version := godfish.WithTargetVersion("19700101000000")
+
+	err = godfish.RollbackWith(ctx, driver, migrationsDir, version)
+	if err != nil {
+		// Handle error
+	}
+}
+
+// Run any one migration in the forward direction.
+func ExampleApplyMigrationWith() {
+	ctx := context.Background()
+	var err error
+
+	// driver can be one of the drivers in this project, see drivers/.
+	driver := mysql.NewDriver()
+	if err := driver.Connect(mysql.SampleDSN); err != nil {
+		fmt.Println("connecting to DB", err)
+		return
+	}
+	defer func() { _ = driver.Close() }()
+
+	// migrationsDir is an fs.FS directory with the migrations files.
+	migrationsDir := os.DirFS("path/to/migration/files")
+
+	// This will apply the next available migration in the forward direction,
+	// relative to the current. If successful, it records the results in the
+	// default schema_migrations table.
+	err = godfish.ApplyMigrationWith(ctx, driver, migrationsDir)
+	if err != nil {
+		// Handle error
+	}
+
+	// version may match the "version" part of the migration filename,
+	// ie: YYYYMMDDHHmmss. Migrations between the current and the targeted version
+	// are not applied.
+	version := godfish.WithTargetVersion("20380119031408")
+
+	err = godfish.ApplyMigrationWith(ctx, driver, migrationsDir, version)
+	if err != nil {
+		// Handle error
+	}
+
+	// migrationsTable may be changed from its default, "schema_migrations".
+	// This table is where versioning is kept.
+	migrationsTable := godfish.WithMigrationsTable("migration_versions")
+
+	err = godfish.ApplyMigrationWith(ctx, driver, migrationsDir, migrationsTable)
+	if err != nil {
+		// Handle error
+	}
+}
+
+// Run any one rollback migration.
+// In this library, these are considered to have a reverse direction.
+func ExampleApplyRollbackWith() {
+	ctx := context.Background()
+	var err error
+
+	// driver can be one of the drivers in this project, see drivers/.
+	driver := sqlserver.NewDriver()
+	if err := driver.Connect(sqlserver.SampleDSN); err != nil {
+		fmt.Println("connecting to DB", err)
+		return
+	}
+	defer func() { _ = driver.Close() }()
+
+	// migrationsDir is an fs.FS directory with the migrations files.
+	migrationsDir := os.DirFS("path/to/migration/files")
+
+	// This will apply the closest available rollback migration relative to the
+	// current. If successful, it records the results in the default
+	// schema_migrations table.
+	err = godfish.ApplyRollbackWith(ctx, driver, migrationsDir)
+	if err != nil {
+		// Handle error
+	}
+
+	// version may match the "version" part of the migration filename,
+	// ie: YYYYMMDDHHmmss. Migrations between the current and the targeted version
+	// are not applied.
+	version := godfish.WithTargetVersion("19700101000000")
+
+	err = godfish.ApplyRollbackWith(ctx, driver, migrationsDir, version)
+	if err != nil {
+		// Handle error
+	}
+}
+
+func ExampleOpter_invalid() {
+	var (
+		ctx    context.Context
+		err    error
+		driver godfish.Driver
+		dirFS  fs.FS
+	)
+
+	err = godfish.MigrateWith(
+		ctx, driver, dirFS,
+		// When passing in options, if any one value is invalid then the
+		// library function will return an error.
+		godfish.WithTargetVersion("1234"), // valid
+		godfish.WithMigrationsTable(""),   // invalid
+	)
+	if err != nil {
+		// handle error
 	}
 }
