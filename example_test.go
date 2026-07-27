@@ -55,19 +55,15 @@ func Example_embed() {
 		return
 	}
 
-	// migrationsTable may be used to specify the table for recording DB migration state.
-	// If empty, then the library will set it to a default value, "schema_migrations".
-	var migrationsTable string
-
-	// Apply the "forward" migrations through version "3456".
-	forward := true
-	if err = godfish.Migrate(ctx, driver, migrationsDir, forward, "3456", migrationsTable); err != nil {
+	// Migrate all the way to the latest version.
+	err = godfish.MigrateWith(ctx, driver, migrationsDir)
+	if err != nil {
 		fmt.Println("migrating DB", err)
 		return
 	}
 
 	// Show the state of the DB migrations as TSV (default).
-	if err = godfish.Info(ctx, driver, migrationsDir, forward, "", os.Stdout, "tsv", migrationsTable); err != nil {
+	if err = godfish.InfoWith(ctx, driver, migrationsDir); err != nil {
 		fmt.Println("getting, showing info", err)
 		return
 	}
@@ -90,8 +86,7 @@ func ExampleMigrateWith() {
 	migrationsDir := os.DirFS("path/to/migration/files")
 
 	// This will apply all available migrations in the forward direction,
-	// relative to the current. If successful, it records the results in the
-	// default schema_migrations table.
+	// relative to the current.
 	err = godfish.MigrateWith(ctx, driver, migrationsDir)
 	if err != nil {
 		// Handle error
@@ -134,9 +129,7 @@ func ExampleRollbackWith() {
 	// migrationsDir is an fs.FS directory with the migrations files.
 	migrationsDir := os.DirFS("path/to/migration/files")
 
-	// This will apply the closest available rollback migration relative to the
-	// current. If successful, it records the results in the default
-	// schema_migrations table.
+	// This will apply all available rollback migrations.
 	err = godfish.RollbackWith(ctx, driver, migrationsDir)
 	if err != nil {
 		// Handle error
@@ -170,8 +163,7 @@ func ExampleApplyMigrationWith() {
 	migrationsDir := os.DirFS("path/to/migration/files")
 
 	// This will apply the next available migration in the forward direction,
-	// relative to the current. If successful, it records the results in the
-	// default schema_migrations table.
+	// relative to the current.
 	err = godfish.ApplyMigrationWith(ctx, driver, migrationsDir)
 	if err != nil {
 		// Handle error
@@ -215,8 +207,7 @@ func ExampleApplyRollbackWith() {
 	migrationsDir := os.DirFS("path/to/migration/files")
 
 	// This will apply the closest available rollback migration relative to the
-	// current. If successful, it records the results in the default
-	// schema_migrations table.
+	// current.
 	err = godfish.ApplyRollbackWith(ctx, driver, migrationsDir)
 	if err != nil {
 		// Handle error

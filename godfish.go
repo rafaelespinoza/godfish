@@ -1,5 +1,6 @@
-// Package godfish is a database migration library built to support the command
-// line tool.
+// Package godfish is a database migration library.
+// It's built to serve the command line tool, but could be used for more
+// customized situations, such as embedding migrations into a binary.
 package godfish
 
 import (
@@ -68,8 +69,8 @@ func MigrateWith(ctx context.Context, driver Driver, dirFS fs.FS, opts ...Opter)
 //   - [WithTargetVersion]. If passed in with a non-zero value, then this
 //     function will rollback down to and including the target migration.
 //     When passed in with a zero value, then an error is returned.
-//     When this option is omitted, then this function will only apply the
-//     one closest available rollback migration.
+//     When this option is omitted, then this function will apply all
+//     available rollback migrations.
 //   - [WithMigrationsTable]. If passed in with a non-zero value, then this
 //     function will override the default value of "schema_migrations".
 //     When passed in with a zero value, then an error is returned.

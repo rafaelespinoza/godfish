@@ -157,6 +157,18 @@ godfish-sqlite3 -dsn path/to/db/file create-migration -name create_foos_table
 godfish-sqlserver --help
 ```
 
+#### shell completion
+
+Pre-generated shell completion scripts for bash, fish, zsh are available in
+`.assets/completions`, as well as the brew tap (see [installation](#installation)).
+At this time it's only for `godfish` the delegator command.
+
+To generate for driver binaries, see the hidden subcommand `completion`:
+```sh
+godfish-<driver> completion [shell]
+```
+Its usage message may guide you through the rest.
+
 #### getting help
 
 The remaining usage examples are written as if you are directly running a driver
@@ -317,8 +329,8 @@ just --set CONTAINER_TOOL podman -f ci.Justfile
 
 Build environments and run tests
 ```sh
-just -f ci.Justfile cassandra3-up
 just -f ci.Justfile cassandra4-up
+just -f ci.Justfile cassandra5-up
 
 just -f ci.Justfile sqlserver-up
 
@@ -332,8 +344,8 @@ just -f ci.Justfile sqlite3-up
 
 Teardown
 ```sh
-just -f ci.Justfile cassandra3-down
 just -f ci.Justfile cassandra4-down
+just -f ci.Justfile cassandra5-down
 
 just -f ci.Justfile sqlserver-down
 

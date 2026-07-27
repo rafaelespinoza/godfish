@@ -2,9 +2,9 @@ package godfish
 
 import "context"
 
-// Driver adapts a database implementation to use godfish. Implementations
-// are responsible opening a connection, maintaining it and closing it after
-// operations are done.
+// A Driver lets godfish talk to the database. Implementations are responsible
+// opening a connection, maintaining it and closing it after operations are
+// done. See the drivers directory for implementations.
 type Driver interface {
 	// Name should return the name of the driver: ie: postgres, mysql, etc
 	Name() string
