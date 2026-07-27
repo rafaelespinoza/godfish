@@ -374,7 +374,7 @@ func InfoWith(ctx context.Context, driver Driver, directory fs.FS, opts ...Opter
 	if err != nil {
 		return fmt.Errorf("%s.%s: %w", msgPrefix, "InfoWith", err)
 	}
-	return Info(ctx, driver, directory, true, "", o.writer, o.format, o.migrationsTable)
+	return info(ctx, driver, directory, true, "", o.writer, o.format, o.migrationsTable)
 }
 
 // Info writes status of migrations to w in formats json or tsv.
@@ -393,6 +393,8 @@ func Info(ctx context.Context, driver Driver, directory fs.FS, forward bool, fin
 }
 
 func info(ctx context.Context, driver Driver, directory fs.FS, forward bool, finishAtVersion string, w io.Writer, format string, migrationsTable string) (err error) {
+	w = cmp.Or[io.Writer](w, os.Stdout)
+	format = cmp.Or(format, "tsv")
 	migrationsTable = cmp.Or(migrationsTable, internal.DefaultMigrationsTableName)
 
 	direction := internal.DirReverse

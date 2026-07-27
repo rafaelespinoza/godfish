@@ -279,6 +279,10 @@ func TestMigrateWith(t *testing.T) {
 			})
 		}
 	})
+
+	t.Run("called with no options, does not blow up", func(t *testing.T) {
+		testBasicOperationWithoutOpts(t, []string{"1234"}, 2, godfish.MigrateWith)
+	})
 }
 
 func TestRollbackWith(t *testing.T) {
@@ -314,6 +318,10 @@ func TestRollbackWith(t *testing.T) {
 				}
 			})
 		}
+	})
+
+	t.Run("called with no options, does not blow up", func(t *testing.T) {
+		testBasicOperationWithoutOpts(t, []string{"1234", "2345", "3456"}, 3, godfish.RollbackWith)
 	})
 }
 
@@ -504,6 +512,10 @@ func TestApplyMigrationWith(t *testing.T) {
 			})
 		}
 	})
+
+	t.Run("called with no options, does not blow up", func(t *testing.T) {
+		testBasicOperationWithoutOpts(t, []string{"1234"}, 1, godfish.ApplyRollbackWith)
+	})
 }
 
 func TestApplyRollbackWith(t *testing.T) {
@@ -539,6 +551,10 @@ func TestApplyRollbackWith(t *testing.T) {
 				}
 			})
 		}
+	})
+
+	t.Run("called with no options, does not blow up", func(t *testing.T) {
+		testBasicOperationWithoutOpts(t, []string{"1234", "2345", "3456"}, 1, godfish.ApplyRollbackWith)
 	})
 }
 
@@ -686,6 +702,10 @@ func TestInfoWith(t *testing.T) {
 				}
 			})
 		}
+	})
+
+	t.Run("called with no options, does not blow up", func(t *testing.T) {
+		testBasicOperationWithoutOpts(t, []string{"1234", "2345", "3456"}, 0, godfish.InfoWith)
 	})
 }
 
@@ -973,5 +993,48 @@ func makeNoCallDriver(t *testing.T) *stub.Double {
 			t.Fatal("should not call UpgradeSchemaMigrationsFn")
 			return nil
 		},
+	}
+}
+
+// testBasicOperationWithoutOpts is a simple test meant to check that fn does
+// not blow up when passed the bare minimum of required inputs and most
+// importantly, no options.
+func testBasicOperationWithoutOpts(
+	t *testing.T,
+	startingVersions []string,
+	expectedNumCalls int,
+	fn func(context.Context, godfish.Driver, fs.FS, ...godfish.Opter) error,
+) {
+	t.Helper()
+
+	dirFS, err := fs.Sub(testdata.Migrations, "default")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var numExecCalls, numUpdateCalls int
+	driver := &stub.Double{
+		AppliedVersionsFn: makeScanApplied(t, startingVersions...),
+		ExecuteFn: func(context.Context, string, ...any) error {
+			numExecCalls++
+			return nil
+		},
+		CreateSchemaMigrationsFn: makeCreateSchemaMigrationsFn(nil),
+		UpdateSchemaMigrationsFn: func(context.Context, string, bool, string, string) error {
+			numUpdateCalls++
+			return nil
+		},
+	}
+
+	// For this test func, make sure not to pass any of the functional options.
+	if err := fn(t.Context(), driver, dirFS); err != nil {
+		t.Fatal(err)
+	}
+
+	if numExecCalls != expectedNumCalls {
+		t.Errorf("wrong number of calls to Execute; got %d, expected %d", numExecCalls, expectedNumCalls)
+	}
+	if numUpdateCalls != expectedNumCalls {
+		t.Errorf("wrong number of calls to UpdateSchemaMigrations; got %d, expected %d", numUpdateCalls, expectedNumCalls)
 	}
 }
