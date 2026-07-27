@@ -223,23 +223,3 @@ func ExampleApplyRollbackWith() {
 		// Handle error
 	}
 }
-
-func ExampleOpter_invalid() {
-	var (
-		ctx    context.Context
-		err    error
-		driver godfish.Driver
-		dirFS  fs.FS
-	)
-
-	err = godfish.MigrateWith(
-		ctx, driver, dirFS,
-		// When passing in options, if any one value is invalid then the
-		// library function will return an error.
-		godfish.WithTargetVersion("1234"), // valid
-		godfish.WithMigrationsTable(""),   // invalid
-	)
-	if err != nil {
-		// handle error
-	}
-}

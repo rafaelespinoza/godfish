@@ -9,16 +9,19 @@
 [![sqlite3](https://github.com/rafaelespinoza/godfish/actions/workflows/build-sqlite3.yml/badge.svg)](https://github.com/rafaelespinoza/godfish/actions/workflows/build-sqlite3.yml)
 [![sqlserver](https://github.com/rafaelespinoza/godfish/actions/workflows/build-sqlserver.yml/badge.svg)](https://github.com/rafaelespinoza/godfish/actions/workflows/sqlserver.yml)
 
-`godfish` is a database migration manager, similar to the very good
-[`dogfish`](https://github.com/dwb/dogfish), but written in golang.
-It is a CLI and a library.
+`godfish` is a database migration manager. It is a CLI and a golang library.
+The name is an homage to [`dogfish`](https://github.com/dwb/dogfish).
 
-## goals
+## features
 
-- use the native query language in the migration files, no other high-level DSLs
-- interface with many DBs
-- light on dependencies
-- not terrible error messages
+- Use the native query language in the migration files, no other high-level DSLs.
+- Interface with many DBs: cassandra, mysql, postgres, sqlite3, sqlserver.
+- Light on dependencies. Release pipeline builds small binaries targeted for one DB driver.
+- Release binaries are standalone and statically compiled, go is not necessary.
+  Great if you have projects written in different languages and want a consistent experience.
+- CLI with shell completion for bash, fish, zsh.
+- Library usage supports embedding migrations.
+- Not terrible error messages.
 
 ## installation
 
@@ -26,8 +29,9 @@ There are multiple ways to get the CLI.
 
 The [Releases](https://github.com/rafaelespinoza/godfish/releases) page of the GitHub repository
 has pre-built artifacts for supported platforms.
-Each archive file contains an executable binary per driver. Each executable binary will only work
-for the targeted DB. Pick the one(s) you need.
+Each archive file contains an executable binary per driver which targets that DB.
+As of v0.16.0, releases also include a binary compiled with all drivers.
+Pick the one(s) you need.
 
 Alternatively, install via the [Homebrew tap](https://github.com/rafaelespinoza/homebrew-godfish):
 ```sh
@@ -47,6 +51,8 @@ brew install godfish
 For Unix-like environments without Homebrew, there is an installation script at
 [scripts/install.sh](./scripts/install.sh). Check it out.
 
+To install as a golang library, see [library usage](#library-usage)
+
 ## build
 
 An alternative to using a pre-built release to is to build your own.
@@ -61,6 +67,9 @@ just build-mysql
 just build-postgres
 just build-sqlite3
 just build-sqlserver
+
+# want to work with many different kinds of DBs and use the same binary?
+just build
 ```
 
 From there you could move it to `$GOPATH/bin`, move it to your project or
@@ -74,14 +83,14 @@ native language of the database, and exist as files in a directory. All
 migrations to consider should live in the same directory. A migration is one of
 these files, which may have metadata components as part of the filename:
 
-* "direction": Migrations that introduce new changes to the DB shape are
+- "direction": Migrations that introduce new changes to the DB shape are
   considered to have a "forward" direction. A migration intended as the
   inverse of a corresponding forward migration is considered to have a
   "reverse" direction.
-* "version": Describe where a migration exists relative to the other migrations
+- "version": Describe where a migration exists relative to the other migrations
   with the same direction. By default, it's a timestamp in the layout
   `YYYYMMDDHHmmss`.
-* "name": A label you give to describe the migration's contents.
+- "name": A label you give to describe the migration's contents.
 
 The delimiter of each part is a `-`. Each migration filename has this format:
 ```
@@ -259,14 +268,15 @@ binaries, you could also use this as a golang library.
 go get github.com/rafaelespinoza/godfish
 ```
 
+See the [go doc](https://pkg.go.dev/github.com/rafaelespinoza/godfish) page for more.
+
 #### embed migrations
 
 An issue that may arise with deployments is that the migration files must be
 deployed alongside the godfish binary. Migrations data and the behavior provided
 by the `godfish` library can be combined into a single self-contained binary by
 using the [`embed`](https://pkg.go.dev/embed) package.
-See the [go doc](https://pkg.go.dev/github.com/rafaelespinoza/godfish?tab=doc)
-page for an example.
+See the [go doc](https://pkg.go.dev/github.com/rafaelespinoza/godfish) page for more.
 
 ### upgrading schema migrations
 
