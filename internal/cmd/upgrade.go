@@ -19,7 +19,7 @@ func makeUpgradeSchemaMigrations(name string, pathToConfig *string) *cli.Command
 		Usage: "Add columns to schema migrations table",
 		Flags: []cli.Flag{
 			&cli.DurationFlag{
-				Name:  "timeout",
+				Name:  timeoutFlagname,
 				Value: 0,
 				Usage: fmt.Sprintf("max duration to run, ignored if non-positive, example vals %q", exampleDurationVals),
 			},
@@ -54,7 +54,7 @@ returns early without doing anything else.`,
 			if err != nil {
 				return fmt.Errorf("getting driver from %s command: %w", name, err)
 			}
-			timeout := c.Duration("timeout")
+			timeout := c.Duration(timeoutFlagname)
 			migOpts := compat.MigrationOptParams{MigrationsTable: c.String(migrationsTableFlagname)}
 
 			return runUpgrade(ctx, driver, timeout, migOpts)

@@ -8,8 +8,6 @@ import (
 	"os"
 	"text/tabwriter"
 
-	"github.com/rafaelespinoza/godfish"
-
 	"github.com/urfave/cli/v3"
 )
 
@@ -23,7 +21,7 @@ var (
 	versionTag        string
 )
 
-func makeVersion(name string) *cli.Command {
+func MakeVersion(name string, driverNamer interface{ Name() string }) *cli.Command {
 	return &cli.Command{
 		Name:  name,
 		Usage: "Show metadata about the build",
@@ -36,20 +34,16 @@ func makeVersion(name string) *cli.Command {
 		},
 		Description: `Prints some versioning info to stdout. Pass the -json flag to get JSON.`,
 		Action: func(ctx context.Context, c *cli.Command) error {
-			driver, err := getDriver(ctx)
-			if err != nil {
-				return fmt.Errorf("getting driver from %s command: %w", name, err)
-			}
-			return runVersion(driver, c.Bool("json"), os.Stdout)
+			return runVersion(driverNamer, c.Bool("json"), os.Stdout)
 		},
 	}
 }
 
-func runVersion(driver godfish.Driver, outputJSON bool, w io.Writer) error {
+func runVersion(driverNamer interface{ Name() string }, outputJSON bool, w io.Writer) error {
 	versionData := []struct{ Key, Val string }{
 		{"BranchName", versionBranchName},
 		{"BuildTime", versionBuildTime},
-		{"Driver", driver.Name()},
+		{"Driver", driverNamer.Name()},
 		{"CommitHash", versionCommitHash},
 		{"GoVersion", versionGoVersion},
 		{"Tag", versionTag},

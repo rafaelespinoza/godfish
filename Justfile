@@ -170,6 +170,7 @@ _build_delegator_cmd *build_flags:
     mkdir -pv {{ BIN_DIR }}
     ldflags="{{ _LDFLAGS }}"
     {{ GO }} build -o="${bin}" -v -ldflags="${ldflags}" {{ build_flags }} ./internal/cmd/godfish
+    "${bin}" version
     echo "built godfish to ${bin}"
 
 # Makes shell completion scripts, writes each to assets dir

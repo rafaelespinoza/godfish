@@ -26,7 +26,7 @@ func makeMigrate(name string) *cli.Command {
 				Usage: fmt.Sprintf("timestamp of migration, format: %s", internal.TimeFormat),
 			},
 			&cli.DurationFlag{
-				Name:  "timeout",
+				Name:  timeoutFlagname,
 				Value: 0,
 				Usage: fmt.Sprintf("max duration to run, ignored if non-positive, example vals %q", exampleDurationVals),
 			},
@@ -44,7 +44,7 @@ The "files" flag can specify the path to a directory with migration files.`,
 			if err != nil {
 				return fmt.Errorf("getting driver from %s command: %w", name, err)
 			}
-			timeout := c.Duration("timeout")
+			timeout := c.Duration(timeoutFlagname)
 			dirFS := os.DirFS(c.String(pathToFilesFlagname))
 
 			return runMigrate(ctx, driver, timeout, dirFS, compat.MigrationOptParams{
@@ -79,7 +79,7 @@ func makeRemigrate(name string) *cli.Command {
 		Usage: "Rollback and then re-apply the last migration",
 		Flags: []cli.Flag{
 			&cli.DurationFlag{
-				Name:  "timeout",
+				Name:  timeoutFlagname,
 				Value: 0,
 				Usage: fmt.Sprintf("max duration to run, ignored if non-positive, example vals %q", exampleDurationVals),
 			},
@@ -93,7 +93,7 @@ The "files" flag can specify the path to a directory with migration files.`,
 			if err != nil {
 				return fmt.Errorf("getting driver from %s command: %w", name, err)
 			}
-			timeout := c.Duration("timeout")
+			timeout := c.Duration(timeoutFlagname)
 			dirFS := os.DirFS(c.String(pathToFilesFlagname))
 			migOpts := compat.MigrationOptParams{MigrationsTable: c.String(migrationsTableFlagname)}
 
@@ -134,7 +134,7 @@ func makeRollback(name string) *cli.Command {
 				Usage: fmt.Sprintf("timestamp of migration, format: %s", internal.TimeFormat),
 			},
 			&cli.DurationFlag{
-				Name:  "timeout",
+				Name:  timeoutFlagname,
 				Value: 0,
 				Usage: fmt.Sprintf("max duration to run, ignored if non-positive, example vals %q", exampleDurationVals),
 			},
@@ -151,7 +151,7 @@ The "files" flag can specify the path to a directory with migration files.`,
 			if err != nil {
 				return fmt.Errorf("getting driver from %s command: %w", name, err)
 			}
-			timeout := c.Duration("timeout")
+			timeout := c.Duration(timeoutFlagname)
 			dirFS := os.DirFS(c.String(pathToFilesFlagname))
 
 			return runRollback(ctx, driver, timeout, dirFS, compat.MigrationOptParams{

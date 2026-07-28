@@ -7,6 +7,7 @@ import (
 	"context"
 	"log/slog"
 	"os"
+	"strings"
 
 	"github.com/rafaelespinoza/godfish/drivers/cassandra"
 	"github.com/rafaelespinoza/godfish/drivers/mysql"
@@ -19,16 +20,12 @@ import (
 )
 
 func main() {
+	commands := buildCommands()
+
 	root := &cli.Command{
-		Name:  "godfish",
-		Usage: "A delegator for all supported godfish DB drivers",
-		Commands: []*cli.Command{
-			newDriverCommand(cassandra.NewDriver(), cassandra.SampleDSN),
-			newDriverCommand(mysql.NewDriver(), mysql.SampleDSN),
-			newDriverCommand(postgres.NewDriver(), postgres.SampleDSN),
-			newDriverCommand(sqlite3.NewDriver(), sqlite3.SampleDSN),
-			newDriverCommand(sqlserver.NewDriver(), sqlserver.SampleDSN),
-		},
+		Name:                  "godfish",
+		Usage:                 "A delegator for all supported godfish DB drivers",
+		Commands:              commands,
 		EnableShellCompletion: true,
 		Suggest:               true,
 		Description: `This is a unified entrypoint for the DB migration manager, godfish.
@@ -46,13 +43,44 @@ Each DB driver binary is compiled within this binary,
 	}
 }
 
+func buildCommands() []*cli.Command {
+	driversWithSampleDSNs := []struct {
+		driver    cmd.DriverConnector
+		sampleDSN string
+	}{
+		{cassandra.NewDriver(), cassandra.SampleDSN},
+		{mysql.NewDriver(), mysql.SampleDSN},
+		{postgres.NewDriver(), postgres.SampleDSN},
+		{sqlite3.NewDriver(), sqlite3.SampleDSN},
+		{sqlserver.NewDriver(), sqlserver.SampleDSN},
+	}
+	driverNames := make([]string, len(driversWithSampleDSNs))
+	numCommands := len(driverNames) + 1 // add version command
+	commands := make([]*cli.Command, numCommands)
+	for i, tuple := range driversWithSampleDSNs {
+		driverNames[i] = tuple.driver.Name()
+		commands[i] = newDriverCommand(tuple.driver, tuple.sampleDSN)
+	}
+	namer := allTheNames{name: strings.Join(driverNames, ",")}
+	commands[numCommands-1] = cmd.MakeVersion("version", &namer)
+
+	return commands
+}
+
 func newDriverCommand(dc cmd.DriverConnector, dsn string) *cli.Command {
 	c := cmd.New(dc, dsn).(*cli.Command)
 
 	c.Name = dc.Name()
 	c.Suggest = true
+	c.Category = "driver"
 	// The parent command will enable this feature.
 	c.EnableShellCompletion = false
 
 	return c
 }
+
+// allTheNames satisfies an interface so that version metadata can mention each
+// driver compiled within.
+type allTheNames struct{ name string }
+
+func (d *allTheNames) Name() string { return d.name }

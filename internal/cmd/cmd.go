@@ -62,7 +62,7 @@ Sample DSN:
 			},
 			&cli.StringFlag{
 				Name:      pathToFilesFlagname,
-				Usage:     "path to migration files, can also set with config file",
+				Usage:     "path to migration files directory, can also set with config file",
 				TakesFile: true,
 				Sources:   newSourceConfigChain(&pathToConfig, "path_to_files"),
 			},
@@ -100,7 +100,7 @@ Sample DSN:
 			makeRemigrate("remigrate"),
 			makeRollback("rollback"),
 			makeUpgradeSchemaMigrations(upgradeCmdName, &pathToConfig),
-			makeVersion("version"),
+			MakeVersion("version", driver),
 		},
 		CommandNotFound: func(ctx context.Context, c *cli.Command, input string) {
 			if err := renderCommandNotFound(c, input, c.Writer); err != nil {
@@ -149,6 +149,7 @@ Sample DSN:
 const (
 	pathToFilesFlagname     = "files"
 	migrationsTableFlagname = "migrations-table"
+	timeoutFlagname         = "timeout"
 )
 
 // newSourceConfigChain is for use on flags that may have values set from a configuration file.

@@ -60,3 +60,11 @@ function teardown_file() {
 		assert_output --regexp "Driver.*${driver}"
 	done
 }
+
+@test 'has version command' {
+	assert_file_executable "${BIN}"
+
+	run "${BIN}" version
+	assert_success
+	assert_output --regexp "Driver.*\w*"
+}

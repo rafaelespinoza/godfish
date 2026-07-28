@@ -24,12 +24,12 @@ func makeInfo(name string) *cli.Command {
 			&cli.StringFlag{
 				Name:  "direction",
 				Value: "forward",
-				Usage: "which way to look? (forward|reverse)",
+				Usage: "which way to look? [forward|reverse]",
 			},
 			&cli.StringFlag{
 				Name:  "format",
 				Value: "tsv",
-				Usage: "output format, one of (json|tsv)",
+				Usage: "output format, one of [json|tsv]",
 			},
 			&cli.StringFlag{
 				Name:  "version",
@@ -37,7 +37,7 @@ func makeInfo(name string) *cli.Command {
 				Usage: fmt.Sprintf("timestamp of migration, format: %s", internal.TimeFormat),
 			},
 			&cli.DurationFlag{
-				Name:  "timeout",
+				Name:  timeoutFlagname,
 				Value: 0,
 				Usage: fmt.Sprintf("max duration to run, ignored if non-positive, example vals %q", exampleDurationVals),
 			},
@@ -56,7 +56,7 @@ limit or extend the range of migrations to apply.`,
 			if err != nil {
 				return fmt.Errorf("getting driver from %s command: %w", name, err)
 			}
-			timeout := c.Duration("timeout")
+			timeout := c.Duration(timeoutFlagname)
 			dirFS := os.DirFS(c.String(pathToFilesFlagname))
 
 			return runInfo(ctx, driver, timeout, dirFS, compat.MigrationOptParams{
