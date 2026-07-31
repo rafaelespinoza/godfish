@@ -38,12 +38,24 @@ var (
 	}
 )
 
+// ValidateForwardDirectionLabel checks if val is a valid name
+// for a forward direction.
+func ValidateForwardDirectionLabel(val string) error {
+	return validateDirectionLabel(ForwardDirections, val)
+}
+
+// ValidateReverseDirectionLabel checks if val is a valid name
+// for a reverse direction.
+func ValidateReverseDirectionLabel(val string) error {
+	return validateDirectionLabel(ReverseDirections, val)
+}
+
 func validateDirectionLabel(okVals []string, val string) (err error) {
 	ok := slices.Contains(okVals, val)
 	if !ok {
 		err = fmt.Errorf(
-			"invalid value (%q); should be one of: %s",
-			val, strings.Join(okVals, ", "),
+			"%s (%q); should be one of: %s",
+			ErrDataInvalid, val, strings.Join(okVals, ", "),
 		)
 	}
 	return

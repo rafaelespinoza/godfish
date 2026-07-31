@@ -5,6 +5,7 @@ import (
 	"encoding/csv"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"strconv"
 	"testing"
@@ -26,13 +27,13 @@ func TestTSV(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		const numExpectedFields = 5
+		const numExpectedFields = 6
 		expected := [][numExpectedFields]string{
-			{"i", "version", "applied", "executed_at", "label"},
-			{"0", "1000", "true", "1000-01-02 15:04:05", "alfa"},
-			{"1", "2000", "true", "2000-01-02 15:04:05", "bravo"},
-			{"2", "3000", "false", "-", "charlie"},
-			{"3", "4000", "false", "-", "delta"},
+			{"i", "version", "applied", "executed_at", "label", "filename"},
+			{"0", "1000", "true", "1000-01-02 15:04:05", "alfa", "forward-1000-alfa.sql"},
+			{"1", "2000", "true", "2000-01-02 15:04:05", "bravo", "forward-2000-bravo.sql"},
+			{"2", "3000", "false", "-", "charlie", "forward-3000-charlie.sql"},
+			{"3", "4000", "false", "-", "delta", "forward-4000-delta.sql"},
 		}
 
 		tsvReader := csv.NewReader(&buf)
@@ -147,6 +148,7 @@ func mustMakeMigrations(t *testing.T, labels ...string) []*internal.Migration {
 			Indirection: internal.Indirection{Label: "forward", Value: internal.DirForward},
 			Label:       label,
 			Version:     version,
+			Filename:    fmt.Sprintf("%s-%s-%s.sql", "forward", version.String(), label),
 		}
 		executedAt := time.Date(num, time.January, 2, 15, 4, 5, 0, time.UTC)
 		if executedAt.Before(now) {

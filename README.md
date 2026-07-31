@@ -94,7 +94,7 @@ these files, which may have metadata components as part of the filename:
 
 The delimiter of each part is a `-`. Each migration filename has this format:
 ```
-${direction}-${version}-${name}.sql
+${direction}-${version}-${name}
 ```
 
 There is an implicit ordering to migrations, denoted by the "version", where

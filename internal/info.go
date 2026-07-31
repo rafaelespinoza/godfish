@@ -32,10 +32,10 @@ type tsvPrinter struct{ tw *tabwriter.Writer }
 type jsonPrinter struct{ enc *json.Encoder }
 
 func (p *tsvPrinter) PrintInfo(in []*Migration) error {
-	const format = "%s\t%s\t%s\t%s\t%s"
+	const format = "%s\t%s\t%s\t%s\t%s\t%s"
 
 	// headers
-	_, err := fmt.Fprintf(p.tw, format+"\n", "i", "version", "applied", "executed_at", "label")
+	_, err := fmt.Fprintf(p.tw, format+"\n", "i", "version", "applied", "executed_at", "label", "filename")
 	if err != nil {
 		slog.Error("internal: printing TSV headers", slog.Any("error", err))
 	}
@@ -55,12 +55,12 @@ func (p *tsvPrinter) PrintInfo(in []*Migration) error {
 		_, err = fmt.Fprintf(
 			p.tw,
 			format+"\n",
-			strconv.Itoa(i), mig.Version.String(), strconv.FormatBool(mig.Applied), executedAt, label,
+			strconv.Itoa(i), mig.Version.String(), strconv.FormatBool(mig.Applied), executedAt, label, mig.Filename,
 		)
 		if err != nil {
 			slog.Error(
 				"internal: printing TSV body",
-				slog.Any("error", err), slog.String("version", mig.Version.String()), slog.String("label", label),
+				slog.Any("error", err), slog.String("version", mig.Version.String()), slog.String("label", label), slog.String("filename", mig.Filename),
 			)
 		}
 	}
@@ -77,6 +77,7 @@ func (p *jsonPrinter) PrintInfo(in []*Migration) error {
 		Applied    bool   `json:"applied"`
 		ExecutedAt string `json:"executed_at"`
 		Label      string `json:"label"`
+		Filename   string `json:"filename"`
 	}
 	encodeJSON := p.enc.Encode
 	var err error
@@ -88,11 +89,12 @@ func (p *jsonPrinter) PrintInfo(in []*Migration) error {
 			Applied:    mig.Applied,
 			ExecutedAt: formatTime(mig.ExecutedAt),
 			Label:      mig.Label,
+			Filename:   mig.Filename,
 		})
 		if err != nil {
 			slog.Error(
 				"internal: printing JSON item",
-				slog.Any("error", err), slog.String("version", mig.Version.String()), slog.String("label", mig.Label),
+				slog.Any("error", err), slog.String("version", mig.Version.String()), slog.String("label", mig.Label), slog.String("filename", mig.Filename),
 			)
 		}
 	}

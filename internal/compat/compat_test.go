@@ -39,6 +39,21 @@ func TestMakeMigrationOpts(t *testing.T) {
 			expLength: 1,
 		},
 		{
+			name:      "only FwdLabel set",
+			params:    compat.MigrationOptParams{ForwardLabel: "migrate"},
+			expLength: 1,
+		},
+		{
+			name:      "only RevLabel set",
+			params:    compat.MigrationOptParams{ReverseLabel: "rollback"},
+			expLength: 1,
+		},
+		{
+			name:      "only FilenameExt set",
+			params:    compat.MigrationOptParams{FilenameExt: ".abc"},
+			expLength: 1,
+		},
+		{
 			name: "partial options set",
 			params: compat.MigrationOptParams{
 				Format:        "tsv",

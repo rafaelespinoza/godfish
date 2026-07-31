@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"cmp"
 	"fmt"
 	"log/slog"
 	"os"
@@ -19,6 +20,7 @@ type Migration struct {
 	Version     Version
 	Applied     bool
 	ExecutedAt  time.Time
+	Filename    string // the file basename with an extension.
 }
 
 // ParseMigration constructs a Migration from a Filename.
@@ -48,7 +50,9 @@ func ParseMigration(name Filename) (mig *Migration, err error) {
 	// index of the start of migration label
 	j := i + len(version.String()) + len(filenameDelimeter)
 	if j < len(basename) {
-		label = strings.TrimSuffix(string(basename[j:]), ".sql")
+		tail := string(basename[j:])
+		ext := filepath.Ext(tail)
+		label = strings.TrimSuffix(tail, ext)
 	}
 
 	mig = &Migration{
@@ -83,6 +87,7 @@ func (m *Migration) LogValue() slog.Value {
 		slog.Group("version", slog.String("string", ver.String()), slog.Int64("value", ver.Value())),
 		slog.Bool("applied", m.Applied),
 		slog.String("executed_at", executedAt),
+		slog.String("filename", m.Filename),
 	)
 }
 
@@ -103,25 +108,22 @@ func (m Migrations) LogValue() slog.Value {
 // Otherwise, it only generates a file in the forward direction. The Directory
 // field refers to the path to the directory with the migration files.
 type MigrationParams struct {
-	Forward    Migration
-	Reverse    Migration
-	Reversible bool
-	Dirpath    string
+	Forward           Migration
+	Reverse           Migration
+	Reversible        bool
+	Dirpath           string
+	FilenameExtension string
 }
 
 // NewMigrationParams constructs a MigrationParams that's ready to use.
-func NewMigrationParams(name string, reversible bool, dirpath, fwdLabel, revLabel string) (out *MigrationParams, err error) {
-	if fwdLabel == "" {
-		fwdLabel = ForwardDirections[0]
-	}
-	if err = validateDirectionLabel(ForwardDirections, fwdLabel); err != nil {
+func NewMigrationParams(name string, reversible bool, dirpath, fwdLabel, revLabel, filenameExt string) (out *MigrationParams, err error) {
+	fwdLabel = cmp.Or(fwdLabel, ForwardDirections[0])
+	if err = ValidateForwardDirectionLabel(fwdLabel); err != nil {
 		return
 	}
 
-	if revLabel == "" {
-		revLabel = ReverseDirections[0]
-	}
-	if err = validateDirectionLabel(ReverseDirections, revLabel); err != nil {
+	revLabel = cmp.Or(revLabel, ReverseDirections[0])
+	if err = ValidateReverseDirectionLabel(revLabel); err != nil {
 		return
 	}
 
@@ -141,6 +143,7 @@ func NewMigrationParams(name string, reversible bool, dirpath, fwdLabel, revLabe
 			Label:       name,
 			Version:     &version,
 		},
+		FilenameExtension: filenameExt,
 	}
 	return
 }
@@ -152,7 +155,7 @@ func NewMigrationParams(name string, reversible bool, dirpath, fwdLabel, revLabe
 func (m *MigrationParams) GenerateFiles() (err error) {
 	var forwardFile, reverseFile *os.File
 
-	if forwardFile, err = newMigrationFile(m.Forward, m.Dirpath); err != nil {
+	if forwardFile, err = newMigrationFile(m.Forward, m.Dirpath, m.FilenameExtension); err != nil {
 		return
 	}
 
@@ -164,7 +167,7 @@ func (m *MigrationParams) GenerateFiles() (err error) {
 		return
 	}
 
-	if reverseFile, err = newMigrationFile(m.Reverse, m.Dirpath); err != nil {
+	if reverseFile, err = newMigrationFile(m.Reverse, m.Dirpath, m.FilenameExtension); err != nil {
 		return
 	}
 	slog.Info("created reverse file", slog.String("filename", reverseFile.Name()))
@@ -172,7 +175,10 @@ func (m *MigrationParams) GenerateFiles() (err error) {
 	return
 }
 
-func newMigrationFile(m Migration, baseDir string) (*os.File, error) {
-	name := filepath.Join(baseDir, string(m.ToFilename()))
+func newMigrationFile(m Migration, baseDir string, ext string) (*os.File, error) {
+	if len(ext) > 0 && !strings.HasPrefix(ext, ".") {
+		ext = "." + ext
+	}
+	name := filepath.Join(baseDir, string(m.ToFilename())+ext)
 	return os.Create(filepath.Clean(name))
 }

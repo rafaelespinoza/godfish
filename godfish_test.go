@@ -22,6 +22,37 @@ import (
 )
 
 func TestCreateMigrationFiles(t *testing.T) {
+	tests := []struct {
+		name   string
+		create compat.CreateMigrationFunc
+	}{
+		{
+			name: "Deprecated APIs",
+			create: func(migrationName string, reversible bool, dirpath, fwdlabel, revlabel, ext string) error {
+				return godfish.CreateMigrationFiles(migrationName, reversible, dirpath, fwdlabel, revlabel)
+			},
+		},
+		{
+			name: "Replacement APIs",
+			create: func(migrationName string, reversible bool, dirpath, fwdlabel, revlabel, ext string) error {
+				opts := compat.MakeMigrationOpts(compat.MigrationOptParams{
+					ForwardLabel: fwdlabel,
+					ReverseLabel: revlabel,
+					FilenameExt:  ext,
+				})
+				return godfish.CreateMigrationFilesWith(migrationName, reversible, dirpath, opts...)
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			testCreateMigrationFiles(t, test.create)
+		})
+	}
+}
+
+func testCreateMigrationFiles(t *testing.T, create compat.CreateMigrationFunc) {
 	t.Run("err", func(t *testing.T) {
 		err := godfish.CreateMigrationFiles("err_test", true, t.TempDir(), "bad", "bad2")
 		if err == nil {
@@ -31,7 +62,7 @@ func TestCreateMigrationFiles(t *testing.T) {
 
 	t.Run("ok", func(t *testing.T) {
 		testdir := t.TempDir()
-		err := godfish.CreateMigrationFiles("err_test", true, testdir, "", "")
+		err := create("err_test", true, testdir, "", "", "")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -49,8 +80,103 @@ func TestCreateMigrationFiles(t *testing.T) {
 			if !strings.HasPrefix(got, direction) {
 				t.Errorf("expected filename, %q, to have prefix %q", got, direction)
 			}
+			// Inspect the label + filename extension part.
 			if !strings.HasSuffix(got, "err_test.sql") {
 				t.Errorf("expected filename, %q, to have suffix %q", got, "err_test.sql")
+			}
+		}
+	})
+}
+
+func TestCreateMigrationFilesWith(t *testing.T) {
+	t.Run("error - validation", func(t *testing.T) {
+
+		tests := []struct {
+			name string
+			opt  godfish.Opter
+		}{
+			{
+				name: "WithForwardLabel",
+				opt:  godfish.WithForwardLabel("bad"),
+			},
+			{
+				name: "WithReverseLabel",
+				opt:  godfish.WithReverseLabel("bad"),
+			},
+		}
+
+		for _, test := range tests {
+			t.Run(test.name, func(t *testing.T) {
+				testdir := t.TempDir()
+				migrationName := strings.ReplaceAll(t.Name(), "/", "")
+				err := godfish.CreateMigrationFilesWith(migrationName, false, testdir, test.opt)
+				if err == nil {
+					t.Fatal("expected error but got nil")
+				}
+
+				// should contain some substring that suggests correct values.
+				const looseExpectation = "should be one of"
+				if m := err.Error(); !strings.Contains(m, looseExpectation) {
+					t.Errorf("expected for error message (%q) to contain %q", m, looseExpectation)
+				}
+			})
+		}
+	})
+
+	t.Run("called with no options, does not blow up", func(t *testing.T) {
+		testdir := t.TempDir()
+		err := godfish.CreateMigrationFilesWith("this_is_fine", true, testdir)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		entries, err := os.ReadDir(testdir)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(entries) != 2 {
+			t.Fatalf("wrong number of entries, got %d, expected %d", len(entries), 2)
+		}
+
+		for i, direction := range []string{"forward", "reverse"} {
+			got := entries[i].Name()
+			if !strings.HasPrefix(got, direction) {
+				t.Errorf("expected filename, %q, to have prefix %q", got, direction)
+			}
+			// Inspect the label + filename extension part.
+			if !strings.HasSuffix(got, "this_is_fine.sql") {
+				t.Errorf("expected filename, %q, to have suffix %q", got, "this_is_fine.sql")
+			}
+		}
+	})
+
+	t.Run("called with options, it creates the files", func(t *testing.T) {
+		testdir := t.TempDir()
+		err := godfish.CreateMigrationFilesWith("everything_is_fine", true, testdir,
+			godfish.WithForwardLabel("migrate"),
+			godfish.WithReverseLabel("rollback"),
+			godfish.WithFilenameExtension(".cql"),
+		)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		entries, err := os.ReadDir(testdir)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(entries) != 2 {
+			t.Fatalf("wrong number of entries, got %d, expected %d", len(entries), 2)
+		}
+
+		for i, direction := range []string{"migrate", "rollback"} {
+			got := entries[i].Name()
+			if !strings.HasPrefix(got, direction) {
+				t.Errorf("expected filename, %q, to have prefix %q", got, direction)
+			}
+			// Inspect the label + filename extension part.
+			if !strings.HasSuffix(got, "everything_is_fine.cql") {
+				t.Errorf("expected filename, %q, to have suffix %q", got, "everything_is_fine.cql")
 			}
 		}
 	})
@@ -98,104 +224,12 @@ func TestMigrate(t *testing.T) {
 }
 
 func testMigrate(t *testing.T, up compat.MigrateFunc, down compat.RollbackFunc) {
+	testUpDown(t, up, down)
 	// There are more detailed tests in the internal/test package.
 	dirFS, err := fs.Sub(testdata.Migrations, "default")
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	t.Run("all the way up and down", func(t *testing.T) {
-		driver := stub.Double{
-			AppliedVersionsFn:        makeScanApplied(t, "1234", "2345", "3456"),
-			ExecuteFn:                func(ctx context.Context, q string, a ...any) error { return nil },
-			CreateSchemaMigrationsFn: func(ctx context.Context, migrationsTable string) error { return nil },
-			UpdateSchemaMigrationsFn: func(ctx context.Context, migrationsTable string, forward bool, version, label string) error {
-				return nil
-			},
-		}
-		var err error
-		if err = up(t.Context(), &driver, dirFS, "", ""); err != nil {
-			t.Fatal(err)
-		}
-
-		if err = down(t.Context(), &driver, dirFS, "", ""); err != nil {
-			t.Fatal(err)
-		}
-	})
-
-	t.Run("bad version", func(t *testing.T) {
-		driver := stub.Double{
-			AppliedVersionsFn:        makeScanApplied(t, "1234", "2345", "3456"),
-			ExecuteFn:                makeExecuteFn(nil),
-			CreateSchemaMigrationsFn: makeCreateSchemaMigrationsFn(nil),
-			UpdateSchemaMigrationsFn: makeUpdatSchemaMigrationsFn(nil),
-		}
-		err := up(t.Context(), &driver, dirFS, "bad", "")
-		if err == nil {
-			t.Fatal("expected error")
-		}
-		t.Log(err)
-		if m := err.Error(); !strings.Contains(m, "version") {
-			t.Errorf("expected for error (%v) to mention %q", m, "version")
-		}
-	})
-
-	t.Run("error executing migration", func(t *testing.T) {
-		var calledUpdateFn bool
-		driver := &stub.Double{
-			AppliedVersionsFn: makeScanApplied(t, "1234"),
-			ExecuteFn:         makeExecuteFn(errors.New("OOF")),
-			UpdateSchemaMigrationsFn: func(ctx context.Context, migrationsTable string, forward bool, version, label string) error {
-				calledUpdateFn = true
-				return nil
-			},
-		}
-		err := up(t.Context(), driver, dirFS, "2345", "test")
-		expErr := internal.ErrExecutingMigration
-		if !errors.Is(err, expErr) {
-			t.Errorf("expected error (%v) to be %v", err, expErr)
-		}
-		if calledUpdateFn {
-			t.Errorf("did not expect to call the update method")
-		}
-	})
-
-	t.Run("error creating migrations table", func(t *testing.T) {
-		oof := errors.New("oof")
-		var calledUpdateFn bool
-		driver := &stub.Double{
-			AppliedVersionsFn:        makeScanApplied(t),
-			ExecuteFn:                makeExecuteFn(nil),
-			CreateSchemaMigrationsFn: makeCreateSchemaMigrationsFn(oof),
-			UpdateSchemaMigrationsFn: func(ctx context.Context, migrationsTable string, forward bool, version, label string) error {
-				calledUpdateFn = true
-				return nil
-			},
-		}
-		err := up(t.Context(), driver, dirFS, "2345", "test")
-		if !errors.Is(err, oof) {
-			t.Errorf("expected error (%v) to be %v", err, oof)
-		}
-		if calledUpdateFn {
-			t.Errorf("did not expect to call the update method")
-		}
-	})
-
-	t.Run("error updating migrations table", func(t *testing.T) {
-		oof := errors.New("oof")
-		driver := &stub.Double{
-			AppliedVersionsFn:        makeScanApplied(t, "1234"),
-			ExecuteFn:                makeExecuteFn(nil),
-			CreateSchemaMigrationsFn: makeCreateSchemaMigrationsFn(nil),
-			UpdateSchemaMigrationsFn: func(ctx context.Context, migrationsTable string, forward bool, version, label string) error {
-				return oof
-			},
-		}
-		err := up(t.Context(), driver, dirFS, "2345", "test")
-		if !errors.Is(err, oof) {
-			t.Errorf("expected error (%v) to be %v", err, oof)
-		}
-	})
 
 	t.Run("schema migrations table does not exist", func(t *testing.T) {
 		// Check that when the table does not exist, in the happy path, the
@@ -221,26 +255,71 @@ func testMigrate(t *testing.T, up compat.MigrateFunc, down compat.RollbackFunc) 
 		}
 	})
 
-	t.Run("other error scanning for migrations", func(t *testing.T) {
-		oof := errors.New("oof")
-		var calledUpdate bool
-		driver := &stub.Double{
+	t.Run("handles alternate filename extensions", func(t *testing.T) {
+		var appliedVersionsCalls, executeCalls int
+		var createSchemaMigrationsCalls, updateSchemaMigrationsCall int
+		driver := stub.Double{
 			AppliedVersionsFn: func(ctx context.Context, migrationsTable string) (godfish.AppliedVersions, error) {
-				return nil, oof
+				appliedVersionsCalls++
+				switch appliedVersionsCalls {
+				case 1:
+					return makeScanApplied(t)(ctx, migrationsTable)
+				case 2:
+					return makeScanApplied(t, "1234", "2345", "3456")(ctx, migrationsTable)
+				default:
+					t.Fatalf("unexpected number of calls to AppliedVersions; got %d, expected [1,2]", appliedVersionsCalls)
+					return nil, nil
+				}
 			},
-			ExecuteFn:                makeExecuteFn(nil),
-			CreateSchemaMigrationsFn: makeCreateSchemaMigrationsFn(nil),
+			ExecuteFn: func(ctx context.Context, q string, a ...any) error {
+				executeCalls++
+				return nil
+			},
+			CreateSchemaMigrationsFn: func(ctx context.Context, migrationsTable string) error {
+				createSchemaMigrationsCalls++
+				return nil
+			},
 			UpdateSchemaMigrationsFn: func(ctx context.Context, migrationsTable string, forward bool, version, label string) error {
-				calledUpdate = true
+				updateSchemaMigrationsCall++
 				return nil
 			},
 		}
-		err := up(t.Context(), driver, dirFS, "2345", "test")
-		if !errors.Is(err, oof) {
-			t.Errorf("expected error (%v) to be %v", err, oof)
+		dirFS := stub.FS{
+			FS: fstest.MapFS{
+				"forward-1234-a.cql": &fstest.MapFile{Mode: 0x600},
+				"forward-2345-b.cql": &fstest.MapFile{Mode: 0x600},
+				"forward-3456-c.cql": &fstest.MapFile{Mode: 0x600},
+				"reverse-1234-a.cql": &fstest.MapFile{Mode: 0x600},
+				"reverse-2345-b.cql": &fstest.MapFile{Mode: 0x600},
+				"reverse-3456-c.cql": &fstest.MapFile{Mode: 0x600},
+			},
 		}
-		if calledUpdate {
-			t.Errorf("did not expect to call UpdateSchemaMigrations")
+		if err := up(t.Context(), &driver, dirFS, "", ""); err != nil {
+			t.Fatal(err)
+		}
+		const expNumCallsAfterUp = 3
+		if got := executeCalls; got != expNumCallsAfterUp {
+			t.Errorf("wrong number of calls to Execute; got %d, expected %d", got, expNumCallsAfterUp)
+		}
+		if got := createSchemaMigrationsCalls; got != expNumCallsAfterUp {
+			t.Errorf("wrong number of calls to CreateSchemaMigrations; got %d, expected %d", got, expNumCallsAfterUp)
+		}
+		if got := updateSchemaMigrationsCall; got != expNumCallsAfterUp {
+			t.Errorf("wrong number of calls to UpdateSchemaMigrations; got %d, expected %d", got, expNumCallsAfterUp)
+		}
+
+		if err := down(t.Context(), &driver, dirFS, "", ""); err != nil {
+			t.Fatal(err)
+		}
+		const expNumCallsAfterDown = 6
+		if got := executeCalls; got != expNumCallsAfterDown {
+			t.Errorf("wrong number of calls to Execute; got %d, expected %d", got, expNumCallsAfterDown)
+		}
+		if got := createSchemaMigrationsCalls; got != expNumCallsAfterDown {
+			t.Errorf("wrong number of calls to CreateSchemaMigrations; got %d, expected %d", got, expNumCallsAfterDown)
+		}
+		if got := updateSchemaMigrationsCall; got != expNumCallsAfterDown {
+			t.Errorf("wrong number of calls to UpdateSchemaMigrations; got %d, expected %d", got, expNumCallsAfterDown)
 		}
 	})
 }
@@ -367,28 +446,12 @@ func TestApplyMigration(t *testing.T) {
 }
 
 func testApplyMigration(t *testing.T, up compat.MigrateFunc, down compat.RollbackFunc) {
-	// There are more detailed tests in the internal/test package.
+	testUpDown(t, up, down)
+
 	okFS, err := fs.Sub(testdata.Migrations, "default")
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	t.Run("all the way up and down", func(t *testing.T) {
-		driver := stub.Double{
-			AppliedVersionsFn:        makeScanApplied(t, "1234"),
-			ExecuteFn:                makeExecuteFn(nil),
-			CreateSchemaMigrationsFn: makeCreateSchemaMigrationsFn(nil),
-			UpdateSchemaMigrationsFn: makeUpdatSchemaMigrationsFn(nil),
-		}
-		var err error
-		if err = up(t.Context(), &driver, okFS, "", ""); err != nil {
-			t.Fatal(err)
-		}
-
-		if err = down(t.Context(), &driver, okFS, "", ""); err != nil {
-			t.Fatal(err)
-		}
-	})
 
 	t.Run("version empty, not found", func(t *testing.T) {
 		driver := stub.Double{
@@ -417,31 +480,74 @@ func testApplyMigration(t *testing.T, up compat.MigrateFunc, down compat.Rollbac
 		}
 	})
 
-	// TODO: add test case for error executing migration
-	// TODO: add test case for error creating the schema migrations table
-	// TODO: add test case for error updating the schema migrations table
-	// TODO: add test case for when the schema migrations table does not exist
+	t.Run("version specified, found", func(t *testing.T) {
+		var numCallsToAppliedVersions int
+		driver := stub.Double{
+			AppliedVersionsFn: func(ctx context.Context, migrationsTable string) (godfish.AppliedVersions, error) {
+				defer func() { numCallsToAppliedVersions++ }()
+				var migs []internal.Migration
+				switch numCallsToAppliedVersions {
+				case 0:
+					migs = makeMigrations(t)
+				case 1:
+					migs = makeMigrations(t, "1234")
+				default:
+					t.Fatal("too many calls to AppliedVersions")
+				}
+				return stub.NewAppliedVersions(migs...), nil
+			},
+			ExecuteFn:                makeExecuteFn(nil),
+			CreateSchemaMigrationsFn: makeCreateSchemaMigrationsFn(nil),
+			UpdateSchemaMigrationsFn: makeUpdatSchemaMigrationsFn(nil),
+		}
+		err := up(t.Context(), &driver, okFS, "1234", "")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		err = down(t.Context(), &driver, okFS, "1234", "")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
 
-	t.Run("other error scanning for migrations", func(t *testing.T) {
-		oof := errors.New("oof")
-		var calledUpdate bool
+	t.Run("error too many migration files with same version", func(t *testing.T) {
+		driver := makeNoCallDriver(t)
+		badFS := fstest.MapFS{
+			"forward-1234-a": &fstest.MapFile{Mode: 0x640},
+			"forward-1234-b": &fstest.MapFile{Mode: 0x640},
+		}
+		err := up(t.Context(), driver, badFS, "1234", "")
+		if err == nil {
+			t.Fatal("expected an error but got nil")
+		}
+		t.Log(err)
+		const looseExpectation = "too many migration files with matching"
+		if m := err.Error(); !strings.Contains(m, looseExpectation) {
+			t.Errorf("expected for error (%v) to contain %q", err, looseExpectation)
+		}
+	})
+
+	t.Run("schema migrations table does not exist", func(t *testing.T) {
+		// Check that when the table does not exist, in the happy path, the
+		// "database" will handle the error by creating the table and updating it.
+		var updateCalls int
 		driver := &stub.Double{
 			AppliedVersionsFn: func(ctx context.Context, migrationsTable string) (godfish.AppliedVersions, error) {
-				return nil, oof
+				return nil, godfish.ErrSchemaMigrationsDoesNotExist
 			},
 			ExecuteFn:                makeExecuteFn(nil),
 			CreateSchemaMigrationsFn: makeCreateSchemaMigrationsFn(nil),
 			UpdateSchemaMigrationsFn: func(ctx context.Context, migrationsTable string, forward bool, version, label string) error {
-				calledUpdate = true
+				updateCalls++
 				return nil
 			},
 		}
-		err := up(t.Context(), driver, okFS, "", "test")
-		if !errors.Is(err, oof) {
-			t.Errorf("expected error (%v) to be %v", err, oof)
+		err := up(t.Context(), driver, okFS, "2345", "test")
+		if err != nil {
+			t.Fatal(err)
 		}
-		if calledUpdate {
-			t.Errorf("did not expect to call UpdateSchemaMigrations")
+		if expNumCalls := 1; updateCalls != expNumCalls {
+			t.Errorf("number of calls to UpdateSchemaMigrations; got %d, expected %d", updateCalls, expNumCalls)
 		}
 	})
 
@@ -474,6 +580,276 @@ func testApplyMigration(t *testing.T, up compat.MigrateFunc, down compat.Rollbac
 		}
 		if calledUpdate {
 			t.Errorf("did not expect to call UpdateSchemaMigrations")
+		}
+	})
+
+	t.Run("handles alternate filename extensions", func(t *testing.T) {
+		var appliedVersionsCalls, executeCalls int
+		var createSchemaMigrationsCalls, updateSchemaMigrationsCall int
+		driver := stub.Double{
+			AppliedVersionsFn: func(ctx context.Context, migrationsTable string) (godfish.AppliedVersions, error) {
+				appliedVersionsCalls++
+				switch appliedVersionsCalls {
+				case 1:
+					return makeScanApplied(t)(ctx, migrationsTable)
+				case 2:
+					return makeScanApplied(t, "1234")(ctx, migrationsTable)
+				default:
+					t.Fatalf("unexpected number of calls to AppliedVersions; got %d, expected [1,2]", appliedVersionsCalls)
+					return nil, nil
+				}
+			},
+			ExecuteFn: func(ctx context.Context, q string, a ...any) error {
+				executeCalls++
+				return nil
+			},
+			CreateSchemaMigrationsFn: func(ctx context.Context, migrationsTable string) error {
+				createSchemaMigrationsCalls++
+				return nil
+			},
+			UpdateSchemaMigrationsFn: func(ctx context.Context, migrationsTable string, forward bool, version, label string) error {
+				updateSchemaMigrationsCall++
+				return nil
+			},
+		}
+		dirFS := stub.FS{
+			FS: fstest.MapFS{
+				"forward-1234-a.cql": &fstest.MapFile{Mode: 0x600},
+				"forward-2345-b.cql": &fstest.MapFile{Mode: 0x600},
+				"forward-3456-c.cql": &fstest.MapFile{Mode: 0x600},
+				"reverse-1234-a.cql": &fstest.MapFile{Mode: 0x600},
+				"reverse-2345-b.cql": &fstest.MapFile{Mode: 0x600},
+				"reverse-3456-c.cql": &fstest.MapFile{Mode: 0x600},
+			},
+		}
+
+		if err := up(t.Context(), &driver, dirFS, "", ""); err != nil {
+			t.Fatal(err)
+		}
+		const expNumCallsAfterUp = 1
+		if got := executeCalls; got != expNumCallsAfterUp {
+			t.Errorf("wrong number of calls to Execute; got %d, expected %d", got, expNumCallsAfterUp)
+		}
+		if got := createSchemaMigrationsCalls; got != expNumCallsAfterUp {
+			t.Errorf("wrong number of calls to CreateSchemaMigrations; got %d, expected %d", got, expNumCallsAfterUp)
+		}
+		if got := updateSchemaMigrationsCall; got != expNumCallsAfterUp {
+			t.Errorf("wrong number of calls to UpdateSchemaMigrations; got %d, expected %d", got, expNumCallsAfterUp)
+		}
+
+		if err := down(t.Context(), &driver, dirFS, "", ""); err != nil {
+			t.Fatal(err)
+		}
+		const expNumCallsAfterDown = 2
+		if got := executeCalls; got != expNumCallsAfterDown {
+			t.Errorf("wrong number of calls to Execute; got %d, expected %d", got, expNumCallsAfterDown)
+		}
+		if got := createSchemaMigrationsCalls; got != expNumCallsAfterDown {
+			t.Errorf("wrong number of calls to CreateSchemaMigrations; got %d, expected %d", got, expNumCallsAfterDown)
+		}
+		if got := updateSchemaMigrationsCall; got != expNumCallsAfterDown {
+			t.Errorf("wrong number of calls to UpdateSchemaMigrations; got %d, expected %d", got, expNumCallsAfterDown)
+		}
+	})
+}
+
+// testUpDown is for testing ApplyMigration, ApplyMigrationWith,
+// ApplyRollbackWith, Migrate, MigrateWith, RollbackWith.
+func testUpDown(t *testing.T, up compat.MigrateFunc, down compat.RollbackFunc) {
+	okFS, err := fs.Sub(testdata.Migrations, "default")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	t.Run("all the way up and down", func(t *testing.T) {
+		driver := stub.Double{
+			AppliedVersionsFn:        makeScanApplied(t, "1234"),
+			ExecuteFn:                makeExecuteFn(nil),
+			CreateSchemaMigrationsFn: makeCreateSchemaMigrationsFn(nil),
+			UpdateSchemaMigrationsFn: makeUpdatSchemaMigrationsFn(nil),
+		}
+		var err error
+		if err = up(t.Context(), &driver, okFS, "", ""); err != nil {
+			t.Fatal(err)
+		}
+
+		if err = down(t.Context(), &driver, okFS, "", ""); err != nil {
+			t.Fatal(err)
+		}
+	})
+
+	t.Run("bad version", func(t *testing.T) {
+		driver := stub.Double{
+			AppliedVersionsFn:        makeScanApplied(t, "1234", "2345", "3456"),
+			ExecuteFn:                makeExecuteFn(nil),
+			CreateSchemaMigrationsFn: makeCreateSchemaMigrationsFn(nil),
+			UpdateSchemaMigrationsFn: makeUpdatSchemaMigrationsFn(nil),
+		}
+		err := up(t.Context(), &driver, okFS, "bad", "")
+		if err == nil {
+			t.Fatal("expected error")
+		}
+		t.Log(err)
+		if m := err.Error(); !strings.Contains(m, "version") {
+			t.Errorf("expected for error (%v) to mention %q", m, "version")
+		}
+	})
+
+	t.Run("error reading from FS directory", func(t *testing.T) {
+		driver := makeNoCallDriver(t)
+		badFS := stub.FS{
+			FS: fstest.MapFS{"forward-1234-no_read_permissions": &fstest.MapFile{Mode: 0x000}},
+			ReadDirFn: func(n string) ([]fs.DirEntry, error) {
+				return nil, errors.New("I've never seen that file in my life")
+			},
+		}
+		err := up(t.Context(), driver, &badFS, "1234", "")
+		if err == nil {
+			t.Fatal("expected an error but got nil")
+		}
+		t.Log(err)
+		const looseExpectation = "reading directory entries"
+		if m := err.Error(); !strings.Contains(m, looseExpectation) {
+			t.Errorf("expected for error (%v) to contain %q", err, looseExpectation)
+		}
+	})
+
+	t.Run("error reading from found file", func(t *testing.T) {
+		driver := makeNoCallDriver(t)
+		// The only allowed Driver method in this case is AppliedVersions.
+		// Check that an error reading the file stops before calling Execute, and
+		// the other methods.
+		driver.AppliedVersionsFn = makeScanApplied(t, "1234")
+
+		badFS := stub.FS{
+			FS: fstest.MapFS{
+				"forward-1234-a": &fstest.MapFile{Mode: 0x600},
+				"forward-2345-b": &fstest.MapFile{Mode: 0x600},
+			},
+			ReadFileFn: func(name string) ([]byte, error) {
+				if name != "forward-2345-b" {
+					t.Fatalf("read unexpected file %q, should read %q", name, "forward-2345-b")
+				}
+				return nil, errors.New("OOF")
+			},
+		}
+		err := up(t.Context(), driver, &badFS, "2345", "")
+		if err == nil {
+			t.Fatal("expected an error but got nil")
+		}
+		t.Log(err)
+		const looseExpectation = "reading file"
+		if m := err.Error(); !strings.Contains(m, looseExpectation) {
+			t.Errorf("expected for error (%v) to contain %q", err, looseExpectation)
+		}
+	})
+
+	t.Run("other error scanning for migrations", func(t *testing.T) {
+		oof := errors.New("oof")
+		var calledUpdate bool
+		driver := &stub.Double{
+			AppliedVersionsFn: func(ctx context.Context, migrationsTable string) (godfish.AppliedVersions, error) {
+				return nil, oof
+			},
+			ExecuteFn:                makeExecuteFn(nil),
+			CreateSchemaMigrationsFn: makeCreateSchemaMigrationsFn(nil),
+			UpdateSchemaMigrationsFn: func(ctx context.Context, migrationsTable string, forward bool, version, label string) error {
+				calledUpdate = true
+				return nil
+			},
+		}
+
+		// TODO: also add test that passes a non-zero version
+		err := up(t.Context(), driver, okFS, "", "test")
+		if !errors.Is(err, oof) {
+			t.Errorf("expected error (%v) to be %v", err, oof)
+		}
+		if calledUpdate {
+			t.Errorf("did not expect to call UpdateSchemaMigrations")
+		}
+	})
+
+	t.Run("error executing migration", func(t *testing.T) {
+		var calledUpdateFn bool
+		driver := &stub.Double{
+			AppliedVersionsFn: makeScanApplied(t, "1234"),
+			ExecuteFn:         makeExecuteFn(errors.New("OOF")),
+			UpdateSchemaMigrationsFn: func(ctx context.Context, migrationsTable string, forward bool, version, label string) error {
+				calledUpdateFn = true
+				return nil
+			},
+		}
+		err := up(t.Context(), driver, okFS, "2345", "test")
+		expErr := internal.ErrExecutingMigration
+		if !errors.Is(err, expErr) {
+			t.Errorf("expected error (%v) to be %v", err, expErr)
+		}
+		if calledUpdateFn {
+			t.Errorf("did not expect to call the update method")
+		}
+	})
+
+	t.Run("error creating migrations table", func(t *testing.T) {
+		oof := errors.New("oof")
+		var calledUpdateFn bool
+		driver := &stub.Double{
+			AppliedVersionsFn:        makeScanApplied(t),
+			ExecuteFn:                makeExecuteFn(nil),
+			CreateSchemaMigrationsFn: makeCreateSchemaMigrationsFn(oof),
+			UpdateSchemaMigrationsFn: func(ctx context.Context, migrationsTable string, forward bool, version, label string) error {
+				calledUpdateFn = true
+				return nil
+			},
+		}
+		err := up(t.Context(), driver, okFS, "2345", "test")
+		if !errors.Is(err, oof) {
+			t.Errorf("expected error (%v) to be %v", err, oof)
+		}
+		if calledUpdateFn {
+			t.Errorf("did not expect to call the update method")
+		}
+	})
+
+	t.Run("error updating migrations table", func(t *testing.T) {
+		oof := errors.New("oof")
+		driver := &stub.Double{
+			AppliedVersionsFn:        makeScanApplied(t, "1234"),
+			ExecuteFn:                makeExecuteFn(nil),
+			CreateSchemaMigrationsFn: makeCreateSchemaMigrationsFn(nil),
+			UpdateSchemaMigrationsFn: func(ctx context.Context, migrationsTable string, forward bool, version, label string) error {
+				return oof
+			},
+		}
+		err := up(t.Context(), driver, okFS, "2345", "test")
+		if !errors.Is(err, oof) {
+			t.Errorf("expected error (%v) to be %v", err, oof)
+		}
+	})
+
+	t.Run("skips over directories", func(t *testing.T) {
+		var numExecCalls int
+		driver := &stub.Double{
+			AppliedVersionsFn: makeScanApplied(t, "1234"),
+			ExecuteFn: func(ctx context.Context, q string, a ...any) error {
+				numExecCalls++
+				return nil
+			},
+			CreateSchemaMigrationsFn: makeCreateSchemaMigrationsFn(nil),
+			UpdateSchemaMigrationsFn: makeUpdatSchemaMigrationsFn(nil),
+		}
+		dirFS := fstest.MapFS{
+			// this "directory" is named like a migrations file, but should be ignored.
+			"forward-2345-directory": &fstest.MapFile{Mode: fs.ModeDir},
+			"forward-1234-a.sql":     &fstest.MapFile{Mode: 0x640},
+			"forward-2345-b.sql":     &fstest.MapFile{Mode: 0x640},
+		}
+		err := up(t.Context(), driver, dirFS, "2345", "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		const expNumCalls = 1
+		if numExecCalls != expNumCalls {
+			t.Errorf("wrong number of method calls; got %d, expected %d", numExecCalls, expNumCalls)
 		}
 	})
 }
@@ -963,34 +1339,34 @@ func mustParseVersion(t *testing.T, v string) internal.Version {
 	return out
 }
 
-// makeNoCallDriver constructs a Driver that fails the test immediately
-// whenever a [godfish.Driver] method is invoked.
+// makeNoCallDriver constructs a Driver that errors the test whenever a
+// [godfish.Driver] method is invoked.
 func makeNoCallDriver(t *testing.T) *stub.Double {
 	t.Helper()
 
 	return &stub.Double{
 		NameFn: func() string {
-			t.Fatal("should not call Name")
+			t.Error("should not call Name")
 			return ""
 		},
 		AppliedVersionsFn: func(_ context.Context, _ string) (godfish.AppliedVersions, error) {
-			t.Fatal("should not call AppliedVersions")
+			t.Error("should not call AppliedVersions")
 			return nil, nil
 		},
 		CreateSchemaMigrationsFn: func(_ context.Context, _ string) error {
-			t.Fatal("should not call CreateSchemaMigrations")
+			t.Error("should not call CreateSchemaMigrations")
 			return nil
 		},
 		ExecuteFn: func(_ context.Context, _ string, _ ...any) error {
-			t.Fatal("should not call Execute")
+			t.Error("should not call Execute")
 			return nil
 		},
 		UpdateSchemaMigrationsFn: func(_ context.Context, _ string, _ bool, _, _ string) error {
-			t.Fatal("should not call UpdateSchemaMigrations")
+			t.Error("should not call UpdateSchemaMigrations")
 			return nil
 		},
 		UpgradeSchemaMigrationsFn: func(_ context.Context, _ string) error {
-			t.Fatal("should not call UpgradeSchemaMigrationsFn")
+			t.Error("should not call UpgradeSchemaMigrationsFn")
 			return nil
 		},
 	}
@@ -998,7 +1374,8 @@ func makeNoCallDriver(t *testing.T) *stub.Double {
 
 // testBasicOperationWithoutOpts is a simple test meant to check that fn does
 // not blow up when passed the bare minimum of required inputs and most
-// importantly, no options.
+// importantly, no options. It's only targeted toward migrate and rollback
+// functions.
 func testBasicOperationWithoutOpts(
 	t *testing.T,
 	startingVersions []string,

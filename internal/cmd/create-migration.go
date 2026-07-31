@@ -7,12 +7,13 @@ import (
 
 	"github.com/rafaelespinoza/godfish"
 	"github.com/rafaelespinoza/godfish/internal"
+	"github.com/rafaelespinoza/godfish/internal/compat"
 
 	"github.com/urfave/cli/v3"
 )
 
 func makeCreateMigration(subcmdName string, pathToConfig *string) *cli.Command {
-	const fwdlabelFlagname, revlabelFlagname = "fwdlabel", "revlabel"
+	const fwdlabelFlagname, revlabelFlagname, filenameExtFlagname = "fwdlabel", "revlabel", "ext"
 
 	return &cli.Command{
 		Name:  subcmdName,
@@ -53,15 +54,23 @@ Acceptable values for the %q and %q flags are:
 				Usage:   "customize the directional part of the filename for reverse migration",
 				Sources: newSourceConfigChain(pathToConfig, "reverse_label"),
 			},
+			&cli.StringFlag{
+				Name:  filenameExtFlagname,
+				Value: ".sql",
+				Usage: "customize filename extension",
+			},
 		},
 		Action: func(_ context.Context, c *cli.Command) error {
 			migrationName := c.String("name")
 			reversible := c.Bool("reversible")
 			pathToFiles := c.String(pathToFilesFlagname)
-			fwdlabelValue := c.String(fwdlabelFlagname)
-			revlabelValue := c.String(revlabelFlagname)
+			opts := compat.MakeMigrationOpts(compat.MigrationOptParams{
+				ForwardLabel: c.String(fwdlabelFlagname),
+				ReverseLabel: c.String(revlabelFlagname),
+				FilenameExt:  c.String(filenameExtFlagname),
+			})
 
-			return godfish.CreateMigrationFiles(migrationName, reversible, pathToFiles, fwdlabelValue, revlabelValue)
+			return godfish.CreateMigrationFilesWith(migrationName, reversible, pathToFiles, opts...)
 		},
 	}
 }

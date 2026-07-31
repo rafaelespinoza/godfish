@@ -221,7 +221,7 @@ func generateMigrationFiles(t *testing.T, pathToTestDir string, stubs []testDriv
 		}
 
 		fwd, rev := stub.indirectives.forward, stub.indirectives.reverse
-		params, err := internal.NewMigrationParams(strconv.Itoa(i), reversible, pathToTestDir, fwd.Label, rev.Label)
+		params, err := internal.NewMigrationParams(strconv.Itoa(i), reversible, pathToTestDir, fwd.Label, rev.Label, ".sql")
 		if err != nil {
 			t.Fatalf("error in generateMigrationFiles, stubs[%d] failure from NewMigrationParams: %v", i, err)
 		}

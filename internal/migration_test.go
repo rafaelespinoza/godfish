@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"testing"
 
 	"github.com/rafaelespinoza/godfish/internal"
@@ -84,6 +85,15 @@ func TestParseMigration(t *testing.T) {
 	t.Run("no extension", func(t *testing.T) {
 		runTest(t, testCase{
 			filename:        internal.Filename("forward-20191118121314-test"),
+			expIndirection:  internal.Indirection{Value: internal.DirForward},
+			expLabel:        "test",
+			expVersionInput: "20191118121314",
+		})
+	})
+
+	t.Run("different filename extension", func(t *testing.T) {
+		runTest(t, testCase{
+			filename:        internal.Filename("forward-20191118121314-test.cql"),
 			expIndirection:  internal.Indirection{Value: internal.DirForward},
 			expLabel:        "test",
 			expVersionInput: "20191118121314",
@@ -205,6 +215,7 @@ func TestMigrationParams(t *testing.T) {
 		reversible         bool
 		dirpath            string
 		fwdLabel, revLabel string
+		filenameExt        string
 		expectedDirections []string
 		expectError        bool
 	}
@@ -217,7 +228,7 @@ func TestMigrationParams(t *testing.T) {
 		)
 
 		// construct params and test the fields.
-		migParams, err = internal.NewMigrationParams(test.name, test.reversible, test.dirpath, test.fwdLabel, test.revLabel)
+		migParams, err = internal.NewMigrationParams(test.name, test.reversible, test.dirpath, test.fwdLabel, test.revLabel, test.filenameExt)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -271,11 +282,15 @@ func TestMigrationParams(t *testing.T) {
 		sort.Slice(filesAfter, func(i, j int) bool { return filesAfter[i].Name() < filesAfter[j].Name() })
 
 		// Sorting this makes sense here as long as the generated filenames
-		// begin with the direction label.
+		// begin with the direction (ie: forward|reverse).
 		sort.Strings(test.expectedDirections)
 
 		for i, dirEntry := range filesAfter {
-			patt := fmt.Sprintf("%s-[0-9]*-%s.sql", test.expectedDirections[i], test.name)
+			expExtension := test.filenameExt
+			if !strings.HasPrefix(expExtension, ".") {
+				expExtension = "." + expExtension
+			}
+			patt := fmt.Sprintf("%s-[0-9]*-%s%s", test.expectedDirections[i], test.name, expExtension)
 			name := dirEntry.Name()
 			if match, err := filepath.Match(patt, name); err != nil {
 				t.Fatalf("test [%d]; %v", i, err)
@@ -295,6 +310,7 @@ func TestMigrationParams(t *testing.T) {
 			dirpath:            t.TempDir(),
 			fwdLabel:           "forward",
 			revLabel:           "reverse",
+			filenameExt:        ".sql",
 			expectedDirections: []string{"forward", "reverse"},
 		})
 	})
@@ -305,6 +321,7 @@ func TestMigrationParams(t *testing.T) {
 			reversible:         false,
 			dirpath:            t.TempDir(),
 			fwdLabel:           "forward",
+			filenameExt:        ".sql",
 			expectedDirections: []string{"forward"},
 		})
 	})
@@ -316,18 +333,44 @@ func TestMigrationParams(t *testing.T) {
 			dirpath:            t.TempDir(),
 			fwdLabel:           "forward",
 			revLabel:           "reverse",
+			filenameExt:        ".sql",
 			expectedDirections: []string{"forward"},
 		})
 	})
 
 	t.Run("alternative direction names", func(t *testing.T) {
 		runTest(t, testCase{
-			name:               "alternatives",
+			name:               "alternative_directions",
 			reversible:         true,
 			dirpath:            t.TempDir(),
 			fwdLabel:           "up",
 			revLabel:           "down",
+			filenameExt:        ".sql",
 			expectedDirections: []string{"up", "down"},
+		})
+	})
+
+	t.Run("alternative filename extensions", func(t *testing.T) {
+		runTest(t, testCase{
+			name:               "alternative_extensions",
+			reversible:         true,
+			dirpath:            t.TempDir(),
+			fwdLabel:           "forward",
+			revLabel:           "reverse",
+			filenameExt:        ".cql",
+			expectedDirections: []string{"forward", "reverse"},
+		})
+	})
+
+	t.Run("filename extension not prefixed with dot", func(t *testing.T) {
+		runTest(t, testCase{
+			name:               "filename_extension_not_prefixed_with_dot",
+			reversible:         true,
+			dirpath:            t.TempDir(),
+			fwdLabel:           "forward",
+			revLabel:           "reverse",
+			filenameExt:        "cql",
+			expectedDirections: []string{"forward", "reverse"},
 		})
 	})
 
@@ -338,6 +381,7 @@ func TestMigrationParams(t *testing.T) {
 			dirpath:     filepath.Join(t.TempDir(), "this_should_not_exist"),
 			fwdLabel:    "forward",
 			revLabel:    "reverse",
+			filenameExt: ".sql",
 			expectError: true,
 		})
 	})

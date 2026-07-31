@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+
+	"github.com/rafaelespinoza/godfish/internal"
 )
 
 // options are configuration parameters set through an [opter].
@@ -12,6 +14,12 @@ type options struct {
 	migrationsTable string
 	targetVersion   string
 	writer          io.Writer
+
+	// relevant for create migration
+
+	filenameExt  string
+	forwardLabel string
+	reverseLabel string
 }
 
 // An Opter configures a migration/rollback and returns a validation error,
@@ -68,6 +76,42 @@ func WithWriter(w io.Writer) Opter {
 			return fmt.Errorf("%s: %w", "WithWriter", errNonZeroValueRequired)
 		}
 		opt.writer = w
+		return nil
+	}}
+}
+
+// WithForwardLabel sets the name of the forward direction for when creating
+// a migration file.
+// Valid values for l are "forward", "migration", "up".
+func WithForwardLabel(l string) Opter {
+	return &opter{set: func(opt *options) error {
+		if err := internal.ValidateForwardDirectionLabel(l); err != nil {
+			return fmt.Errorf("%s: %w", "WithForwardLabel", err)
+		}
+		opt.forwardLabel = l
+		return nil
+	}}
+}
+
+// WithReverseLabel sets the name of the reverse direction for when creating
+// a migration file.
+// Valid values for l are "reverse", "rollback", "down".
+func WithReverseLabel(l string) Opter {
+	return &opter{set: func(opt *options) error {
+		if err := internal.ValidateReverseDirectionLabel(l); err != nil {
+			return fmt.Errorf("%s: %w", "WithReverseLabel", err)
+		}
+		opt.reverseLabel = l
+		return nil
+	}}
+}
+
+// WithFilenameExtension sets the name of the extension of the filename when
+// creating a migration file.
+func WithFilenameExtension(e string) Opter {
+	return &opter{set: func(opt *options) error {
+		// For now, no validations. Allow zero value strings as well.
+		opt.filenameExt = e
 		return nil
 	}}
 }

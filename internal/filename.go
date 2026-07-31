@@ -8,17 +8,15 @@ const filenameDelimeter = "-"
 // has a generated timestamp, one part has a direction, another has a label.
 type Filename string
 
-// MakeFilename creates a filename based on the independent parts. Format:
-// "${direction}-${version}-${label}.sql"
+// MakeFilename creates a filename based on the independent parts.
+//
+// Format:
+//
+//	"${direction}-${version}-${label}"
 func MakeFilename(version string, indirection Indirection, label string) Filename {
-	var dir string
-	if indirection.Value == DirUnknown {
-		dir = "*" + filenameDelimeter
-	} else {
-		dir = strings.ToLower(indirection.Label) + filenameDelimeter
-	}
+	dir := strings.ToLower(indirection.Label) + filenameDelimeter
 
 	// the length will top out at the high quantifier for this regexp.
 	ver := timeformatMatcher.FindString(version) + filenameDelimeter
-	return Filename(dir + ver + label + ".sql")
+	return Filename(dir + ver + label)
 }

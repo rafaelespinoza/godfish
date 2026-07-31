@@ -16,6 +16,12 @@ type MigrationOptParams struct {
 	MigrationsTable string
 	TargetVersion   string
 	Writer          io.Writer
+
+	// for creating migration files
+
+	ForwardLabel string
+	ReverseLabel string
+	FilenameExt  string
 }
 
 // LogValue lets this type implement the [slog.LogValuer] interface.
@@ -25,6 +31,9 @@ func (m MigrationOptParams) LogValue() slog.Value {
 		slog.String("migrations_table", m.MigrationsTable),
 		slog.String("target_version", m.TargetVersion),
 		slog.Bool("writer_nil?", m.Writer == nil),
+		slog.String("forward_label", m.ForwardLabel),
+		slog.String("reverse_label", m.ReverseLabel),
+		slog.String("filename_ext", m.FilenameExt),
 	)
 }
 
@@ -45,6 +54,18 @@ func MakeMigrationOpts(m MigrationOptParams) []godfish.Opter {
 	if m.Writer != nil {
 		out = append(out, godfish.WithWriter(m.Writer))
 	}
+
+	// these are only relevant for creating migration files.
+	if m.ForwardLabel != "" {
+		out = append(out, godfish.WithForwardLabel(m.ForwardLabel))
+	}
+	if m.ReverseLabel != "" {
+		out = append(out, godfish.WithReverseLabel(m.ReverseLabel))
+	}
+	if m.FilenameExt != "" {
+		out = append(out, godfish.WithFilenameExtension(m.FilenameExt))
+	}
+
 	return out
 }
 
@@ -54,6 +75,15 @@ func MakeMigrationOpts(m MigrationOptParams) []godfish.Opter {
 // These types can be removed, and tests adjusted to use the replacement API
 // after removing the deprecated funcs.
 type (
+	CreateMigrationFunc func(
+		migrationName string,
+		reversible bool,
+		dirpath string,
+		fwdlabel string,
+		revlabel string,
+		extension string,
+	) error
+
 	MigrateFunc func(
 		ctx context.Context,
 		driver godfish.Driver,

@@ -17,59 +17,59 @@ func TestFilename(t *testing.T) {
 			version:   "20191118121314",
 			direction: internal.Indirection{Value: internal.DirForward, Label: "forward"},
 			label:     "test",
-			expOut:    internal.Filename("forward-20191118121314-test.sql"),
+			expOut:    internal.Filename("forward-20191118121314-test"),
 		},
 		{
 			version:   "20191118121314",
 			direction: internal.Indirection{Value: internal.DirReverse, Label: "reverse"},
 			label:     "test",
-			expOut:    internal.Filename("reverse-20191118121314-test.sql"),
+			expOut:    internal.Filename("reverse-20191118121314-test"),
 		},
 		// timestamp too long
 		{
 			version:   "201911181213141516",
 			direction: internal.Indirection{Value: internal.DirForward, Label: "forward"},
 			label:     "test",
-			expOut:    internal.Filename("forward-20191118121314-test.sql"),
+			expOut:    internal.Filename("forward-20191118121314-test"),
 		},
 		// timestamp too short
 		{
 			version:   "1234",
 			direction: internal.Indirection{Value: internal.DirForward, Label: "forward"},
 			label:     "test",
-			expOut:    internal.Filename("forward-1234-test.sql"),
+			expOut:    internal.Filename("forward-1234-test"),
 		},
 		// label has dashes
 		{
 			version:   "20191118121314",
 			direction: internal.Indirection{Value: internal.DirForward, Label: "forward"},
 			label:     "foo-bar",
-			expOut:    internal.Filename("forward-20191118121314-foo-bar.sql"),
+			expOut:    internal.Filename("forward-20191118121314-foo-bar"),
 		},
 		// alternative names
 		{
 			direction: internal.Indirection{Value: internal.DirForward, Label: "migrate"},
 			version:   "20191118121314",
 			label:     "test",
-			expOut:    internal.Filename("migrate-20191118121314-test.sql"),
+			expOut:    internal.Filename("migrate-20191118121314-test"),
 		},
 		{
 			direction: internal.Indirection{Value: internal.DirForward, Label: "up"},
 			version:   "20191118121314",
 			label:     "test",
-			expOut:    internal.Filename("up-20191118121314-test.sql"),
+			expOut:    internal.Filename("up-20191118121314-test"),
 		},
 		{
 			direction: internal.Indirection{Value: internal.DirReverse, Label: "rollback"},
 			version:   "20191118121314",
 			label:     "test",
-			expOut:    internal.Filename("rollback-20191118121314-test.sql"),
+			expOut:    internal.Filename("rollback-20191118121314-test"),
 		},
 		{
 			direction: internal.Indirection{Value: internal.DirReverse, Label: "down"},
 			version:   "20191118121314",
 			label:     "test",
-			expOut:    internal.Filename("down-20191118121314-test.sql"),
+			expOut:    internal.Filename("down-20191118121314-test"),
 		},
 	}
 	for i, test := range tests {
