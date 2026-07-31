@@ -404,6 +404,7 @@ func TestMigrationParams(t *testing.T) {
 			revLabel:           "reverse",
 			filenameExt:        ".cql",
 			expectedDirections: []string{"forward", "reverse"},
+			numExpectedRecords: 2,
 		})
 	})
 
@@ -416,6 +417,7 @@ func TestMigrationParams(t *testing.T) {
 			revLabel:           "reverse",
 			filenameExt:        "cql",
 			expectedDirections: []string{"forward", "reverse"},
+			numExpectedRecords: 2,
 		})
 	})
 
