@@ -12,6 +12,7 @@ import (
 	"io"
 	"io/fs"
 	"log/slog"
+	"math"
 	"os"
 	"path/filepath"
 	"slices"
@@ -609,7 +610,7 @@ func (m *migrationFinder) query(ctx context.Context, d driver.Driver, migrations
 		slog.String("finish_at_version", m.finishAtVersion),
 	))
 
-	toApply, err := m.filter(applied, available)
+	toApply, err := m.filter(applied, available, m.infoPrinter != nil)
 	if err != nil {
 		return
 	}
@@ -776,11 +777,19 @@ func scanAppliedVersions(ctx context.Context, d driver.Driver, migrationsTable s
 
 // filter compares lists of applied and available migrations, then selects a
 // list of migrations to apply.
-func (m *migrationFinder) filter(applied, available []*internal.Migration) (out []*internal.Migration, err error) {
+//
+// When infoMode is true, then filtering criteria is relaxed to permit
+// migrations with versions <= the highest applied version when looking in the
+// forward direction, and versions < lowestAppliedVersion when looking in the
+// reverse direction.
+func (m *migrationFinder) filter(applied, available []*internal.Migration, infoMode bool) (out []*internal.Migration, err error) {
 	allVersions := make(map[int64]*internal.Migration)
 	uniqueToApplied := make(map[int64]*internal.Migration)
+	lowestAppliedVersion, highestAppliedVersion := int64(math.MaxInt64), int64(math.MinInt64)
 	for _, mig := range applied {
 		version := mig.Version.Value()
+		lowestAppliedVersion = min(lowestAppliedVersion, version)
+		highestAppliedVersion = max(highestAppliedVersion, version)
 		uniqueToApplied[version] = mig
 		allVersions[version] = mig
 	}
@@ -799,7 +808,7 @@ func (m *migrationFinder) filter(applied, available []*internal.Migration) (out 
 		for version, mig := range allVersions {
 			_, isApplied := uniqueToApplied[version]
 			_, isAvailable := uniqueToAvailable[version]
-			if !isApplied && isAvailable {
+			if !isApplied && isAvailable && (infoMode || version > highestAppliedVersion) {
 				out = append(out, mig)
 			}
 		}
@@ -807,7 +816,13 @@ func (m *migrationFinder) filter(applied, available []*internal.Migration) (out 
 		for version, mig := range allVersions {
 			_, appliedOK := uniqueToApplied[version]
 			_, availableOK := uniqueToAvailable[version]
-			if !appliedOK && !availableOK {
+			ok := !appliedOK && !availableOK && (infoMode || version >= lowestAppliedVersion)
+			slog.Debug("considering reverse migration from (*migrationFinder).filter method",
+				slog.Int64("version", version), slog.Int64("lowest_applied_version", lowestAppliedVersion),
+				slog.Bool("applied_ok", appliedOK), slog.Bool("available_ok", availableOK),
+				slog.Bool("info_mode", infoMode), slog.Bool("ok", ok),
+			)
+			if ok {
 				// The Migration direction is artificially set to Forward from a
 				// previous step. Here, we correct it. Also, we're guessing what
 				// the original filename was, by assuming that the list of
