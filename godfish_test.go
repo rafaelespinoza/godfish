@@ -256,8 +256,9 @@ func testMigrate(t *testing.T, up compat.MigrateFunc, down compat.RollbackFunc) 
 	})
 
 	t.Run("handles alternate filename extensions", func(t *testing.T) {
-		var appliedVersionsCalls, executeCalls int
-		var createSchemaMigrationsCalls, updateSchemaMigrationsCall int
+		// setup
+		var appliedVersionsCalls int
+		var executedForwardMigrations, executedReverseMigrations []*internal.Migration
 		driver := stub.Double{
 			AppliedVersionsFn: func(ctx context.Context, migrationsTable string) (driver.AppliedVersions, error) {
 				appliedVersionsCalls++
@@ -272,17 +273,23 @@ func testMigrate(t *testing.T, up compat.MigrateFunc, down compat.RollbackFunc) 
 				}
 			},
 			ExecuteFn: func(ctx context.Context, q string, a ...any) error {
-				executeCalls++
+				mig, ok := internal.GetMigrationContext(ctx)
+				if !ok {
+					t.Errorf("expected for context to have a *Migration in it; query (%q)", q)
+				} else {
+					switch v := mig.Indirection.Value; v {
+					case internal.DirForward:
+						executedForwardMigrations = append(executedForwardMigrations, mig)
+					case internal.DirReverse:
+						executedReverseMigrations = append(executedReverseMigrations, mig)
+					default:
+						t.Errorf("unknown direction for migration %q", v)
+					}
+				}
 				return nil
 			},
-			CreateSchemaMigrationsFn: func(ctx context.Context, migrationsTable string) error {
-				createSchemaMigrationsCalls++
-				return nil
-			},
-			UpdateSchemaMigrationsFn: func(ctx context.Context, migrationsTable string, forward bool, version, label string) error {
-				updateSchemaMigrationsCall++
-				return nil
-			},
+			CreateSchemaMigrationsFn: makeCreateSchemaMigrationsFn(nil),
+			UpdateSchemaMigrationsFn: makeUpdatSchemaMigrationsFn(nil),
 		}
 		dirFS := stub.FS{
 			FS: fstest.MapFS{
@@ -294,32 +301,47 @@ func testMigrate(t *testing.T, up compat.MigrateFunc, down compat.RollbackFunc) 
 				"reverse-3456-c.cql": &fstest.MapFile{Mode: 0x600},
 			},
 		}
+
+		// test the "up" function
 		if err := up(t.Context(), &driver, dirFS, "", ""); err != nil {
 			t.Fatal(err)
 		}
-		const expNumCallsAfterUp = 3
-		if got := executeCalls; got != expNumCallsAfterUp {
-			t.Errorf("wrong number of calls to Execute; got %d, expected %d", got, expNumCallsAfterUp)
+		// check the "up" function
+		expForwardVersions := []string{"1234", "2345", "3456"}
+		if n, m := len(executedForwardMigrations), len(expForwardVersions); n != m {
+			t.Errorf("wrong number of executed forward migrations; got %d, expected %d", n, m)
 		}
-		if got := createSchemaMigrationsCalls; got != expNumCallsAfterUp {
-			t.Errorf("wrong number of calls to CreateSchemaMigrations; got %d, expected %d", got, expNumCallsAfterUp)
-		}
-		if got := updateSchemaMigrationsCall; got != expNumCallsAfterUp {
-			t.Errorf("wrong number of calls to UpdateSchemaMigrations; got %d, expected %d", got, expNumCallsAfterUp)
+		for i, gotMig := range executedForwardMigrations {
+			if i >= len(expForwardVersions) {
+				break
+			} else {
+				gotVersion := gotMig.Version.String()
+				expVersion := expForwardVersions[i]
+				if gotVersion != expVersion {
+					t.Errorf("wrong version for forward migration [%d]; got %q, expected %q", i, gotVersion, expVersion)
+				}
+			}
 		}
 
+		// test the "down" function
 		if err := down(t.Context(), &driver, dirFS, "", ""); err != nil {
 			t.Fatal(err)
 		}
-		const expNumCallsAfterDown = 6
-		if got := executeCalls; got != expNumCallsAfterDown {
-			t.Errorf("wrong number of calls to Execute; got %d, expected %d", got, expNumCallsAfterDown)
+		// check the "down" function
+		expReverseVersions := []string{"3456", "2345", "1234"}
+		if n, m := len(executedReverseMigrations), len(expReverseVersions); n != m {
+			t.Errorf("wrong number of executed reverse migrations; got %d, expected %d", n, m)
 		}
-		if got := createSchemaMigrationsCalls; got != expNumCallsAfterDown {
-			t.Errorf("wrong number of calls to CreateSchemaMigrations; got %d, expected %d", got, expNumCallsAfterDown)
-		}
-		if got := updateSchemaMigrationsCall; got != expNumCallsAfterDown {
-			t.Errorf("wrong number of calls to UpdateSchemaMigrations; got %d, expected %d", got, expNumCallsAfterDown)
+		for i, gotMig := range executedReverseMigrations {
+			if i >= len(expReverseVersions) {
+				break
+			} else {
+				gotVersion := gotMig.Version.String()
+				expVersion := expReverseVersions[i]
+				if gotVersion != expVersion {
+					t.Errorf("wrong version for reverse migration [%d]; got %q, expected %q", i, gotVersion, expVersion)
+				}
+			}
 		}
 	})
 }
@@ -584,8 +606,9 @@ func testApplyMigration(t *testing.T, up compat.MigrateFunc, down compat.Rollbac
 	})
 
 	t.Run("handles alternate filename extensions", func(t *testing.T) {
-		var appliedVersionsCalls, executeCalls int
-		var createSchemaMigrationsCalls, updateSchemaMigrationsCall int
+		// setup
+		var appliedVersionsCalls int
+		var executedForwardMigrations, executedReverseMigrations []*internal.Migration
 		driver := stub.Double{
 			AppliedVersionsFn: func(ctx context.Context, migrationsTable string) (driver.AppliedVersions, error) {
 				appliedVersionsCalls++
@@ -600,17 +623,23 @@ func testApplyMigration(t *testing.T, up compat.MigrateFunc, down compat.Rollbac
 				}
 			},
 			ExecuteFn: func(ctx context.Context, q string, a ...any) error {
-				executeCalls++
+				mig, ok := internal.GetMigrationContext(ctx)
+				if !ok {
+					t.Errorf("expected for context to have a *Migration in it; query (%q)", q)
+				} else {
+					switch v := mig.Indirection.Value; v {
+					case internal.DirForward:
+						executedForwardMigrations = append(executedForwardMigrations, mig)
+					case internal.DirReverse:
+						executedReverseMigrations = append(executedReverseMigrations, mig)
+					default:
+						t.Errorf("unknown direction for migration %q", v)
+					}
+				}
 				return nil
 			},
-			CreateSchemaMigrationsFn: func(ctx context.Context, migrationsTable string) error {
-				createSchemaMigrationsCalls++
-				return nil
-			},
-			UpdateSchemaMigrationsFn: func(ctx context.Context, migrationsTable string, forward bool, version, label string) error {
-				updateSchemaMigrationsCall++
-				return nil
-			},
+			CreateSchemaMigrationsFn: makeCreateSchemaMigrationsFn(nil),
+			UpdateSchemaMigrationsFn: makeUpdatSchemaMigrationsFn(nil),
 		}
 		dirFS := stub.FS{
 			FS: fstest.MapFS{
@@ -623,32 +652,46 @@ func testApplyMigration(t *testing.T, up compat.MigrateFunc, down compat.Rollbac
 			},
 		}
 
+		// test the "up" function
 		if err := up(t.Context(), &driver, dirFS, "", ""); err != nil {
 			t.Fatal(err)
 		}
-		const expNumCallsAfterUp = 1
-		if got := executeCalls; got != expNumCallsAfterUp {
-			t.Errorf("wrong number of calls to Execute; got %d, expected %d", got, expNumCallsAfterUp)
+		// check the "up" function
+		expForwardVersions := []string{"1234"}
+		if n, m := len(executedForwardMigrations), len(expForwardVersions); n != m {
+			t.Errorf("wrong number of executed forward migrations; got %d, expected %d", n, m)
 		}
-		if got := createSchemaMigrationsCalls; got != expNumCallsAfterUp {
-			t.Errorf("wrong number of calls to CreateSchemaMigrations; got %d, expected %d", got, expNumCallsAfterUp)
-		}
-		if got := updateSchemaMigrationsCall; got != expNumCallsAfterUp {
-			t.Errorf("wrong number of calls to UpdateSchemaMigrations; got %d, expected %d", got, expNumCallsAfterUp)
+		for i, gotMig := range executedForwardMigrations {
+			if i >= len(expForwardVersions) {
+				break
+			} else {
+				gotVersion := gotMig.Version.String()
+				expVersion := expForwardVersions[i]
+				if gotVersion != expVersion {
+					t.Errorf("wrong version for forward migration [%d]; got %q, expected %q", i, gotVersion, expVersion)
+				}
+			}
 		}
 
+		// test the "down" function
 		if err := down(t.Context(), &driver, dirFS, "", ""); err != nil {
 			t.Fatal(err)
 		}
-		const expNumCallsAfterDown = 2
-		if got := executeCalls; got != expNumCallsAfterDown {
-			t.Errorf("wrong number of calls to Execute; got %d, expected %d", got, expNumCallsAfterDown)
+		// check the "down" function
+		expReverseVersions := []string{"1234"}
+		if n, m := len(executedReverseMigrations), len(expReverseVersions); n != m {
+			t.Errorf("wrong number of executed reverse migrations; got %d, expected %d", n, m)
 		}
-		if got := createSchemaMigrationsCalls; got != expNumCallsAfterDown {
-			t.Errorf("wrong number of calls to CreateSchemaMigrations; got %d, expected %d", got, expNumCallsAfterDown)
-		}
-		if got := updateSchemaMigrationsCall; got != expNumCallsAfterDown {
-			t.Errorf("wrong number of calls to UpdateSchemaMigrations; got %d, expected %d", got, expNumCallsAfterDown)
+		for i, gotMig := range executedReverseMigrations {
+			if i >= len(expReverseVersions) {
+				break
+			} else {
+				gotVersion := gotMig.Version.String()
+				expVersion := expReverseVersions[i]
+				if gotVersion != expVersion {
+					t.Errorf("wrong version for reverse migration [%d]; got %q, expected %q", i, gotVersion, expVersion)
+				}
+			}
 		}
 	})
 }

@@ -344,6 +344,9 @@ func runMigration(ctx context.Context, driver driver.Driver, dir fs.FS, mig *int
 		gerund = "rolling back"
 	}
 
+	// For some extra observability in tests.
+	ctx = internal.SetMigrationContext(ctx, mig)
+
 	lgr := slog.With(slog.String("path_to_file", mig.Filename), slog.String("version", mig.Version.String()))
 	lgr.Info(gerund + " ...")
 	startTime := time.Now()

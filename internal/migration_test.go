@@ -1,12 +1,14 @@
 package internal_test
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/rafaelespinoza/godfish/internal"
 )
@@ -384,4 +386,95 @@ func TestMigrationParams(t *testing.T) {
 			expectError: true,
 		})
 	})
+}
+
+func TestMigrationContext(t *testing.T) {
+	version1234, err := internal.ParseVersion("1234")
+	if err != nil {
+		t.Fatal(err)
+	}
+	executedAt := time.Date(2029, time.July, 1, 15, 4, 5, 1234, time.UTC)
+
+	tests := []struct {
+		name              string
+		setupCtx          func(context.Context) context.Context
+		expectedMigration *internal.Migration
+		expectedFound     bool
+	}{
+		{
+			name: "ok",
+			setupCtx: func(c context.Context) context.Context {
+				return internal.SetMigrationContext(c, &internal.Migration{
+					Indirection: internal.Indirection{Value: internal.DirForward},
+					Label:       "test",
+					Version:     version1234,
+					Applied:     true,
+					ExecutedAt:  executedAt,
+					Filename:    "forward-1234-test.sql",
+				})
+			},
+			expectedMigration: &internal.Migration{
+				Indirection: internal.Indirection{Value: internal.DirForward},
+				Label:       "test",
+				Version:     version1234,
+				Applied:     true,
+				ExecutedAt:  executedAt,
+				Filename:    "forward-1234-test.sql",
+			},
+			expectedFound: true,
+		},
+		{
+			name:              "empty context",
+			setupCtx:          func(c context.Context) context.Context { return c },
+			expectedMigration: nil,
+			expectedFound:     false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			ctx := test.setupCtx(t.Context())
+			got, found := internal.GetMigrationContext(ctx)
+			exp := test.expectedMigration
+
+			switch {
+			case found && !test.expectedFound:
+				t.Errorf("wrong found; got %t, expected %t", found, test.expectedFound)
+				if got != nil {
+					t.Error("expected nil output")
+				}
+				return
+			case !found && test.expectedFound:
+				t.Errorf("wrong found; got %t, expected %t", found, test.expectedFound)
+				if got == nil {
+					t.Error("expected non-nil output")
+				}
+				return
+			case !found && !test.expectedFound:
+				if got != nil {
+					t.Error("expected nil output")
+				}
+				return
+			}
+
+			if got.Indirection != exp.Indirection {
+				t.Errorf("wrong Indirection; got %v, expected %v", got.Indirection, exp.Indirection)
+			}
+			if got.Label != exp.Label {
+				t.Errorf("wrong Label; got %v, expected %v", got.Label, exp.Label)
+			}
+			if got.Version.Value() != exp.Version.Value() {
+				t.Errorf("wrong Version; got %v, expected %v", got.Version.Value(), exp.Version.Value())
+			}
+			if got.Applied != exp.Applied {
+				t.Errorf("wrong Applied; got %v, expected %v", got.Applied, exp.Applied)
+			}
+			if !got.ExecutedAt.Equal(exp.ExecutedAt) {
+				t.Errorf("wrong ExecutedAt; got %v, expected %v", got.ExecutedAt.String(), exp.ExecutedAt.String())
+			}
+			if got.Filename != exp.Filename {
+				t.Errorf("wrong Filename; got %v, expected %v", got.Filename, exp.Filename)
+			}
+		})
+	}
 }
