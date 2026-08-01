@@ -231,6 +231,78 @@ func testMigrate(t *testing.T, up compat.MigrateFunc, down compat.RollbackFunc) 
 		t.Fatal(err)
 	}
 
+	t.Run("all the way up and down", func(t *testing.T) {
+		tests := []struct {
+			name        string
+			filenameExt string
+		}{
+			{name: "default filename ext", filenameExt: ".sql"},
+			{name: "alternate filename ext", filenameExt: ".cql"},
+		}
+
+		for _, test := range tests {
+			t.Run(test.name, func(t *testing.T) {
+				// setup
+				var appliedVersionsCalls int
+				var executedForwardMigrations, executedReverseMigrations []*internal.Migration
+				driver := stub.Double{
+					AppliedVersionsFn: func(ctx context.Context, migrationsTable string) (driver.AppliedVersions, error) {
+						appliedVersionsCalls++
+						switch appliedVersionsCalls {
+						case 1:
+							return makeScanApplied(t)(ctx, migrationsTable)
+						case 2:
+							return makeScanApplied(t, "1234", "2345", "3456")(ctx, migrationsTable)
+						default:
+							t.Fatalf("unexpected number of calls to AppliedVersions; got %d, expected [1,2]", appliedVersionsCalls)
+							return nil, nil
+						}
+					},
+					ExecuteFn: func(ctx context.Context, q string, a ...any) error {
+						mig, ok := internal.GetMigrationContext(ctx)
+						if !ok {
+							t.Errorf("expected for context to have a *Migration in it; query (%q)", q)
+						} else {
+							switch v := mig.Indirection.Value; v {
+							case internal.DirForward:
+								executedForwardMigrations = append(executedForwardMigrations, mig)
+							case internal.DirReverse:
+								executedReverseMigrations = append(executedReverseMigrations, mig)
+							default:
+								t.Errorf("unknown direction for migration %q", v)
+							}
+						}
+						return nil
+					},
+					CreateSchemaMigrationsFn: makeCreateSchemaMigrationsFn(nil),
+					UpdateSchemaMigrationsFn: makeUpdatSchemaMigrationsFn(nil),
+				}
+				dirFS := stub.FS{
+					FS: fstest.MapFS{
+						"forward-1234-a" + test.filenameExt: &fstest.MapFile{Mode: 0x600},
+						"forward-2345-b" + test.filenameExt: &fstest.MapFile{Mode: 0x600},
+						"forward-3456-c" + test.filenameExt: &fstest.MapFile{Mode: 0x600},
+						"reverse-1234-a" + test.filenameExt: &fstest.MapFile{Mode: 0x600},
+						"reverse-2345-b" + test.filenameExt: &fstest.MapFile{Mode: 0x600},
+						"reverse-3456-c" + test.filenameExt: &fstest.MapFile{Mode: 0x600},
+					},
+				}
+
+				// test the "up" function
+				if err := up(t.Context(), &driver, dirFS, "", ""); err != nil {
+					t.Fatal(err)
+				}
+				testMigrationVersions(t, executedForwardMigrations, "1234", "2345", "3456")
+
+				// test the "down" function
+				if err := down(t.Context(), &driver, dirFS, "", ""); err != nil {
+					t.Fatal(err)
+				}
+				testMigrationVersions(t, executedReverseMigrations, "3456", "2345", "1234")
+			})
+		}
+	})
+
 	t.Run("schema migrations table does not exist", func(t *testing.T) {
 		// Check that when the table does not exist, in the happy path, the
 		// "database" will handle the error by creating the table and updating it.
@@ -252,96 +324,6 @@ func testMigrate(t *testing.T, up compat.MigrateFunc, down compat.RollbackFunc) 
 		}
 		if expNumCalls := 2; updateCalls != expNumCalls {
 			t.Errorf("number of calls to UpdateSchemaMigrations; got %d, expected %d", updateCalls, expNumCalls)
-		}
-	})
-
-	t.Run("handles alternate filename extensions", func(t *testing.T) {
-		// setup
-		var appliedVersionsCalls int
-		var executedForwardMigrations, executedReverseMigrations []*internal.Migration
-		driver := stub.Double{
-			AppliedVersionsFn: func(ctx context.Context, migrationsTable string) (driver.AppliedVersions, error) {
-				appliedVersionsCalls++
-				switch appliedVersionsCalls {
-				case 1:
-					return makeScanApplied(t)(ctx, migrationsTable)
-				case 2:
-					return makeScanApplied(t, "1234", "2345", "3456")(ctx, migrationsTable)
-				default:
-					t.Fatalf("unexpected number of calls to AppliedVersions; got %d, expected [1,2]", appliedVersionsCalls)
-					return nil, nil
-				}
-			},
-			ExecuteFn: func(ctx context.Context, q string, a ...any) error {
-				mig, ok := internal.GetMigrationContext(ctx)
-				if !ok {
-					t.Errorf("expected for context to have a *Migration in it; query (%q)", q)
-				} else {
-					switch v := mig.Indirection.Value; v {
-					case internal.DirForward:
-						executedForwardMigrations = append(executedForwardMigrations, mig)
-					case internal.DirReverse:
-						executedReverseMigrations = append(executedReverseMigrations, mig)
-					default:
-						t.Errorf("unknown direction for migration %q", v)
-					}
-				}
-				return nil
-			},
-			CreateSchemaMigrationsFn: makeCreateSchemaMigrationsFn(nil),
-			UpdateSchemaMigrationsFn: makeUpdatSchemaMigrationsFn(nil),
-		}
-		dirFS := stub.FS{
-			FS: fstest.MapFS{
-				"forward-1234-a.cql": &fstest.MapFile{Mode: 0x600},
-				"forward-2345-b.cql": &fstest.MapFile{Mode: 0x600},
-				"forward-3456-c.cql": &fstest.MapFile{Mode: 0x600},
-				"reverse-1234-a.cql": &fstest.MapFile{Mode: 0x600},
-				"reverse-2345-b.cql": &fstest.MapFile{Mode: 0x600},
-				"reverse-3456-c.cql": &fstest.MapFile{Mode: 0x600},
-			},
-		}
-
-		// test the "up" function
-		if err := up(t.Context(), &driver, dirFS, "", ""); err != nil {
-			t.Fatal(err)
-		}
-		// check the "up" function
-		expForwardVersions := []string{"1234", "2345", "3456"}
-		if n, m := len(executedForwardMigrations), len(expForwardVersions); n != m {
-			t.Errorf("wrong number of executed forward migrations; got %d, expected %d", n, m)
-		}
-		for i, gotMig := range executedForwardMigrations {
-			if i >= len(expForwardVersions) {
-				break
-			} else {
-				gotVersion := gotMig.Version.String()
-				expVersion := expForwardVersions[i]
-				if gotVersion != expVersion {
-					t.Errorf("wrong version for forward migration [%d]; got %q, expected %q", i, gotVersion, expVersion)
-				}
-			}
-		}
-
-		// test the "down" function
-		if err := down(t.Context(), &driver, dirFS, "", ""); err != nil {
-			t.Fatal(err)
-		}
-		// check the "down" function
-		expReverseVersions := []string{"3456", "2345", "1234"}
-		if n, m := len(executedReverseMigrations), len(expReverseVersions); n != m {
-			t.Errorf("wrong number of executed reverse migrations; got %d, expected %d", n, m)
-		}
-		for i, gotMig := range executedReverseMigrations {
-			if i >= len(expReverseVersions) {
-				break
-			} else {
-				gotVersion := gotMig.Version.String()
-				expVersion := expReverseVersions[i]
-				if gotVersion != expVersion {
-					t.Errorf("wrong version for reverse migration [%d]; got %q, expected %q", i, gotVersion, expVersion)
-				}
-			}
 		}
 	})
 }
@@ -475,6 +457,78 @@ func testApplyMigration(t *testing.T, up compat.MigrateFunc, down compat.Rollbac
 		t.Fatal(err)
 	}
 
+	t.Run("all the way up and down", func(t *testing.T) {
+		tests := []struct {
+			name        string
+			filenameExt string
+		}{
+			{name: "default filename ext", filenameExt: ".sql"},
+			{name: "alternate filename ext", filenameExt: ".cql"},
+		}
+
+		for _, test := range tests {
+			t.Run(test.name, func(t *testing.T) {
+				// setup
+				var appliedVersionsCalls int
+				var executedForwardMigrations, executedReverseMigrations []*internal.Migration
+				driver := stub.Double{
+					AppliedVersionsFn: func(ctx context.Context, migrationsTable string) (driver.AppliedVersions, error) {
+						appliedVersionsCalls++
+						switch appliedVersionsCalls {
+						case 1:
+							return makeScanApplied(t)(ctx, migrationsTable)
+						case 2:
+							return makeScanApplied(t, "1234")(ctx, migrationsTable)
+						default:
+							t.Fatalf("unexpected number of calls to AppliedVersions; got %d, expected [1,2]", appliedVersionsCalls)
+							return nil, nil
+						}
+					},
+					ExecuteFn: func(ctx context.Context, q string, a ...any) error {
+						mig, ok := internal.GetMigrationContext(ctx)
+						if !ok {
+							t.Errorf("expected for context to have a *Migration in it; query (%q)", q)
+						} else {
+							switch v := mig.Indirection.Value; v {
+							case internal.DirForward:
+								executedForwardMigrations = append(executedForwardMigrations, mig)
+							case internal.DirReverse:
+								executedReverseMigrations = append(executedReverseMigrations, mig)
+							default:
+								t.Errorf("unknown direction for migration %q", v)
+							}
+						}
+						return nil
+					},
+					CreateSchemaMigrationsFn: makeCreateSchemaMigrationsFn(nil),
+					UpdateSchemaMigrationsFn: makeUpdatSchemaMigrationsFn(nil),
+				}
+				dirFS := stub.FS{
+					FS: fstest.MapFS{
+						"forward-1234-a" + test.filenameExt: &fstest.MapFile{Mode: 0x600},
+						"forward-2345-b" + test.filenameExt: &fstest.MapFile{Mode: 0x600},
+						"forward-3456-c" + test.filenameExt: &fstest.MapFile{Mode: 0x600},
+						"reverse-1234-a" + test.filenameExt: &fstest.MapFile{Mode: 0x600},
+						"reverse-2345-b" + test.filenameExt: &fstest.MapFile{Mode: 0x600},
+						"reverse-3456-c" + test.filenameExt: &fstest.MapFile{Mode: 0x600},
+					},
+				}
+
+				// test the "up" function
+				if err := up(t.Context(), &driver, dirFS, "", ""); err != nil {
+					t.Fatal(err)
+				}
+				testMigrationVersions(t, executedForwardMigrations, "1234")
+
+				// test the "down" function
+				if err := down(t.Context(), &driver, dirFS, "", ""); err != nil {
+					t.Fatal(err)
+				}
+				testMigrationVersions(t, executedReverseMigrations, "1234")
+			})
+		}
+	})
+
 	t.Run("version empty, not found", func(t *testing.T) {
 		driver := stub.Double{
 			AppliedVersionsFn: makeScanApplied(t),
@@ -604,96 +658,6 @@ func testApplyMigration(t *testing.T, up compat.MigrateFunc, down compat.Rollbac
 			t.Errorf("did not expect to call UpdateSchemaMigrations")
 		}
 	})
-
-	t.Run("handles alternate filename extensions", func(t *testing.T) {
-		// setup
-		var appliedVersionsCalls int
-		var executedForwardMigrations, executedReverseMigrations []*internal.Migration
-		driver := stub.Double{
-			AppliedVersionsFn: func(ctx context.Context, migrationsTable string) (driver.AppliedVersions, error) {
-				appliedVersionsCalls++
-				switch appliedVersionsCalls {
-				case 1:
-					return makeScanApplied(t)(ctx, migrationsTable)
-				case 2:
-					return makeScanApplied(t, "1234")(ctx, migrationsTable)
-				default:
-					t.Fatalf("unexpected number of calls to AppliedVersions; got %d, expected [1,2]", appliedVersionsCalls)
-					return nil, nil
-				}
-			},
-			ExecuteFn: func(ctx context.Context, q string, a ...any) error {
-				mig, ok := internal.GetMigrationContext(ctx)
-				if !ok {
-					t.Errorf("expected for context to have a *Migration in it; query (%q)", q)
-				} else {
-					switch v := mig.Indirection.Value; v {
-					case internal.DirForward:
-						executedForwardMigrations = append(executedForwardMigrations, mig)
-					case internal.DirReverse:
-						executedReverseMigrations = append(executedReverseMigrations, mig)
-					default:
-						t.Errorf("unknown direction for migration %q", v)
-					}
-				}
-				return nil
-			},
-			CreateSchemaMigrationsFn: makeCreateSchemaMigrationsFn(nil),
-			UpdateSchemaMigrationsFn: makeUpdatSchemaMigrationsFn(nil),
-		}
-		dirFS := stub.FS{
-			FS: fstest.MapFS{
-				"forward-1234-a.cql": &fstest.MapFile{Mode: 0x600},
-				"forward-2345-b.cql": &fstest.MapFile{Mode: 0x600},
-				"forward-3456-c.cql": &fstest.MapFile{Mode: 0x600},
-				"reverse-1234-a.cql": &fstest.MapFile{Mode: 0x600},
-				"reverse-2345-b.cql": &fstest.MapFile{Mode: 0x600},
-				"reverse-3456-c.cql": &fstest.MapFile{Mode: 0x600},
-			},
-		}
-
-		// test the "up" function
-		if err := up(t.Context(), &driver, dirFS, "", ""); err != nil {
-			t.Fatal(err)
-		}
-		// check the "up" function
-		expForwardVersions := []string{"1234"}
-		if n, m := len(executedForwardMigrations), len(expForwardVersions); n != m {
-			t.Errorf("wrong number of executed forward migrations; got %d, expected %d", n, m)
-		}
-		for i, gotMig := range executedForwardMigrations {
-			if i >= len(expForwardVersions) {
-				break
-			} else {
-				gotVersion := gotMig.Version.String()
-				expVersion := expForwardVersions[i]
-				if gotVersion != expVersion {
-					t.Errorf("wrong version for forward migration [%d]; got %q, expected %q", i, gotVersion, expVersion)
-				}
-			}
-		}
-
-		// test the "down" function
-		if err := down(t.Context(), &driver, dirFS, "", ""); err != nil {
-			t.Fatal(err)
-		}
-		// check the "down" function
-		expReverseVersions := []string{"1234"}
-		if n, m := len(executedReverseMigrations), len(expReverseVersions); n != m {
-			t.Errorf("wrong number of executed reverse migrations; got %d, expected %d", n, m)
-		}
-		for i, gotMig := range executedReverseMigrations {
-			if i >= len(expReverseVersions) {
-				break
-			} else {
-				gotVersion := gotMig.Version.String()
-				expVersion := expReverseVersions[i]
-				if gotVersion != expVersion {
-					t.Errorf("wrong version for reverse migration [%d]; got %q, expected %q", i, gotVersion, expVersion)
-				}
-			}
-		}
-	})
 }
 
 // testUpDown is for testing ApplyMigration, ApplyMigrationWith,
@@ -703,23 +667,6 @@ func testUpDown(t *testing.T, up compat.MigrateFunc, down compat.RollbackFunc) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	t.Run("all the way up and down", func(t *testing.T) {
-		driver := stub.Double{
-			AppliedVersionsFn:        makeScanApplied(t, "1234"),
-			ExecuteFn:                makeExecuteFn(nil),
-			CreateSchemaMigrationsFn: makeCreateSchemaMigrationsFn(nil),
-			UpdateSchemaMigrationsFn: makeUpdatSchemaMigrationsFn(nil),
-		}
-		var err error
-		if err = up(t.Context(), &driver, okFS, "", ""); err != nil {
-			t.Fatal(err)
-		}
-
-		if err = down(t.Context(), &driver, okFS, "", ""); err != nil {
-			t.Fatal(err)
-		}
-	})
 
 	t.Run("bad version", func(t *testing.T) {
 		driver := stub.Double{
@@ -1447,5 +1394,25 @@ func testBasicOperationWithoutOpts(
 	}
 	if numUpdateCalls != expectedNumCalls {
 		t.Errorf("wrong number of calls to UpdateSchemaMigrations; got %d, expected %d", numUpdateCalls, expectedNumCalls)
+	}
+}
+
+func testMigrationVersions(t *testing.T, gotMigrations []*internal.Migration, expVersions ...string) {
+	t.Helper()
+
+	if got, exp := len(gotMigrations), len(expVersions); got != exp {
+		t.Errorf("wrong number of migrations; got %d, expected %d", got, exp)
+	}
+
+	for i, gotMig := range gotMigrations {
+		if i >= len(expVersions) {
+			break
+		} else {
+			gotVersion := gotMig.Version.String()
+			expVersion := expVersions[i]
+			if gotVersion != expVersion {
+				t.Errorf("wrong version at [%d]; got %q, expected %q", i, gotVersion, expVersion)
+			}
+		}
 	}
 }
