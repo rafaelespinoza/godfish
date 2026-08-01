@@ -19,7 +19,7 @@
 # vendor/
 
 ### Go Patch ###
-/vendor/
+vendor/
 /Godeps/
 
 ### Linux ###
@@ -70,3 +70,5 @@ Temporary Items
 .ci/.test_coverage
 bin
 dist/
+
+go.work*

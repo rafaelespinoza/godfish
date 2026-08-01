@@ -5,8 +5,8 @@ import (
 	"log"
 	"os"
 
+	"github.com/rafaelespinoza/godfish/cmd"
 	"github.com/rafaelespinoza/godfish/drivers/mysql"
-	"github.com/rafaelespinoza/godfish/internal/cmd"
 )
 
 func main() {
