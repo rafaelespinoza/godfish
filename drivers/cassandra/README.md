@@ -1,16 +1,17 @@
 # cassandra
 
-This `godfish.Driver` implementation has been tested against cassandra versions:
+This `godfish/driver.Driver` implementation has been tested against cassandra
+versions:
 
 - 4.1.10
 - 5.0.6
 
 ## Connecting
 
-Like other `godfish.Driver` implementations, you must specify an environment
-variable, `DB_DSN`, to connect to the DB. There does not seem to be a standard
-connection URI schema for cassandra, but nonetheless this library expects a
-`DB_DSN` value. The form is roughly:
+Like other `godfish/driver.Driver` implementations, you must specify an
+environment variable, `DB_DSN`, to connect to the DB. There does not seem to
+be a standard connection URI schema for cassandra, but nonetheless this library
+expects a `DB_DSN` value. The form is roughly:
 
 ```
 scheme://[userinfo@]host[,more,hosts]/keyspace[?query]

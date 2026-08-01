@@ -2,9 +2,15 @@
 
 GO := "go"
 BIN_DIR := justfile_directory() / "bin"
+[private]
 PKG_IMPORT_PATH := "github.com/rafaelespinoza/godfish"
 [private]
-_CORE_SRC_PKG_PATHS := PKG_IMPORT_PATH + " " + PKG_IMPORT_PATH / "internal" / "..."
+_CORE_SRC_PKG_PATHS := (
+    PKG_IMPORT_PATH + " " +
+    PKG_IMPORT_PATH / "internal/..." + " " +
+    PKG_IMPORT_PATH / "driver/..."+ " " +
+    PKG_IMPORT_PATH / "drivers/internal/..."
+)
 [private]
 _GO_VERSION := `go version | awk '{ print $3 }'`
 [private]
@@ -26,7 +32,7 @@ test *args:
 
 # Examine source code for suspicious constructs
 vet *args:
-    {{ GO }} vet {{ args }} {{ _CORE_SRC_PKG_PATHS }} {{ PKG_IMPORT_PATH }}/drivers/...
+    {{ GO }} vet {{ args }} {{ _CORE_SRC_PKG_PATHS }} {{ _BASE_DRIVER_PATH }}/...
 
 # Remove BIN_DIR
 clean:

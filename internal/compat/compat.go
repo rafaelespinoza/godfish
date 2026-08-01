@@ -9,6 +9,7 @@ import (
 	"log/slog"
 
 	"github.com/rafaelespinoza/godfish"
+	"github.com/rafaelespinoza/godfish/driver"
 )
 
 type MigrationOptParams struct {
@@ -86,7 +87,7 @@ type (
 
 	MigrateFunc func(
 		ctx context.Context,
-		driver godfish.Driver,
+		driver driver.Driver,
 		dirFS fs.FS,
 		version string,
 		table string,
@@ -94,7 +95,7 @@ type (
 
 	RollbackFunc func(
 		ctx context.Context,
-		driver godfish.Driver,
+		driver driver.Driver,
 		dirFS fs.FS,
 		version string,
 		table string,
@@ -102,7 +103,7 @@ type (
 
 	InfoFunc func(
 		ctx context.Context,
-		driver godfish.Driver,
+		driver driver.Driver,
 		dirFS fs.FS,
 		fwd bool,
 		version string,
@@ -113,7 +114,7 @@ type (
 
 	UpgradeSchemaFunc func(
 		ctx context.Context,
-		driver godfish.Driver,
+		driver driver.Driver,
 		table string,
 	) error
 )

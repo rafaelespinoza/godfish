@@ -7,7 +7,7 @@ ignore:
   # This is a test util package
   - ./internal/stub
   # This package tests implementations of Driver. Shouldn't be counted in coverage.
-  - ./internal/test
+  - ./drivers/internal/drivertest
 
 parsers:
   go:

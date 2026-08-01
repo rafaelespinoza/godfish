@@ -1,4 +1,4 @@
-// Package cassandra provides a [godfish.Driver] for cassandra databases.
+// Package cassandra provides a [driver.Driver] for cassandra databases.
 package cassandra
 
 import (
@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/rafaelespinoza/godfish"
-	"github.com/rafaelespinoza/godfish/internal"
+	"github.com/rafaelespinoza/godfish/driver"
+	"github.com/rafaelespinoza/godfish/drivers/internal"
 
 	"github.com/gocql/gocql"
 )
@@ -23,7 +23,7 @@ const SampleDSN = `cassandra://server_host:9042/keyspace_name?timeout_ms=2000&co
 // NewDriver creates a new cassandra driver.
 func NewDriver() *Driver { return &Driver{} }
 
-// Driver implements the [godfish.Driver] interface for cassandra databases.
+// Driver implements the [driver.Driver] interface for cassandra databases.
 type Driver struct {
 	connection *gocql.Session
 	keyspace   string
@@ -92,7 +92,7 @@ func (d *Driver) CreateSchemaMigrationsTable(ctx context.Context, migrationsTabl
 	return
 }
 
-func (d *Driver) AppliedVersions(ctx context.Context, migrationsTable string) (out godfish.AppliedVersions, err error) {
+func (d *Driver) AppliedVersions(ctx context.Context, migrationsTable string) (out driver.AppliedVersions, err error) {
 	cleanedTableName, err := cleanIdentifier(migrationsTable)
 	if err != nil {
 		return
@@ -102,10 +102,10 @@ func (d *Driver) AppliedVersions(ctx context.Context, migrationsTable string) (o
 	if err != nil {
 		return
 	} else if !metadata.hasTable {
-		err = godfish.ErrSchemaMigrationsDoesNotExist
+		err = driver.ErrSchemaMigrationsDoesNotExist
 		return
 	} else if !metadata.hasColLabel || !metadata.hasColExecutedAt {
-		err = godfish.ErrSchemaMigrationsMissingColumns
+		err = driver.ErrSchemaMigrationsMissingColumns
 		return
 	}
 
@@ -191,7 +191,7 @@ func (d *Driver) UpgradeSchemaMigrations(ctx context.Context, migrationsTable st
 	if err != nil {
 		return err
 	} else if !metadata.hasTable {
-		return godfish.ErrSchemaMigrationsDoesNotExist
+		return driver.ErrSchemaMigrationsDoesNotExist
 	}
 	// Conditionally add the updates in case there's a need to retry 1 of them.
 	if metadata.hasColLabel {

@@ -1,4 +1,4 @@
-// Package sqlserver provides a [godfish.Driver] for sqlserver databases.
+// Package sqlserver provides a [driver.Driver] for sqlserver databases.
 package sqlserver
 
 import (
@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/rafaelespinoza/godfish"
-	"github.com/rafaelespinoza/godfish/internal"
+	"github.com/rafaelespinoza/godfish/driver"
+	"github.com/rafaelespinoza/godfish/drivers/internal"
 
 	_ "github.com/microsoft/go-mssqldb" // register driver with database/sql
 )
@@ -23,7 +23,7 @@ const SampleDSN = `sqlserver://user:pass@server_host/instance?database=test1` //
 // NewDriver creates a new Microsoft SQL Server driver.
 func NewDriver() *Driver { return &Driver{} }
 
-// Driver implements the [godfish.Driver] interface for Microsoft SQL Server.
+// Driver implements the [driver.Driver] interface for Microsoft SQL Server.
 type Driver struct {
 	connection *sql.DB
 }
@@ -80,7 +80,7 @@ func (d *Driver) CreateSchemaMigrationsTable(ctx context.Context, migrationsTabl
 	return
 }
 
-func (d *Driver) AppliedVersions(ctx context.Context, migrationsTable string) (out godfish.AppliedVersions, err error) {
+func (d *Driver) AppliedVersions(ctx context.Context, migrationsTable string) (out driver.AppliedVersions, err error) {
 	cleanedTableName, err := cleanIdentifier(migrationsTable)
 	if err != nil {
 		return
@@ -90,17 +90,17 @@ func (d *Driver) AppliedVersions(ctx context.Context, migrationsTable string) (o
 	if err != nil {
 		return
 	} else if !metadata.hasTable {
-		err = godfish.ErrSchemaMigrationsDoesNotExist
+		err = driver.ErrSchemaMigrationsDoesNotExist
 		return
 	} else if !metadata.hasColLabel || !metadata.hasColExecutedAt {
-		err = godfish.ErrSchemaMigrationsMissingColumns
+		err = driver.ErrSchemaMigrationsMissingColumns
 		return
 	}
 
 	// #nosec G202 -- table name was sanitized
 	q := `SELECT migration_id, label, executed_at FROM ` + cleanedTableName + ` ORDER BY migration_id ASC`
 	rows, err := d.connection.QueryContext(ctx, q)
-	out = godfish.AppliedVersions(rows)
+	out = driver.AppliedVersions(rows)
 	return
 }
 

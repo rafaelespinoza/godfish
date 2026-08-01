@@ -1,7 +1,6 @@
 package internal_test
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -33,8 +32,8 @@ func TestParseMigration(t *testing.T) {
 		} else if test.expErr && err != nil {
 			// some unexported funcs in the godfish package have behavior that
 			// depend on this wrapped error.
-			if !errors.Is(err, internal.ErrDataInvalid) {
-				t.Fatalf("expected error %v to wrap %v", err, internal.ErrDataInvalid)
+			if !internal.IsInvalidDataError(err) {
+				t.Fatalf("expected error %v to be an invalid data error", err)
 			}
 			return // ok, nothing more to test.
 		}

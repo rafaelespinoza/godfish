@@ -12,7 +12,7 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/rafaelespinoza/godfish"
+	"github.com/rafaelespinoza/godfish/driver"
 	"github.com/rafaelespinoza/godfish/internal"
 
 	altsrc "github.com/urfave/cli-altsrc/v3"
@@ -27,13 +27,13 @@ type Root interface {
 }
 
 // New constructs a top-level command with subcommands.
-func New(driver DriverConnector, sampleDSN string) Root {
+func New(d DriverConnector, sampleDSN string) Root {
 	const defaultConfigFilepath = ".godfish.json"
 	pathToConfig := defaultConfigFilepath
 
 	cmd := &cli.Command{
 		Name:  filepath.Base(os.Args[0]),
-		Usage: fmt.Sprintf("Manage %s DB migrations", driver.Name()),
+		Usage: fmt.Sprintf("Manage %s DB migrations", d.Name()),
 		Description: fmt.Sprintf(`godfish is a database migration manager. It tracks the status of migrations
 by recording a timestamp in a table, by default called %q,
 in the "migration_id" column. Those timestamps correspond to SQL migration
@@ -100,7 +100,7 @@ Sample DSN:
 			makeRemigrate("remigrate"),
 			makeRollback("rollback"),
 			makeUpgradeSchemaMigrations(upgradeCmdName, &pathToConfig),
-			MakeVersion("version", driver),
+			MakeVersion("version", d),
 		},
 		CommandNotFound: func(ctx context.Context, c *cli.Command, input string) {
 			if err := renderCommandNotFound(c, input, c.Writer); err != nil {
@@ -110,7 +110,7 @@ Sample DSN:
 		},
 		Version: versionTag,
 		Before: func(ctx context.Context, c *cli.Command) (context.Context, error) {
-			ctx = setDriver(ctx, driver)
+			ctx = setDriver(ctx, d)
 
 			handler := newLogHandler(os.Stderr, c.Bool("q"), c.String("loglevel"), c.String("logformat"))
 			slog.SetDefault(slog.New(handler))
@@ -163,7 +163,7 @@ var exampleDurationVals = []string{"30s", "5m", "1h2m3s"}
 
 // DriverConnector is a godfish Driver with connection management.
 type DriverConnector interface {
-	godfish.Driver
+	driver.Driver
 	Connector
 }
 
@@ -198,7 +198,7 @@ type Connector interface {
 
 // withConnection runs a DB operation f after connecting to the DB and before
 // closing the connection. The callback function f is passed the context ctx,
-// and is meant as a placeholder for a godfish.Driver.
+// and is meant as a placeholder for a [driver.Driver].
 //
 // The input dsn (data source name) is a DB-specific connection string, and is
 // a soft requirement. If empty then it looks up an environment variable DB_DSN.

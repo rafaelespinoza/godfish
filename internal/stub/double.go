@@ -4,10 +4,10 @@ package stub
 import (
 	"context"
 
-	"github.com/rafaelespinoza/godfish"
+	"github.com/rafaelespinoza/godfish/driver"
 )
 
-// Double is a test double for [Driver] that invokes the function
+// Double is a test double for [driver.Driver] that invokes the function
 // field corresponding to the interface method. For example, the interface
 // method, Execute, corresponds to the field ExecuteFn.
 //
@@ -16,7 +16,7 @@ import (
 // remind you to define the field.
 type Double struct {
 	NameFn                    func() string
-	AppliedVersionsFn         func(ctx context.Context, migrationsTable string) (godfish.AppliedVersions, error)
+	AppliedVersionsFn         func(ctx context.Context, migrationsTable string) (driver.AppliedVersions, error)
 	CreateSchemaMigrationsFn  func(ctx context.Context, migrationsTable string) error
 	ExecuteFn                 func(ctx context.Context, q string, a ...any) error
 	UpdateSchemaMigrationsFn  func(ctx context.Context, migrationsTable string, forward bool, version, label string) error
@@ -30,7 +30,7 @@ func (d *Double) Name() string {
 	return d.NameFn()
 }
 
-func (d *Double) AppliedVersions(ctx context.Context, migrationsTable string) (godfish.AppliedVersions, error) {
+func (d *Double) AppliedVersions(ctx context.Context, migrationsTable string) (driver.AppliedVersions, error) {
 	if d.AppliedVersionsFn == nil {
 		panic("define AppliedVersionsFn")
 	}

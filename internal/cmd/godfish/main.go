@@ -1,6 +1,7 @@
-// Command godfish is an omni-command of sorts. It bundles each [godfish.Driver]
-// implementation into a single binary. The top-level command merely routes
-// arguments to the chosen driver, which is specified as the 1st positional arg.
+// Command godfish is an omni-command of sorts. It bundles each
+// godfish/driver.Driver implementation into a single binary. The top-level
+// command merely routes arguments to the chosen driver, which is specified as
+// the 1st positional arg.
 package main
 
 import (

@@ -4,9 +4,9 @@ import (
 	"testing"
 
 	"github.com/rafaelespinoza/godfish/drivers/cassandra"
-	"github.com/rafaelespinoza/godfish/internal/test"
+	"github.com/rafaelespinoza/godfish/drivers/internal/drivertest"
 )
 
 func Test(t *testing.T) {
-	test.RunDriverTests(t, cassandra.NewDriver())
+	drivertest.RunDriverTests(t, cassandra.NewDriver())
 }

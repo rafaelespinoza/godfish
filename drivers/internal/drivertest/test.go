@@ -1,5 +1,5 @@
-// Package test is a test suite for a godfish.Driver.
-package test
+// Package drivertest is a test suite for a [driver.Driver].
+package drivertest
 
 import (
 	"cmp"
@@ -15,39 +15,41 @@ import (
 	"time"
 
 	"github.com/rafaelespinoza/godfish"
+	"github.com/rafaelespinoza/godfish/driver"
+
 	"github.com/rafaelespinoza/godfish/internal"
 	"github.com/rafaelespinoza/godfish/internal/compat"
 	"github.com/rafaelespinoza/godfish/internal/stub"
 )
 
-// DriverConnector is a godfish.Driver with connection management.
+// DriverConnector is a [driver.Driver] with connection management.
 type DriverConnector interface {
-	godfish.Driver
+	driver.Driver
 	Connect(dsn string) error
 	Close() error
 }
 
-// RunDriverTests tests an implementation of the [godfish.Driver] interface.
+// RunDriverTests tests an implementation of the [driver.Driver] interface.
 // Callers should set the env var, DB_DSN.
-func RunDriverTests(t *testing.T, d DriverConnector) {
+func RunDriverTests(t *testing.T, driver DriverConnector) {
 	dsn := os.Getenv(internal.DSNKey)
 	if dsn == "" {
 		t.Fatalf("define env var %q for these tests", internal.DSNKey)
 	}
-	if err := d.Connect(dsn); err != nil {
+	if err := driver.Connect(dsn); err != nil {
 		t.Fatal(err)
 	}
-	defer d.Close()
+	defer driver.Close()
 
 	var q testdataQueries
-	q.populateContents(t, d)
+	q.populateContents(t, driver)
 
-	t.Run("Migrate", func(t *testing.T) { testMigrate(t, d, q) })
-	t.Run("Info", func(t *testing.T) { testInfo(t, d, q) })
-	t.Run("ApplyMigration", func(t *testing.T) { testApplyMigration(t, d, q) })
-	t.Run("UpdateSchemaMigrations", func(t *testing.T) { testUpdateSchemaMigrations(t, d) })
-	t.Run("UpgradeSchemaMigrations", func(t *testing.T) { testUpgradeSchemaMigrations(t, d, q) })
-	t.Run("Context", func(t *testing.T) { testContext(t, d) })
+	t.Run("Migrate", func(t *testing.T) { testMigrate(t, driver, q) })
+	t.Run("Info", func(t *testing.T) { testInfo(t, driver, q) })
+	t.Run("ApplyMigration", func(t *testing.T) { testApplyMigration(t, driver, q) })
+	t.Run("UpdateSchemaMigrations", func(t *testing.T) { testUpdateSchemaMigrations(t, driver) })
+	t.Run("UpgradeSchemaMigrations", func(t *testing.T) { testUpgradeSchemaMigrations(t, driver, q) })
+	t.Run("Context", func(t *testing.T) { testContext(t, driver) })
 }
 
 // testdataQueries are named DB testdataQueries to use in the tests.
@@ -59,7 +61,7 @@ type testdataQueries struct {
 
 // populateContents prepares the test suite by looking up testdata for a
 // driver and hydrating q.
-func (q *testdataQueries) populateContents(t *testing.T, d godfish.Driver) {
+func (q *testdataQueries) populateContents(t *testing.T, driver driver.Driver) {
 	t.Helper()
 
 	// Calculate the absolute path to this file. Needed because this test suite
@@ -67,7 +69,7 @@ func (q *testdataQueries) populateContents(t *testing.T, d godfish.Driver) {
 	// distances relative to the testdata directory.
 	_, thisFile, _, _ := runtime.Caller(0)
 
-	testdataSubdir := filepath.Join(filepath.Dir(thisFile), "..", "..", "testdata", getTestdataSubdir(d))
+	testdataSubdir := filepath.Join(filepath.Dir(thisFile), "..", "..", "..", "testdata", getTestdataSubdir(driver))
 	testdataRoot, err := os.OpenRoot(testdataSubdir)
 	if err != nil {
 		t.Fatalf("opening root at path %s: %s", testdataSubdir, err)
@@ -128,7 +130,7 @@ const (
 )
 
 // setup prepares state before running a test.
-func setup(t *testing.T, driver godfish.Driver, stubs []testDriverStub, migrateTo string, migrationsTable string) (path string) {
+func setup(t *testing.T, driver driver.Driver, stubs []testDriverStub, migrateTo string, migrationsTable string) (path string) {
 	t.Helper()
 
 	path = t.TempDir()
@@ -150,7 +152,7 @@ func setup(t *testing.T, driver godfish.Driver, stubs []testDriverStub, migrateT
 }
 
 // teardown clears state after running a test.
-func teardown(t *testing.T, driver godfish.Driver, path string, migrationsTable string, tablesToDrop ...string) {
+func teardown(t *testing.T, driver driver.Driver, path string, migrationsTable string, tablesToDrop ...string) {
 	t.Helper()
 
 	migrationsTable = cmp.Or(migrationsTable, internal.DefaultMigrationsTableName)
@@ -200,7 +202,7 @@ type testDriverStub struct {
 	version      internal.Version
 }
 
-func getTestdataSubdir(driver godfish.Driver) string {
+func getTestdataSubdir(driver driver.Driver) string {
 	switch name := driver.Name(); name {
 	case "cassandra", "sqlserver":
 		return name
@@ -281,7 +283,7 @@ func newMigrationStub(mig internal.Migration, version internal.Version, ind inte
 // than when the caller test is complete. This approach helps ensure fewer
 // bugs in test support code, especially when it's called multiple times from
 // the same test.
-func collectAppliedMigrations(t *testing.T, driver godfish.Driver, migrationsTable string) (out []internal.Migration) {
+func collectAppliedMigrations(t *testing.T, driver driver.Driver, migrationsTable string) (out []internal.Migration) {
 	t.Helper()
 
 	migrationsTable = cmp.Or(migrationsTable, internal.DefaultMigrationsTableName)

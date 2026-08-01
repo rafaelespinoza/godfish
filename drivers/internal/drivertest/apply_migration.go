@@ -1,4 +1,4 @@
-package test
+package drivertest
 
 import (
 	"context"
@@ -8,11 +8,12 @@ import (
 	"testing"
 
 	"github.com/rafaelespinoza/godfish"
+	"github.com/rafaelespinoza/godfish/driver"
 	"github.com/rafaelespinoza/godfish/internal"
 	"github.com/rafaelespinoza/godfish/internal/compat"
 )
 
-func testApplyMigration(t *testing.T, driver godfish.Driver, queries testdataQueries) {
+func testApplyMigration(t *testing.T, d driver.Driver, queries testdataQueries) {
 	tests := []struct {
 		name     string
 		migrate  compat.MigrateFunc
@@ -20,40 +21,40 @@ func testApplyMigration(t *testing.T, driver godfish.Driver, queries testdataQue
 	}{
 		{
 			name: "Deprecated APIs",
-			migrate: func(ctx context.Context, d godfish.Driver, fsys fs.FS, v, tbl string) error {
-				return godfish.ApplyMigration(ctx, d, fsys, true, v, tbl)
+			migrate: func(ctx context.Context, driver driver.Driver, fsys fs.FS, v, tbl string) error {
+				return godfish.ApplyMigration(ctx, driver, fsys, true, v, tbl)
 			},
-			rollback: func(ctx context.Context, d godfish.Driver, fsys fs.FS, v, tbl string) error {
-				return godfish.ApplyMigration(ctx, d, fsys, false, v, tbl)
+			rollback: func(ctx context.Context, driver driver.Driver, fsys fs.FS, v, tbl string) error {
+				return godfish.ApplyMigration(ctx, driver, fsys, false, v, tbl)
 			},
 		},
 		{
 			name: "Replacement APIs",
-			migrate: func(ctx context.Context, d godfish.Driver, fsys fs.FS, v, tbl string) error {
+			migrate: func(ctx context.Context, driver driver.Driver, fsys fs.FS, v, tbl string) error {
 				opts := compat.MakeMigrationOpts(compat.MigrationOptParams{
 					TargetVersion:   v,
 					MigrationsTable: tbl,
 				})
-				return godfish.ApplyMigrationWith(ctx, d, fsys, opts...)
+				return godfish.ApplyMigrationWith(ctx, driver, fsys, opts...)
 			},
-			rollback: func(ctx context.Context, d godfish.Driver, fsys fs.FS, v, tbl string) error {
+			rollback: func(ctx context.Context, driver driver.Driver, fsys fs.FS, v, tbl string) error {
 				opts := compat.MakeMigrationOpts(compat.MigrationOptParams{
 					TargetVersion:   v,
 					MigrationsTable: tbl,
 				})
-				return godfish.ApplyRollbackWith(ctx, d, fsys, opts...)
+				return godfish.ApplyRollbackWith(ctx, driver, fsys, opts...)
 			},
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			runApplyMigrationTests(t, driver, queries, test.migrate, test.rollback)
+			runApplyMigrationTests(t, d, queries, test.migrate, test.rollback)
 		})
 	}
 }
 
-func runApplyMigrationTests(t *testing.T, driver godfish.Driver, queries testdataQueries, migrate compat.MigrateFunc, rollback compat.RollbackFunc) {
+func runApplyMigrationTests(t *testing.T, driver driver.Driver, queries testdataQueries, migrate compat.MigrateFunc, rollback compat.RollbackFunc) {
 	// testSetupState is the database state before calling ApplyMigration.
 	type testSetupState struct {
 		// migrateTo is the version that the DB should be at.

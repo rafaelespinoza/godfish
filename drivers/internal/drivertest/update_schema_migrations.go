@@ -1,15 +1,14 @@
-package test
+package drivertest
 
 import (
-	"errors"
 	"strings"
 	"testing"
 
-	"github.com/rafaelespinoza/godfish"
+	"github.com/rafaelespinoza/godfish/driver"
 	"github.com/rafaelespinoza/godfish/internal"
 )
 
-func testUpdateSchemaMigrations(t *testing.T, driver godfish.Driver) {
+func testUpdateSchemaMigrations(t *testing.T, driver driver.Driver) {
 	t.Run("invalid migrations table", func(t *testing.T) {
 		for _, test := range invalidMigrationsTableTestCases {
 			t.Run(test.name, func(t *testing.T) {
@@ -18,8 +17,8 @@ func testUpdateSchemaMigrations(t *testing.T, driver godfish.Driver) {
 				testAppliedMigrations(t, appliedVersions, []string{})
 
 				err := driver.UpdateSchemaMigrations(t.Context(), test.migrationsTable, true, "1234", test.migrationsTable)
-				if !errors.Is(err, internal.ErrDataInvalid) {
-					t.Fatalf("expected error (%v) to match %v", err, internal.ErrDataInvalid)
+				if !internal.IsInvalidDataError(err) {
+					t.Fatalf("expected error (%v) to be an invalid data error", err)
 				}
 				if msg := err.Error(); !strings.Contains(msg, "identifier") {
 					t.Errorf("expected for error message (%q) to mention %q", msg, "identifier")

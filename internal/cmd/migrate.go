@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/rafaelespinoza/godfish"
+	"github.com/rafaelespinoza/godfish/driver"
 	"github.com/rafaelespinoza/godfish/internal"
 	"github.com/rafaelespinoza/godfish/internal/compat"
 
@@ -67,7 +68,7 @@ func runMigrate(ctx context.Context, driverConn DriverConnector, timeout time.Du
 		return godfish.MigrateWith(ictx, driverConn, dirFS, opts...)
 	})
 
-	if errors.Is(err, godfish.ErrSchemaMigrationsMissingColumns) {
+	if errors.Is(err, driver.ErrSchemaMigrationsMissingColumns) {
 		err = fmt.Errorf("%w; run the %q command to fix this", err, upgradeCmdName)
 	}
 	return err
@@ -117,7 +118,7 @@ func runRemigrate(ctx context.Context, driverConn DriverConnector, timeout time.
 		return godfish.ApplyMigrationWith(ictx, driverConn, dirFS, opts...)
 	})
 
-	if errors.Is(err, godfish.ErrSchemaMigrationsMissingColumns) {
+	if errors.Is(err, driver.ErrSchemaMigrationsMissingColumns) {
 		err = fmt.Errorf("%w; run the %q command to fix this", err, upgradeCmdName)
 	}
 	return err
@@ -169,7 +170,7 @@ func runRollback(ctx context.Context, driverConn DriverConnector, timeout time.D
 		defer cancel()
 	}
 
-	var rollbackFn func(context.Context, godfish.Driver, fs.FS, ...godfish.Opter) error
+	var rollbackFn func(context.Context, driver.Driver, fs.FS, ...godfish.Opter) error
 	if migOpts.TargetVersion == "" {
 		rollbackFn = godfish.ApplyRollbackWith
 	} else {
@@ -185,7 +186,7 @@ func runRollback(ctx context.Context, driverConn DriverConnector, timeout time.D
 		)
 	})
 
-	if errors.Is(err, godfish.ErrSchemaMigrationsMissingColumns) {
+	if errors.Is(err, driver.ErrSchemaMigrationsMissingColumns) {
 		err = fmt.Errorf("%w; run the %q command to fix this", err, upgradeCmdName)
 	}
 	return err

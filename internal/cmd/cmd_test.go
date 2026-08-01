@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/rafaelespinoza/godfish"
+	"github.com/rafaelespinoza/godfish/driver"
 	"github.com/rafaelespinoza/godfish/internal"
 	"github.com/rafaelespinoza/godfish/internal/stub"
 )
@@ -274,7 +274,7 @@ func makeNoopConnector() *connector {
 	conn := connector{
 		Double: &stub.Double{
 			NameFn: func() string { return "test" },
-			AppliedVersionsFn: func(context.Context, string) (godfish.AppliedVersions, error) {
+			AppliedVersionsFn: func(context.Context, string) (driver.AppliedVersions, error) {
 				return stub.NewAppliedVersions(), nil
 			},
 			ExecuteFn:                func(context.Context, string, ...any) error { return nil },

@@ -19,6 +19,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/rafaelespinoza/godfish/driver"
 	"github.com/rafaelespinoza/godfish/internal"
 )
 
@@ -109,13 +110,13 @@ func createMigrationFiles(migrationName string, reversible bool, dirpath, fwdlab
 //     When passed in with a zero value, then an error is returned.
 //     When this option is omitted, then this function will use the default.
 //     This DB table will be automatically created unless it already exists.
-func MigrateWith(ctx context.Context, driver Driver, dirFS fs.FS, opts ...Opter) error {
+func MigrateWith(ctx context.Context, driver driver.Driver, dirFS fs.FS, opts ...Opter) error {
 	o, err := setOptions(opts...)
 	if err != nil {
 		return fmt.Errorf("%s.%s: %w", msgPrefix, "MigrateWith", err)
 	}
 
-	return migrate(ctx, driver, dirFS, true, o.targetVersion, o.migrationsTable)
+	return migrateOrRollback(ctx, driver, dirFS, true, o.targetVersion, o.migrationsTable)
 }
 
 // RollbackWith applies one or more available migrations in the reverse direction.
@@ -132,13 +133,13 @@ func MigrateWith(ctx context.Context, driver Driver, dirFS fs.FS, opts ...Opter)
 //     When passed in with a zero value, then an error is returned.
 //     When this option is omitted, then this function will use the default.
 //     This DB table will be automatically created unless it already exists.
-func RollbackWith(ctx context.Context, driver Driver, dirFS fs.FS, opts ...Opter) error {
+func RollbackWith(ctx context.Context, driver driver.Driver, dirFS fs.FS, opts ...Opter) error {
 	o, err := setOptions(opts...)
 	if err != nil {
 		return fmt.Errorf("%s.%s: %w", msgPrefix, "RollbackWith", err)
 	}
 
-	return migrate(ctx, driver, dirFS, false, o.targetVersion, o.migrationsTable)
+	return migrateOrRollback(ctx, driver, dirFS, false, o.targetVersion, o.migrationsTable)
 }
 
 // Migrate executes all migrations at the directory dirFS in the specified
@@ -156,11 +157,11 @@ func RollbackWith(ctx context.Context, driver Driver, dirFS fs.FS, opts ...Opter
 // New code should use [MigrateWith] or [RollbackWith], depending the direction
 // of the migration(s) to apply.
 // Current code is encouraged to adjust as well.
-func Migrate(ctx context.Context, driver Driver, dirFS fs.FS, forward bool, finishAtVersion string, migrationsTable string) (err error) {
-	return migrate(ctx, driver, dirFS, forward, finishAtVersion, migrationsTable)
+func Migrate(ctx context.Context, driver driver.Driver, dirFS fs.FS, forward bool, finishAtVersion string, migrationsTable string) (err error) {
+	return migrateOrRollback(ctx, driver, dirFS, forward, finishAtVersion, migrationsTable)
 }
 
-func migrate(ctx context.Context, driver Driver, dirFS fs.FS, forward bool, finishAtVersion string, migrationsTable string) (err error) {
+func migrateOrRollback(ctx context.Context, driver driver.Driver, dirFS fs.FS, forward bool, finishAtVersion string, migrationsTable string) (err error) {
 	migrationsTable = cmp.Or(migrationsTable, internal.DefaultMigrationsTableName)
 	var migrations []*internal.Migration
 	direction := internal.DirReverse
@@ -201,10 +202,6 @@ func migrate(ctx context.Context, driver Driver, dirFS fs.FS, forward bool, fini
 	return
 }
 
-// ErrSchemaMigrationsDoesNotExist means there is no database table to
-// record migration status.
-var ErrSchemaMigrationsDoesNotExist = errors.New("schema migrations table does not exist")
-
 // ApplyMigrationWith runs one forward migration at the directory dirFS with
 // the specified version.
 // This function could be used for cherry-picking one forward migration to
@@ -225,7 +222,7 @@ var ErrSchemaMigrationsDoesNotExist = errors.New("schema migrations table does n
 //     When passed in with a zero value, then an error is returned.
 //     When this option is omitted, then this function will use the default.
 //     This DB table will be automatically created unless it already exists.
-func ApplyMigrationWith(ctx context.Context, driver Driver, dirFS fs.FS, opts ...Opter) error {
+func ApplyMigrationWith(ctx context.Context, driver driver.Driver, dirFS fs.FS, opts ...Opter) error {
 	o, err := setOptions(opts...)
 	if err != nil {
 		return fmt.Errorf("%s.%s: %w", msgPrefix, "ApplyMigrationWith", err)
@@ -254,7 +251,7 @@ func ApplyMigrationWith(ctx context.Context, driver Driver, dirFS fs.FS, opts ..
 //     When passed in with a zero value, then an error is returned.
 //     When this option is omitted, then this function will use the default.
 //     This DB table will be automatically created unless it already exists.
-func ApplyRollbackWith(ctx context.Context, driver Driver, dirFS fs.FS, opts ...Opter) error {
+func ApplyRollbackWith(ctx context.Context, driver driver.Driver, dirFS fs.FS, opts ...Opter) error {
 	o, err := setOptions(opts...)
 	if err != nil {
 		return fmt.Errorf("%s.%s: %w", msgPrefix, "ApplyRollbackWith", err)
@@ -277,11 +274,11 @@ func ApplyRollbackWith(ctx context.Context, driver Driver, dirFS fs.FS, opts ...
 // New code should use [ApplyMigrationWith] or [ApplyRollbackWith], depending
 // the direction of the migration to apply.
 // Current code is encouraged to adjust as well.
-func ApplyMigration(ctx context.Context, driver Driver, dirFS fs.FS, forward bool, version, migrationsTable string) (err error) {
+func ApplyMigration(ctx context.Context, driver driver.Driver, dirFS fs.FS, forward bool, version, migrationsTable string) (err error) {
 	return applyMigration(ctx, driver, dirFS, forward, version, migrationsTable)
 }
 
-func applyMigration(ctx context.Context, driver Driver, dirFS fs.FS, forward bool, version, migrationsTable string) error {
+func applyMigration(ctx context.Context, driver driver.Driver, dirFS fs.FS, forward bool, version, migrationsTable string) error {
 	migrationsTable = cmp.Or(migrationsTable, internal.DefaultMigrationsTableName)
 
 	direction := internal.DirReverse
@@ -330,7 +327,7 @@ func applyMigration(ctx context.Context, driver Driver, dirFS fs.FS, forward boo
 
 // runMigration executes a migration against the database. The input, pathToFile
 // should be relative to the current working directory.
-func runMigration(ctx context.Context, driver Driver, dir fs.FS, mig *internal.Migration, migrationsTable string) (err error) {
+func runMigration(ctx context.Context, driver driver.Driver, dir fs.FS, mig *internal.Migration, migrationsTable string) (err error) {
 	if mig.Filename == "" {
 		return fmt.Errorf(
 			"migration (direction=%q, version=%s, label=%s) was not assigned a filename",
@@ -413,7 +410,7 @@ func makeDurationMSAttr(startedAt time.Time) slog.Attr {
 //     When passed in with a zero value, then an error is returned.
 //     When this option is omitted, then this function will use the default.
 //     This DB table will be automatically created unless it already exists.
-func InfoWith(ctx context.Context, driver Driver, directory fs.FS, opts ...Opter) error {
+func InfoWith(ctx context.Context, driver driver.Driver, directory fs.FS, opts ...Opter) error {
 	o, err := setOptions(opts...)
 	if err != nil {
 		return fmt.Errorf("%s.%s: %w", msgPrefix, "InfoWith", err)
@@ -432,11 +429,11 @@ func InfoWith(ctx context.Context, driver Driver, directory fs.FS, opts ...Opter
 // Deprecated: This function will be removed in a future release.
 // New code should use [InfoWith].
 // Current code is encouraged to adjust as well.
-func Info(ctx context.Context, driver Driver, directory fs.FS, forward bool, finishAtVersion string, w io.Writer, format string, migrationsTable string) (err error) {
+func Info(ctx context.Context, driver driver.Driver, directory fs.FS, forward bool, finishAtVersion string, w io.Writer, format string, migrationsTable string) (err error) {
 	return info(ctx, driver, directory, forward, finishAtVersion, w, format, migrationsTable)
 }
 
-func info(ctx context.Context, driver Driver, directory fs.FS, forward bool, finishAtVersion string, w io.Writer, format string, migrationsTable string) (err error) {
+func info(ctx context.Context, driver driver.Driver, directory fs.FS, forward bool, finishAtVersion string, w io.Writer, format string, migrationsTable string) (err error) {
 	w = cmp.Or[io.Writer](w, os.Stdout)
 	format = cmp.Or(format, "tsv")
 	migrationsTable = cmp.Or(migrationsTable, internal.DefaultMigrationsTableName)
@@ -562,7 +559,7 @@ type migrationFinder struct {
 }
 
 // query returns a list of Migrations to apply.
-func (m *migrationFinder) query(ctx context.Context, driver Driver, migrationsTable string) (out []*internal.Migration, err error) {
+func (m *migrationFinder) query(ctx context.Context, d driver.Driver, migrationsTable string) (out []*internal.Migration, err error) {
 	lgr := slog.With(slog.String("func", "(*migrationFinder).query"))
 
 	availableByVersion, orderedAvailableVersions, err := m.available()
@@ -578,8 +575,8 @@ func (m *migrationFinder) query(ctx context.Context, driver Driver, migrationsTa
 		slog.Any("available", internal.Migrations(available)),
 	)
 
-	applied, err := scanAppliedVersions(ctx, driver, migrationsTable, availableByVersion)
-	if errors.Is(err, ErrSchemaMigrationsDoesNotExist) {
+	applied, err := scanAppliedVersions(ctx, d, migrationsTable, availableByVersion)
+	if errors.Is(err, driver.ErrSchemaMigrationsDoesNotExist) {
 		// The next invocation of CreateSchemaMigrationsTable should fix this.
 		// We can continue with zero value for now.
 		slog.Info(
@@ -685,7 +682,7 @@ func (m *migrationFinder) available() (map[int64]*internal.Migration, []int64, e
 		}
 
 		mig, ierr := internal.ParseMigration(internal.Filename(name))
-		if errors.Is(ierr, internal.ErrDataInvalid) {
+		if internal.IsInvalidDataError(ierr) {
 			slog.Warn("parsing migration filename, skipping over this one", slog.String("filename", name), slog.String("error", ierr.Error()))
 			continue
 		} else if ierr != nil {
@@ -708,7 +705,7 @@ func (m *migrationFinder) available() (map[int64]*internal.Migration, []int64, e
 // A side effect of this operation is a signal of whether or not the
 // migrationsTable needs to be "upgraded". That is, if the driver detects
 // that the table is missing certain columns, and the driver is properly
-// implemented as described by the [Driver.AppliedVersions] method, then this
+// implemented as described by the [driver.Driver.AppliedVersions] method, then this
 // function will return an error, [ErrSchemaMigrationsMissingColumns].
 //
 // The map, availableByVersion, may be used to enrich more metadata about the
@@ -722,9 +719,9 @@ func (m *migrationFinder) available() (map[int64]*internal.Migration, []int64, e
 // pretty important when you want to read the file later.
 // But if you only you want to check if the DB table needs to be upgraded, then
 // it's ok to pass an empty map.
-func scanAppliedVersions(ctx context.Context, driver Driver, migrationsTable string, availableByVersion map[int64]*internal.Migration) (out []*internal.Migration, err error) {
-	var rows AppliedVersions
-	if rows, err = driver.AppliedVersions(ctx, migrationsTable); err != nil {
+func scanAppliedVersions(ctx context.Context, d driver.Driver, migrationsTable string, availableByVersion map[int64]*internal.Migration) (out []*internal.Migration, err error) {
+	var rows driver.AppliedVersions
+	if rows, err = d.AppliedVersions(ctx, migrationsTable); err != nil {
 		return
 	}
 	defer func() {
@@ -876,10 +873,6 @@ func printMigrations(p internal.InfoPrinter, applied, toApply []*internal.Migrat
 	return p.PrintInfo(toPrint)
 }
 
-// ErrSchemaMigrationsMissingColumns means the schema migrations table exists,
-// but is missing some extra metadata columns.
-var ErrSchemaMigrationsMissingColumns = errors.New("schema migrations table is missing columns")
-
 // UpgradeSchemaMigrationsWith may alter an existing schema migrations table, to
 // have newer metadata columns. If the table was created with v0.14.0 or lower,
 // then it likely could be upgraded. If the driver detects that the columns
@@ -893,7 +886,7 @@ var ErrSchemaMigrationsMissingColumns = errors.New("schema migrations table is m
 //     When passed in with a zero value, then an error is returned.
 //     When this option is omitted, then this function will use the default.
 //     This DB table will be automatically created unless it already exists.
-func UpgradeSchemaMigrationsWith(ctx context.Context, driver Driver, opts ...Opter) error {
+func UpgradeSchemaMigrationsWith(ctx context.Context, driver driver.Driver, opts ...Opter) error {
 	o, err := setOptions(opts...)
 	if err != nil {
 		return fmt.Errorf("%s.%s: %w", msgPrefix, "UpgradeSchemaMigrationsWith", err)
@@ -911,11 +904,11 @@ func UpgradeSchemaMigrationsWith(ctx context.Context, driver Driver, opts ...Opt
 // Deprecated: This function will be removed in a future release.
 // New code should use [UpgradeSchemaMigrationsWith].
 // Current code is encouraged to adjust as well.
-func UpgradeSchemaMigrations(ctx context.Context, driver Driver, migrationsTable string) (err error) {
+func UpgradeSchemaMigrations(ctx context.Context, driver driver.Driver, migrationsTable string) (err error) {
 	return upgradeSchemaMigrations(ctx, driver, migrationsTable)
 }
 
-func upgradeSchemaMigrations(ctx context.Context, driver Driver, migrationsTable string) (err error) {
+func upgradeSchemaMigrations(ctx context.Context, d driver.Driver, migrationsTable string) (err error) {
 	migrationsTable = cmp.Or(migrationsTable, internal.DefaultMigrationsTableName)
 
 	lgr := slog.With(slog.String("migrations_table", migrationsTable))
@@ -925,12 +918,12 @@ func upgradeSchemaMigrations(ctx context.Context, driver Driver, migrationsTable
 	// Keep the map empty here b/c we're not actually interested in the contents
 	// at this time. We want to test if the DB table can be read at all w/o error.
 	var dummyMigrationMap map[int64]*internal.Migration
-	if _, err = scanAppliedVersions(ctx, driver, migrationsTable, dummyMigrationMap); err != nil {
+	if _, err = scanAppliedVersions(ctx, d, migrationsTable, dummyMigrationMap); err != nil {
 		lgr.Debug("from UpgradeSchemaMigrations", slog.Any("error", err))
-		if errors.Is(err, ErrSchemaMigrationsDoesNotExist) {
+		if errors.Is(err, driver.ErrSchemaMigrationsDoesNotExist) {
 			err = fmt.Errorf("%w; cannot upgrade if it does not exist yet", err)
 			return
-		} else if !errors.Is(err, ErrSchemaMigrationsMissingColumns) {
+		} else if !errors.Is(err, driver.ErrSchemaMigrationsMissingColumns) {
 			return
 		}
 
@@ -942,7 +935,7 @@ func upgradeSchemaMigrations(ctx context.Context, driver Driver, migrationsTable
 
 	startTime := time.Now()
 	lgr.Info("upgrading schema migrations table...")
-	if err = driver.UpgradeSchemaMigrations(ctx, migrationsTable); err != nil {
+	if err = d.UpgradeSchemaMigrations(ctx, migrationsTable); err != nil {
 		lgr.Error("failed to upgrade schema migrations table", slog.Any("error", err), makeDurationMSAttr(startTime))
 		return err
 	}

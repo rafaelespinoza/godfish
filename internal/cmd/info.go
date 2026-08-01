@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/rafaelespinoza/godfish"
+	"github.com/rafaelespinoza/godfish/driver"
 	"github.com/rafaelespinoza/godfish/internal"
 	"github.com/rafaelespinoza/godfish/internal/compat"
 
@@ -79,7 +80,7 @@ func runInfo(ctx context.Context, driverConn DriverConnector, timeout time.Durat
 		opts := compat.MakeMigrationOpts(migOpts)
 		return godfish.InfoWith(ictx, driverConn, dirFS.(fs.ReadDirFS), opts...)
 	})
-	if errors.Is(err, godfish.ErrSchemaMigrationsMissingColumns) {
+	if errors.Is(err, driver.ErrSchemaMigrationsMissingColumns) {
 		err = fmt.Errorf("%w; run the %q command to fix this", err, upgradeCmdName)
 	}
 	return err

@@ -1,8 +1,7 @@
-package test
+package drivertest
 
 import (
 	"context"
-	"errors"
 	"io"
 	"io/fs"
 	"os"
@@ -10,12 +9,13 @@ import (
 	"testing"
 
 	"github.com/rafaelespinoza/godfish"
+	"github.com/rafaelespinoza/godfish/driver"
 	"github.com/rafaelespinoza/godfish/internal"
 	"github.com/rafaelespinoza/godfish/internal/compat"
 	"github.com/rafaelespinoza/godfish/testdata"
 )
 
-func testInfo(t *testing.T, driver godfish.Driver, queries testdataQueries) {
+func testInfo(t *testing.T, d driver.Driver, queries testdataQueries) {
 	tests := []struct {
 		name string
 		info compat.InfoFunc
@@ -24,7 +24,7 @@ func testInfo(t *testing.T, driver godfish.Driver, queries testdataQueries) {
 			name: "Deprecated APIs",
 			info: func(
 				ctx context.Context,
-				driver godfish.Driver,
+				driver driver.Driver,
 				dirFS fs.FS,
 				fwd bool,
 				version string,
@@ -39,7 +39,7 @@ func testInfo(t *testing.T, driver godfish.Driver, queries testdataQueries) {
 			name: "Replacement APIs",
 			info: func(
 				ctx context.Context,
-				driver godfish.Driver,
+				driver driver.Driver,
 				dirFS fs.FS,
 				fwd bool,
 				version string,
@@ -58,11 +58,11 @@ func testInfo(t *testing.T, driver godfish.Driver, queries testdataQueries) {
 	}
 
 	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) { runInfoTests(t, driver, queries, test.info) })
+		t.Run(test.name, func(t *testing.T) { runInfoTests(t, d, queries, test.info) })
 	}
 }
 
-func runInfoTests(t *testing.T, driver godfish.Driver, queries testdataQueries, info compat.InfoFunc) {
+func runInfoTests(t *testing.T, driver driver.Driver, queries testdataQueries, info compat.InfoFunc) {
 	t.Run("migrations on filesystem", func(t *testing.T) {
 		stubs := []testDriverStub{
 			{
@@ -139,8 +139,8 @@ func runInfoTests(t *testing.T, driver godfish.Driver, queries testdataQueries, 
 		for _, test := range invalidMigrationsTableTestCases {
 			t.Run(test.name, func(t *testing.T) {
 				err = info(t.Context(), driver, dirFS, true, "", nil, "json", test.migrationsTable)
-				if !errors.Is(err, internal.ErrDataInvalid) {
-					t.Fatalf("expected error (%v) to match %v", err, internal.ErrDataInvalid)
+				if !internal.IsInvalidDataError(err) {
+					t.Fatalf("expected error (%v) to be an invalid data error", err)
 				}
 				if msg := err.Error(); !strings.Contains(msg, "identifier") {
 					t.Errorf("expected for error message (%q) to mention %q", msg, "identifier")

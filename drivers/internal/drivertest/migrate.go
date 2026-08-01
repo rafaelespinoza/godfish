@@ -1,20 +1,20 @@
-package test
+package drivertest
 
 import (
 	"context"
-	"errors"
 	"io/fs"
 	"os"
 	"strings"
 	"testing"
 
 	"github.com/rafaelespinoza/godfish"
+	"github.com/rafaelespinoza/godfish/driver"
 	"github.com/rafaelespinoza/godfish/internal"
 	"github.com/rafaelespinoza/godfish/internal/compat"
 	"github.com/rafaelespinoza/godfish/testdata"
 )
 
-func testMigrate(t *testing.T, driver godfish.Driver, queries testdataQueries) {
+func testMigrate(t *testing.T, d driver.Driver, queries testdataQueries) {
 	tests := []struct {
 		name     string
 		migrate  compat.MigrateFunc
@@ -22,41 +22,41 @@ func testMigrate(t *testing.T, driver godfish.Driver, queries testdataQueries) {
 	}{
 		{
 			name: "Deprecated APIs",
-			migrate: func(ctx context.Context, d godfish.Driver, fsys fs.FS, v, tbl string) error {
-				return godfish.Migrate(ctx, d, fsys, true, v, tbl)
+			migrate: func(ctx context.Context, driver driver.Driver, fsys fs.FS, v, tbl string) error {
+				return godfish.Migrate(ctx, driver, fsys, true, v, tbl)
 			},
-			rollback: func(ctx context.Context, d godfish.Driver, fsys fs.FS, v, tbl string) error {
-				return godfish.Migrate(ctx, d, fsys, false, v, tbl)
+			rollback: func(ctx context.Context, driver driver.Driver, fsys fs.FS, v, tbl string) error {
+				return godfish.Migrate(ctx, driver, fsys, false, v, tbl)
 			},
 		},
 		{
 			name: "Replacement APIs",
-			migrate: func(ctx context.Context, d godfish.Driver, fsys fs.FS, v, tbl string) error {
+			migrate: func(ctx context.Context, driver driver.Driver, fsys fs.FS, v, tbl string) error {
 				opts := compat.MakeMigrationOpts(compat.MigrationOptParams{
 					TargetVersion:   v,
 					MigrationsTable: tbl,
 				})
-				return godfish.MigrateWith(ctx, d, fsys, opts...)
+				return godfish.MigrateWith(ctx, driver, fsys, opts...)
 			},
-			rollback: func(ctx context.Context, d godfish.Driver, fsys fs.FS, v, tbl string) error {
+			rollback: func(ctx context.Context, driver driver.Driver, fsys fs.FS, v, tbl string) error {
 				opts := compat.MakeMigrationOpts(compat.MigrationOptParams{
 					TargetVersion:   v,
 					MigrationsTable: tbl,
 				})
-				return godfish.RollbackWith(ctx, d, fsys, opts...)
+				return godfish.RollbackWith(ctx, driver, fsys, opts...)
 			},
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			runMigrateTests(t, driver, queries, test.migrate, test.rollback)
+			runMigrateTests(t, d, queries, test.migrate, test.rollback)
 		})
 	}
 }
 
-func runMigrateTests(t *testing.T, driver godfish.Driver, queries testdataQueries, migrate compat.MigrateFunc, rollback compat.RollbackFunc) {
-	runTest := func(t *testing.T, driver godfish.Driver, dirFS fs.FS, migrationsTable string, expectedVersions []string) {
+func runMigrateTests(t *testing.T, d driver.Driver, queries testdataQueries, migrate compat.MigrateFunc, rollback compat.RollbackFunc) {
+	runTest := func(t *testing.T, driver driver.Driver, dirFS fs.FS, migrationsTable string, expectedVersions []string) {
 		err := migrate(t.Context(), driver, dirFS, "", migrationsTable)
 		if err != nil {
 			t.Fatalf("could not Migrate in %s Direction; %v", internal.DirForward, err)
@@ -93,20 +93,20 @@ func runMigrateTests(t *testing.T, driver godfish.Driver, queries testdataQuerie
 
 		for _, test := range okMigrationsTableTestCases {
 			t.Run(test.name, func(t *testing.T) {
-				path := setup(t, driver, stubs, skipMigration, test.migrationsTable)
+				path := setup(t, d, stubs, skipMigration, test.migrationsTable)
 				// Migrating all the way in reverse should also remove these tables. In case
 				// it doesn't, teardown tables anyways to make this test less likely to
 				// affect other tests.
-				t.Cleanup(func() { teardown(t, driver, path, test.migrationsTable, "foos", "bars") })
+				t.Cleanup(func() { teardown(t, d, path, test.migrationsTable, "foos", "bars") })
 
 				expectedVersions := []string{"12340102030405", "23450102030405", "34560102030405"}
-				runTest(t, driver, os.DirFS(path), test.migrationsTable, expectedVersions)
+				runTest(t, d, os.DirFS(path), test.migrationsTable, expectedVersions)
 			})
 		}
 	})
 
 	t.Run("embedded migrations", func(t *testing.T) {
-		subdir := getTestdataSubdir(driver)
+		subdir := getTestdataSubdir(d)
 		dirFS, err := fs.Sub(testdata.Migrations, subdir)
 		if err != nil {
 			t.Fatal(err)
@@ -114,13 +114,13 @@ func runMigrateTests(t *testing.T, driver godfish.Driver, queries testdataQuerie
 
 		for _, test := range okMigrationsTableTestCases {
 			t.Run(test.name, func(t *testing.T) {
-				runTest(t, driver, dirFS, test.migrationsTable, []string{"1234", "2345", "3456"})
+				runTest(t, d, dirFS, test.migrationsTable, []string{"1234", "2345", "3456"})
 			})
 		}
 	})
 
 	t.Run("invalid migrations table", func(t *testing.T) {
-		subdir := getTestdataSubdir(driver)
+		subdir := getTestdataSubdir(d)
 		dirFS, err := fs.Sub(testdata.Migrations, subdir)
 		if err != nil {
 			t.Fatal(err)
@@ -129,19 +129,19 @@ func runMigrateTests(t *testing.T, driver godfish.Driver, queries testdataQuerie
 		for _, test := range invalidMigrationsTableTestCases {
 			t.Run(test.name, func(t *testing.T) {
 				// Check that there's a clean slate.
-				appliedVersions := collectAppliedMigrations(t, driver, internal.DefaultMigrationsTableName)
+				appliedVersions := collectAppliedMigrations(t, d, internal.DefaultMigrationsTableName)
 				testAppliedMigrations(t, appliedVersions, []string{})
 
-				err := migrate(t.Context(), driver, dirFS, "", test.migrationsTable)
-				if !errors.Is(err, internal.ErrDataInvalid) {
-					t.Fatalf("expected error (%v) to match %v", err, internal.ErrDataInvalid)
+				err := migrate(t.Context(), d, dirFS, "", test.migrationsTable)
+				if !internal.IsInvalidDataError(err) {
+					t.Fatalf("expected error (%v) to be an invalid data error", err)
 				}
 				if msg := err.Error(); !strings.Contains(msg, "identifier") {
 					t.Errorf("expected for error message (%q) to mention %q", msg, "identifier")
 				}
 
 				// Check that it didn't try to do something silly, like update another table instead.
-				appliedVersions = collectAppliedMigrations(t, driver, internal.DefaultMigrationsTableName)
+				appliedVersions = collectAppliedMigrations(t, d, internal.DefaultMigrationsTableName)
 				testAppliedMigrations(t, appliedVersions, []string{})
 			})
 		}

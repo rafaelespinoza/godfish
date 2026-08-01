@@ -18,8 +18,8 @@ outside of the standard library. The preference is to only add another
 dependency when it's specific to a database driver.
 
 Code and tests for any driver live at `drivers/<name_of_driver>`. Any driver is
-expected to behave as specified by the `godfish.Driver` interface. Those tests
-live at `internal/test`.
+expected to behave as specified by the `godfish/driver.Driver` interface. Those
+tests live at `drivers/internal/drivertest`.
 
 The GitHub Actions run a security scanner on all of the source code using
 [gosec](https://github.com/securego/gosec). There should be no rule violations

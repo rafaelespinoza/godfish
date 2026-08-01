@@ -2,102 +2,64 @@ package internal_test
 
 import (
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/rafaelespinoza/godfish/internal"
 )
 
-func TestCleanNamespacedIdentifier(t *testing.T) {
-	// Simulate quoting requirements of different DBs
-	wrapBackticks := func(s string) string { return "`" + s + "`" }
-	wrapDoubleQuotes := func(s string) string { return "\"" + s + "\"" }
-
-	tests := []struct {
-		name        string
-		input       string
-		quotePart   func(string) string
-		expected    string
-		expectError bool
+func TestIsInvalidDataError(t *testing.T) {
+	for _, test := range []struct {
+		name string
+		err  error
+		exp  bool
 	}{
-		// OK cases
+		{name: "nil", err: nil, exp: false},
 		{
-			name:      "single table name, mysql style quote wrapper",
-			input:     "users",
-			quotePart: wrapBackticks,
-			expected:  "`users`",
+			name: "ErrDataInvalid",
+			err:  internal.ErrDataInvalid,
+			exp:  true,
 		},
 		{
-			name:      "namespaced table, postgres style quote wrapper",
-			input:     "public.users",
-			quotePart: wrapDoubleQuotes,
-			expected:  `"public"."users"`,
+			name: "wraps ErrDataInvalid",
+			err:  fmt.Errorf("%w: test", internal.ErrDataInvalid),
+			exp:  true,
 		},
 		{
-			name:      "input with existing quotes plus some normalization",
-			input:     "`foo`.`bar` ",
-			quotePart: wrapBackticks,
-			expected:  "`foo`.`bar`",
-		},
-
-		// Error cases
-		{
-			name:        "too many dots",
-			input:       "too.many.dots",
-			quotePart:   wrapDoubleQuotes,
-			expectError: true,
+			name: "implements interface but set to false",
+			err:  invalidDataErr{error: errors.New("oof"), invalid: false},
+			exp:  false,
 		},
 		{
-			name:        "sql injection, comment",
-			input:       `foobars; --`,
-			quotePart:   wrapBackticks,
-			expectError: true,
+			name: "implements interface and set to true",
+			err:  invalidDataErr{error: errors.New("oof"), invalid: true},
+			exp:  true,
 		},
 		{
-			name:        "sql injection, query",
-			input:       `foobars' OR '1'='1`,
-			quotePart:   wrapDoubleQuotes,
-			expectError: true,
+			name: "wraps implemented interface but set to false",
+			err:  fmt.Errorf("%w, bar", invalidDataErr{error: errors.New("oof"), invalid: false}),
+			exp:  false,
 		},
 		{
-			name:        "empty",
-			input:       "",
-			quotePart:   wrapBackticks,
-			expectError: true,
+			name: "wraps implemented interface and set to true",
+			err:  fmt.Errorf("%w, bar", invalidDataErr{error: errors.New("oof"), invalid: true}),
+			exp:  true,
 		},
-		{
-			name:        "starts with number",
-			input:       "123bad",
-			quotePart:   wrapBackticks,
-			expectError: true,
-		},
-		{
-			name:        "invalid characters that are not stripped away",
-			input:       "foo\x00_bar",
-			quotePart:   wrapDoubleQuotes,
-			expectError: true,
-		},
-		{
-			name:        "too long",
-			input:       "a23456789012345678901234567890123456789012345678901234567890123",
-			quotePart:   wrapBackticks,
-			expectError: true,
-		},
-	}
-
-	for _, test := range tests {
+	} {
 		t.Run(test.name, func(t *testing.T) {
-			got, err := internal.CleanNamespacedIdentifier(test.input, test.quotePart)
-			if test.expectError && err == nil {
-				t.Fatal("expected an error but got nil")
-			} else if !test.expectError && err != nil {
-				t.Fatalf("unexpected error %v", err)
-			} else if test.expectError && err != nil && !errors.Is(err, internal.ErrDataInvalid) {
-				t.Fatalf("expected error (%v) to match %v", err, internal.ErrDataInvalid)
-			}
-
-			if got != test.expected {
-				t.Errorf("wrong output; got %q, expected %q", got, test.expected)
+			got := internal.IsInvalidDataError(test.err)
+			if got != test.exp {
+				t.Errorf("got %t, expected %t", got, test.exp)
 			}
 		})
 	}
 }
+
+// invalidDataErr simulates an error that implements the behavior targeted by
+// [internal.IsInvalidDataError].
+type invalidDataErr struct {
+	error
+	invalid bool
+}
+
+func (i invalidDataErr) Invalid() bool { return i.invalid }

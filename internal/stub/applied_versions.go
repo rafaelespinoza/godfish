@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/rafaelespinoza/godfish"
+	"github.com/rafaelespinoza/godfish/driver"
 	"github.com/rafaelespinoza/godfish/internal"
 )
 
@@ -15,7 +15,7 @@ type appliedVersions struct {
 
 // NewAppliedVersions constructs an in-memory AppliedVersions implementation for
 // testing purposes.
-func NewAppliedVersions(migrations ...internal.Migration) godfish.AppliedVersions {
+func NewAppliedVersions(migrations ...internal.Migration) driver.AppliedVersions {
 	versions := make([]internal.Migration, len(migrations))
 	copy(versions, migrations)
 	return &appliedVersions{versions: versions}

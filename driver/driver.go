@@ -1,4 +1,6 @@
-package godfish
+// Package driver has interfaces and other identifiers needed to implement a
+// [Driver] for the godfish library.
+package driver
 
 import "context"
 
@@ -38,7 +40,7 @@ type Driver interface {
 // against the database and have been recorded in the schema migrations table.
 // It's enough to convert a *sql.Rows struct when implementing the Driver
 // interface since a *sql.Rows already satisfies this interface. See existing
-// Driver implementations in this package for examples.
+// Driver implementations in this project for examples.
 type AppliedVersions interface {
 	Close() error
 	Next() bool

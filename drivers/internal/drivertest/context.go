@@ -1,4 +1,4 @@
-package test
+package drivertest
 
 import (
 	"context"
@@ -8,12 +8,13 @@ import (
 	"time"
 
 	"github.com/rafaelespinoza/godfish"
+	"github.com/rafaelespinoza/godfish/driver"
 	"github.com/rafaelespinoza/godfish/internal"
 	"github.com/rafaelespinoza/godfish/internal/compat"
 	"github.com/rafaelespinoza/godfish/testdata"
 )
 
-func testContext(t *testing.T, driver godfish.Driver) {
+func testContext(t *testing.T, d driver.Driver) {
 	tests := []struct {
 		name     string
 		migrate  compat.MigrateFunc
@@ -21,40 +22,40 @@ func testContext(t *testing.T, driver godfish.Driver) {
 	}{
 		{
 			name: "Deprecated APIs",
-			migrate: func(ctx context.Context, d godfish.Driver, fsys fs.FS, v, tbl string) error {
-				return godfish.ApplyMigration(ctx, d, fsys, true, v, tbl)
+			migrate: func(ctx context.Context, driver driver.Driver, fsys fs.FS, v, tbl string) error {
+				return godfish.ApplyMigration(ctx, driver, fsys, true, v, tbl)
 			},
-			rollback: func(ctx context.Context, d godfish.Driver, fsys fs.FS, v, tbl string) error {
-				return godfish.Migrate(ctx, d, fsys, false, v, tbl)
+			rollback: func(ctx context.Context, driver driver.Driver, fsys fs.FS, v, tbl string) error {
+				return godfish.Migrate(ctx, driver, fsys, false, v, tbl)
 			},
 		},
 		{
 			name: "Replacement APIs",
-			migrate: func(ctx context.Context, d godfish.Driver, fsys fs.FS, v, tbl string) error {
+			migrate: func(ctx context.Context, driver driver.Driver, fsys fs.FS, v, tbl string) error {
 				opts := compat.MakeMigrationOpts(compat.MigrationOptParams{
 					TargetVersion:   v,
 					MigrationsTable: tbl,
 				})
-				return godfish.ApplyMigrationWith(ctx, d, fsys, opts...)
+				return godfish.ApplyMigrationWith(ctx, driver, fsys, opts...)
 			},
-			rollback: func(ctx context.Context, d godfish.Driver, fsys fs.FS, v, tbl string) error {
+			rollback: func(ctx context.Context, driver driver.Driver, fsys fs.FS, v, tbl string) error {
 				opts := compat.MakeMigrationOpts(compat.MigrationOptParams{
 					TargetVersion:   v,
 					MigrationsTable: tbl,
 				})
-				return godfish.ApplyRollbackWith(ctx, d, fsys, opts...)
+				return godfish.ApplyRollbackWith(ctx, driver, fsys, opts...)
 			},
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			runContextTests(t, driver, test.migrate, test.rollback)
+			runContextTests(t, d, test.migrate, test.rollback)
 		})
 	}
 }
 
-func runContextTests(t *testing.T, driver godfish.Driver, migrate compat.MigrateFunc, rollback compat.RollbackFunc) {
+func runContextTests(t *testing.T, driver driver.Driver, migrate compat.MigrateFunc, rollback compat.RollbackFunc) {
 	subdir := getTestdataSubdir(driver)
 	dirFS, err := fs.Sub(testdata.Migrations, subdir)
 	if err != nil {
