@@ -27,8 +27,8 @@ func (c Config) LogValue() slog.Value {
 // General error values to help shape behavior.
 var (
 	ErrNotFound           = errors.New("not found")
-	ErrDataInvalid        = errors.New("data invalid")
 	ErrExecutingMigration = errors.New("executing migration")
+	ErrDataInvalid        = errors.New("data invalid")
 )
 
 // IsInvalidDataError checks if err is an [ErrDataInvalid], and if not then it

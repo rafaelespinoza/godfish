@@ -4,13 +4,19 @@ permissions: {}
 jobs:
   security_scan:
     runs-on: ubuntu-latest
+    env:
+      BIN_DIR: /usr/local/bin
     steps:
       - name: Checkout repo
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install just
+        uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4
+      - name: Install gosec
+        run: |
+          wget -O - -q https://raw.githubusercontent.com/securego/gosec/master/install.sh |
+            sh -s -- -b ${{ env.BIN_DIR }}
       - name: Run gosec
-        uses: securego/gosec@9e75c0576c9878035d4221392108d458abe10fc3 # v2.28.0
-        with:
-          args: --tests . ./internal/... ./drivers/...
+        run: just --set GOSEC ${{ env.BIN_DIR }}/gosec gosec
 
   vet:
     runs-on: ubuntu-latest
