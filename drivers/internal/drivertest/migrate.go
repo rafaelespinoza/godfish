@@ -62,15 +62,15 @@ func runMigrateTests(t *testing.T, d driver.Driver, queries testdataQueries, mig
 			t.Fatalf("could not Migrate in %s Direction; %v", internal.DirForward, err)
 		}
 
-		appliedVersions := collectAppliedMigrations(t, driver, migrationsTable)
+		appliedVersions := collectAppliedMigrations(t, d, migrationsTable)
 		testAppliedMigrations(t, appliedVersions, expectedVersions)
 
-		err = rollback(t.Context(), driver, dirFS, expectedVersions[0], migrationsTable)
+		err = rollback(t.Context(), d, dirFS, expectedVersions[0], migrationsTable)
 		if err != nil {
 			t.Fatalf("could not Migrate in %s Direction; %v", internal.DirReverse, err)
 		}
 
-		appliedVersions = collectAppliedMigrations(t, driver, migrationsTable)
+		appliedVersions = collectAppliedMigrations(t, d, migrationsTable)
 		expectedVersions = []string{}
 		testAppliedMigrations(t, appliedVersions, expectedVersions)
 	}

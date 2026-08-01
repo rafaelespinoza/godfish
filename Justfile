@@ -5,26 +5,35 @@ BIN_DIR := justfile_directory() / "bin"
 [private]
 PKG_IMPORT_PATH := "github.com/rafaelespinoza/godfish"
 [private]
-_CORE_SRC_PKG_PATHS := (
-    PKG_IMPORT_PATH + " " +
-    PKG_IMPORT_PATH / "internal/..." + " " +
-    PKG_IMPORT_PATH / "driver/..."+ " " +
-    PKG_IMPORT_PATH / "drivers/internal/..."
-)
+_CORE_SRC_PKG_PATHS := "./..."
 [private]
 _GO_VERSION := `go version | awk '{ print $3 }'`
 [private]
-_BASE_DRIVER_PATH := PKG_IMPORT_PATH / "drivers"
+_BASE_DRIVER_PATH := "drivers"
 [private]
-_LDFLAGS_BASE_PREFIX := "-X " + PKG_IMPORT_PATH + "/internal/cmd"
+_LDFLAGS_BASE_PREFIX := "-X " + PKG_IMPORT_PATH / "cmd"
 [private]
 _LDFLAGS_DELIMITER := "\n\t"
 [private]
 _LDFLAGS := ("-extldflags '-static'" + _LDFLAGS_DELIMITER + _LDFLAGS_BASE_PREFIX + ".versionBranchName=" + `git rev-parse --abbrev-ref HEAD` + _LDFLAGS_DELIMITER + _LDFLAGS_BASE_PREFIX + ".versionBuildTime=" + `date -u +%FT%T%z` + _LDFLAGS_DELIMITER + _LDFLAGS_BASE_PREFIX + ".versionCommitHash=" + `git rev-parse --short=7 HEAD` + _LDFLAGS_DELIMITER + _LDFLAGS_BASE_PREFIX + ".versionGoVersion=" + _GO_VERSION + _LDFLAGS_DELIMITER + _LDFLAGS_BASE_PREFIX + ".versionTag=" + `git describe --tag 2>/dev/null || echo 'dev'`)
+[private]
+_DRIVERS := 'cassandra mysql postgres sqlite3 sqlserver'
 
 # List available recipes
 @default:
     {{ justfile() }} --list --unsorted
+
+# Tidy up dependecies
+mod-tidy *args:
+    #!/bin/sh
+    set -eu
+    printf >&2 'module: %s\n' $({{ GO }} list .)
+    {{ GO }} mod tidy {{ args }}
+    for d in {{ _DRIVERS }}; do
+        mod_dir="{{ _BASE_DRIVER_PATH }}/${d}"
+        printf >&2 'module: %s\n' $({{ GO }} -C "${mod_dir}" list .)
+        {{ GO }} -C "${mod_dir}" mod tidy {{ args }}
+    done
 
 # Run unit tests on core source packages
 test *args:
@@ -33,7 +42,15 @@ test *args:
 # Examine source code for suspicious constructs
 [group('static')]
 vet *args:
-    {{ GO }} vet {{ args }} {{ _CORE_SRC_PKG_PATHS }} {{ _BASE_DRIVER_PATH }}/...
+    #!/bin/sh
+    set -eu
+    printf >&2 'module: %s\n' $({{ GO }} list .)
+    {{ GO }} vet {{ args }} {{ _CORE_SRC_PKG_PATHS }}
+    for d in {{ _DRIVERS }}; do
+        mod_dir="{{ _BASE_DRIVER_PATH }}/${d}"
+        printf >&2 'module: %s\n' $({{ GO }} -C "${mod_dir}" list .)
+        {{ GO }} -C "${mod_dir}" vet ./... {{ args }}
+    done
 
 # Remove BIN_DIR
 clean:
@@ -48,17 +65,37 @@ GOSEC := "gosec"
 #
 # Also note, the package paths (last positional input to gosec command) should
 # be a "relative" package path. That is, starting with a dot.
-#
 
 # Run a security scanner over the source code
 [group('static')]
 gosec *args:
-    {{ GOSEC }} {{ args }} . ./internal/... ./drivers/...
+    #!/bin/sh
+    set -eu
+    # As of 2025-12, gosec does not work very well with multiple module
+    # projects. See https://redirect.github.com/securego/gosec/pull/1100.
+    # As a workaround, run the commands from each module directory.
+    printf >&2 'module: %s\n' $({{ GO }} list .)
+    {{ GOSEC }} --tests -exclude-dir {{ _BASE_DRIVER_PATH}}/ ./...
+    for d in {{ _DRIVERS }}; do
+        mod_dir="{{ _BASE_DRIVER_PATH }}/${d}"
+        cd "${mod_dir}"
+        printf >&2 'module: %s\n' $({{ GO }} list .)
+        {{ GOSEC }} --tests {{ args }}  ./...
+        cd -
+    done
 
 # Check for known vulnerabilities
 [group('static')]
 govulncheck *args:
+    #!/bin/sh
+    set -eu
+    printf >&2 'module: %s\n' $({{ GO }} list .)
     {{ GO }} run golang.org/x/vuln/cmd/govulncheck@latest {{ args }} ./...
+    for d in {{ _DRIVERS }}; do
+        mod_dir="{{ _BASE_DRIVER_PATH }}/${d}"
+        printf >&2 'module: %s\n' $({{ GO }} -C "${mod_dir}" list .)
+        {{ GO }} -C "${mod_dir}" run golang.org/x/vuln/cmd/govulncheck@latest {{ args }} ./...
+    done
 
 GORELEASER := "goreleaser"
 
@@ -89,8 +126,7 @@ build-cassandra: (_build_driver "cassandra" (_CASSANDRA_PATH / "godfish"))
 
 # Run tests on a live cassandra instance at DB_DSN
 [group('driver-cassandra')]
-test-cassandra *args:
-    {{ GO }} test {{ args }} {{ _CASSANDRA_PATH }}/...
+test-cassandra *args: (_test_driver _CASSANDRA_PATH args)
 
 # Compile binary for cassandra, integration test coverage
 [group('driver-cassandra')]
@@ -105,8 +141,7 @@ build-mysql: (_build_driver "mysql" (_MYSQL_PATH / "godfish"))
 
 # Run tests on a live mysql instance at DB_DSN
 [group('driver-mysql')]
-test-mysql *args:
-    {{ GO }} test {{ args }} {{ _MYSQL_PATH }}/...
+test-mysql *args: (_test_driver _MYSQL_PATH args)
 
 # Compile binary for mysql, integration test coverage
 [group('driver-mysql')]
@@ -121,8 +156,7 @@ build-postgres: (_build_driver "postgres" (_POSTGRES_PATH / "godfish"))
 
 # Run tests on a live postgres instance at DB_DSN
 [group('driver-postgres')]
-test-postgres *args:
-    {{ GO }} test {{ args }} {{ _POSTGRES_PATH }}/...
+test-postgres *args: (_test_driver _POSTGRES_PATH args)
 
 # Compile binary for postgres, integration test coverage
 [group('driver-postgres')]
@@ -137,8 +171,7 @@ build-sqlite3: (_build_driver "sqlite3" (_SQLITE3_PATH / "godfish"))
 
 # Run tests on a live sqlite3 instance at DB_DSN
 [group('driver-sqlite3')]
-test-sqlite3 *args:
-    {{ GO }} test {{ args }} {{ _SQLITE3_PATH }}/...
+test-sqlite3 *args: (_test_driver _SQLITE3_PATH args)
 
 # Compile binary for sqlite3, integration test coverage
 [group('driver-sqlite3')]
@@ -153,12 +186,14 @@ build-sqlserver: (_build_driver "sqlserver" (_SQLSERVER_PATH / "godfish"))
 
 # Run tests on a live sqlserver instance at DB_DSN
 [group('driver-sqlserver')]
-test-sqlserver *args:
-    {{ GO }} test {{ args }} {{ _SQLSERVER_PATH }}/...
+test-sqlserver *args: (_test_driver _SQLSERVER_PATH args)
 
 # Compile binary for sqlserver, integration test coverage
 [group('driver-sqlserver')]
 build-sqlserver-test: (_build_driver "sqlserver_test" (_SQLSERVER_PATH / "godfish") "-cover")
+
+_test_driver src_path *args:
+    {{ GO }} -C {{ src_path }} test {{ args }} ./...
 
 _build_driver driver_name src_path *build_flags:
     #!/bin/sh
@@ -166,7 +201,7 @@ _build_driver driver_name src_path *build_flags:
     bin={{ clean(BIN_DIR / "godfish-" + driver_name) }}
     mkdir -pv {{ BIN_DIR }}
     ldflags="{{ _LDFLAGS }}"
-    {{ GO }} build -o="${bin}" -v -ldflags="${ldflags}" {{ build_flags }} {{ src_path }}
+    {{ GO }} -C '{{ parent_directory(src_path) }}' build -o="${bin}" -v -ldflags="${ldflags}" {{ build_flags }} './{{ file_stem(src_path) }}'
     "${bin}" version
     echo "built {{ driver_name }} to ${bin}"
 
@@ -182,7 +217,7 @@ _build_delegator_cmd *build_flags:
     bin={{ clean(BIN_DIR / "godfish") }}
     mkdir -pv {{ BIN_DIR }}
     ldflags="{{ _LDFLAGS }}"
-    {{ GO }} build -o="${bin}" -v -ldflags="${ldflags}" {{ build_flags }} ./internal/cmd/godfish
+    {{ GO }} build -o="${bin}" -v -ldflags="${ldflags}" {{ build_flags }} ./cmd/godfish
     "${bin}" version
     echo "built godfish to ${bin}"
 

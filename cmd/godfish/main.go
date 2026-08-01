@@ -10,12 +10,12 @@ import (
 	"os"
 	"strings"
 
+	"github.com/rafaelespinoza/godfish/cmd"
 	"github.com/rafaelespinoza/godfish/drivers/cassandra"
 	"github.com/rafaelespinoza/godfish/drivers/mysql"
 	"github.com/rafaelespinoza/godfish/drivers/postgres"
 	"github.com/rafaelespinoza/godfish/drivers/sqlite3"
 	"github.com/rafaelespinoza/godfish/drivers/sqlserver"
-	"github.com/rafaelespinoza/godfish/internal/cmd"
 
 	"github.com/urfave/cli/v3"
 )
