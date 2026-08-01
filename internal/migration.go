@@ -2,6 +2,7 @@ package internal
 
 import (
 	"cmp"
+	"context"
 	"fmt"
 	"log/slog"
 	"os"
@@ -181,4 +182,21 @@ func newMigrationFile(m Migration, baseDir string, ext string) (*os.File, error)
 	}
 	name := filepath.Join(baseDir, string(m.ToFilename())+ext)
 	return os.Create(filepath.Clean(name))
+}
+
+type migrationContextKey struct{}
+
+// SetMigrationContext puts m on ctx. Use [GetMigrationContext] to read the
+// values.
+func SetMigrationContext(ctx context.Context, m *Migration) context.Context {
+	ctx = context.WithValue(ctx, migrationContextKey{}, m)
+	return ctx
+}
+
+// GetMigrationContext retrieves a *Migration and true when the input ctx has
+// values set by [SetMigrationContext]. If the ctx does not have those values
+// then it returns nil, false.
+func GetMigrationContext(ctx context.Context) (*Migration, bool) {
+	m, found := ctx.Value(migrationContextKey{}).(*Migration)
+	return m, found
 }
