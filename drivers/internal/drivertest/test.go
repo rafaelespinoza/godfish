@@ -204,7 +204,7 @@ type testDriverStub struct {
 
 func getTestdataSubdir(driver driver.Driver) string {
 	switch name := driver.Name(); name {
-	case "cassandra", "sqlserver":
+	case "cassandra", "ql", "sqlserver":
 		return name
 	default:
 		return "default"

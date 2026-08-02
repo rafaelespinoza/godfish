@@ -15,7 +15,7 @@ The name is an homage to [`dogfish`](https://github.com/dwb/dogfish).
 ## features
 
 - Use the native query language in the migration files, no other high-level DSLs.
-- Interface with many DBs: cassandra, mysql, postgres, sqlite3, sqlserver.
+- Interface with many DBs: cassandra, mysql, postgres, ql, sqlite3, sqlserver.
 - Light on dependencies. Release pipeline builds small binaries targeted for one DB driver.
 - Release binaries are standalone and statically compiled, go is not necessary.
   Great if you have projects written in different languages and want a consistent experience.
@@ -135,7 +135,7 @@ as the first argument, like so:
 
 ```sh
 godfish <driver> [...arguments]
-# Where `driver` is one of cassandra, mysql, postgres, sqlite3, sqlserver.
+# Where `driver` is one of cassandra, mysql, postgres, ql, sqlite3, sqlserver.
 
 # More examples of the delegator command.
 godfish cassandra version
@@ -155,7 +155,7 @@ examples of this mode:
 
 ```sh
 godfish-<driver> [...arguments]
-# Where `driver` is one of cassandra, mysql, postgres, sqlite3, sqlserver.
+# Where `driver` is one of cassandra, mysql, postgres, ql, sqlite3, sqlserver.
 
 # More examples of direct driver. Notice, you're invoking a different
 # executable.

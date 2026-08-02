@@ -13,6 +13,7 @@ import (
 	"github.com/rafaelespinoza/godfish/drivers/cassandra"
 	"github.com/rafaelespinoza/godfish/drivers/mysql"
 	"github.com/rafaelespinoza/godfish/drivers/postgres"
+	"github.com/rafaelespinoza/godfish/drivers/ql"
 	"github.com/rafaelespinoza/godfish/drivers/sqlite3"
 	"github.com/rafaelespinoza/godfish/drivers/sqlserver"
 	"github.com/rafaelespinoza/godfish/internal/cmd"
@@ -52,6 +53,7 @@ func buildCommands() []*cli.Command {
 		{cassandra.NewDriver(), cassandra.SampleDSN},
 		{mysql.NewDriver(), mysql.SampleDSN},
 		{postgres.NewDriver(), postgres.SampleDSN},
+		{ql.NewDriver(), ql.SampleDSN},
 		{sqlite3.NewDriver(), sqlite3.SampleDSN},
 		{sqlserver.NewDriver(), sqlserver.SampleDSN},
 	}

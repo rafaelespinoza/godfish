@@ -13,6 +13,10 @@ require (
 	modernc.org/sqlite v1.54.0
 )
 
+// NOTE: a version without CGO was fetched in this case.
+// go get -tags purego modernc.org/ql
+require modernc.org/ql v1.5.2
+
 require (
 	filippo.io/edwards25519 v1.2.0 // indirect
 	github.com/ncruces/go-strftime v1.0.0 // indirect
@@ -22,6 +26,7 @@ require (
 
 require (
 	github.com/dustin/go-humanize v1.0.1 // indirect
+	github.com/edsrzf/mmap-go v1.2.0 // indirect
 	github.com/golang-sql/civil v0.0.0-20220223132316-b832511892a9 // indirect
 	github.com/golang-sql/sqlexp v0.1.0 // indirect
 	github.com/golang/snappy v0.0.3 // indirect
@@ -33,7 +38,17 @@ require (
 	golang.org/x/sys v0.46.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
+	modernc.org/b v1.1.0 // indirect
+	modernc.org/db v1.2.0 // indirect
+	modernc.org/file v1.1.0 // indirect
+	modernc.org/fileutil v1.4.0 // indirect
+	modernc.org/golex v1.1.0 // indirect
+	modernc.org/internal v1.1.10 // indirect
 	modernc.org/libc v1.74.1 // indirect
+	modernc.org/lldb v1.0.8 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.11.0 // indirect
+	modernc.org/sortutil v1.2.1 // indirect
+	modernc.org/strutil v1.2.1 // indirect
+	modernc.org/zappy v1.0.9 // indirect
 )
