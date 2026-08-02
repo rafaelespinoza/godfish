@@ -64,6 +64,7 @@ function _test_one_driver() {
 	run ./scripts/install.sh -o "$(realpath "${install_dir}")"
 	local binary version_file
 
+	# TODO: add ql to this list after the first release with ql in it.
 	for driver in cassandra mysql postgres sqlite3 sqlserver; do
 		# Versions > v0.15.0 may have a different name for the binary.
 		binary=$(find "${install_dir}" -type f -name "godfish*${driver}")
@@ -84,6 +85,9 @@ function _test_one_driver() {
 	run ./scripts/install.sh -o "$(realpath "${install_dir}")" -t "${tag}"
 	local binary version_file
 
+	# NOTE: ql is omitted from this list because it wasn't supported in
+	# versions <= v0.17.0, which is the latest release at the time of this
+	# writing (2026-08).
 	for driver in cassandra mysql postgres sqlite3 sqlserver; do
 		# NOTE: binaries for versions <= v0.15.0 have the prefix godfish_
 		binary="${install_dir}/godfish_${driver}"

@@ -55,7 +55,7 @@ function teardown_file() {
 @test 'routes commands to correct driver' {
 	assert_file_executable "${BIN}"
 
-	for driver in cassandra mysql postgres sqlite3 sqlserver; do
+	for driver in cassandra mysql postgres ql sqlite3 sqlserver; do
 		run "${BIN}" "${driver}" version
 		assert_output --regexp "Driver.*${driver}"
 	done

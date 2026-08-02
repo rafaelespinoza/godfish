@@ -12,7 +12,7 @@ LOG_LEVEL="${LOG_LEVEL:-1}" # could be 1 2 or 3
 github_repo_owner=rafaelespinoza
 github_repo_name=godfish
 checksums_file=checksums.txt
-db_drivers='cassandra mysql postgres sqlite3 sqlserver'
+db_drivers='cassandra mysql postgres ql sqlite3 sqlserver'
 
 usage() {
 	usage_message="Usage: ${0} [flags]

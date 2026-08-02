@@ -1,0 +1,10 @@
+FROM godfish_test/client_base:latest
+
+WORKDIR /src
+RUN apk update && \
+  apk --no-cache add musl-dev && \
+  just build-ql && \
+  just build-ql-test
+
+COPY .ci/ql/client.sh /
+ENTRYPOINT /client.sh
