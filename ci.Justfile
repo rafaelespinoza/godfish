@@ -74,6 +74,17 @@ postgres16-up: (_up "postgres_v16" _POSTGRES_V16_FILE)
 postgres16-down: (_compose_down _POSTGRES_V16_FILE)
 
 [private]
+_QL_FILE := CI_DIR / "ql" / "compose.yaml"
+
+# Setup, perform integration tests for ql driver
+[group('driver-ql')]
+ql-up: (_up "ql" _QL_FILE)
+
+# Cleanup integration test environment for ql driver
+[group('driver-ql')]
+ql-down: (_compose_down _QL_FILE)
+
+[private]
 _SQLITE3_FILE := CI_DIR / "sqlite3" / "compose.yaml"
 
 # Setup, perform integration tests for sqlite3 driver

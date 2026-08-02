@@ -122,6 +122,26 @@ test-postgres *args:
 build-postgres-test: (_build_driver "postgres_test" (_POSTGRES_PATH / "godfish") "-cover")
 
 [private]
+_QL_PATH := _BASE_DRIVER_PATH / "ql"
+
+# Pass this build flag to use the pure go version of the ql library.
+# It otherwise depends on CGO, which we're trying to avoid.
+_QL_TAG_GO := '-tags=purego'
+
+# Compile binary for ql driver
+[group('driver-ql')]
+build-ql: (_build_driver "ql" (_QL_PATH / "godfish") _QL_TAG_GO)
+
+# Run tests on a live ql instance at DB_DSN
+[group('driver-ql')]
+test-ql *args:
+    {{ GO }} test {{ _QL_TAG_GO }} {{ args }} {{ _QL_PATH }}/...
+
+# Compile binary for ql, integration test coverage
+[group('driver-ql')]
+build-ql-test: (_build_driver "ql_test" (_QL_PATH / "godfish") "-cover "+_QL_TAG_GO)
+
+[private]
 _SQLITE3_PATH := _BASE_DRIVER_PATH / "sqlite3"
 
 # Compile binary for sqlite3 driver
@@ -175,7 +195,7 @@ _build_delegator_cmd *build_flags:
     bin={{ clean(BIN_DIR / "godfish") }}
     mkdir -pv {{ BIN_DIR }}
     ldflags="{{ _LDFLAGS }}"
-    {{ GO }} build -o="${bin}" -v -ldflags="${ldflags}" {{ build_flags }} ./internal/cmd/godfish
+    {{ GO }} build -o="${bin}" -v -ldflags="${ldflags}" {{ _QL_TAG_GO }} {{ build_flags }} ./internal/cmd/godfish
     "${bin}" version
     echo "built godfish to ${bin}"
 

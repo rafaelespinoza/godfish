@@ -1,0 +1,13 @@
+services:
+    client:
+        build:
+            context: ../..
+            dockerfile: .ci/ql/Containerfile
+        environment:
+            DB_DSN: file://godfish_test.db
+            GITHUB_TOKEN: # Mitigate rate limits.
+        volumes:
+          -
+            type: bind
+            source: ../../.ci/.test_coverage/ql
+            target: /tmp/test_coverage
