@@ -16,7 +16,13 @@ import (
 	_ "github.com/go-sql-driver/mysql" // register driver with database/sql
 )
 
-const msgPrefix = "godfish/mysql"
+const (
+	// msgPrefix denotes the origin of a log or error.
+	msgPrefix = "godfish/mysql"
+
+	// driverMsgPrefix is for logs or errors emitted from a Driver method.
+	driverMsgPrefix = msgPrefix + ".Driver"
+)
 
 // SampleDSN is an example data source name.
 const SampleDSN = `username:password@tcp(server_host)/db_name?param1=value&paramN=valueN` // #nosec G101 -- not real credentials.
@@ -30,16 +36,16 @@ type Driver struct {
 }
 
 func (d *Driver) Name() string { return "mysql" }
-func (d *Driver) Connect(dsn string) (err error) {
+func (d *Driver) Connect(dsn string) error {
 	if d.connection != nil {
-		return
+		return nil
 	}
 	conn, err := sql.Open(d.Name(), dsn)
 	if err != nil {
-		return
+		return fmt.Errorf("%s.%s: %w", driverMsgPrefix, "Connect", err)
 	}
 	d.connection = conn
-	return
+	return nil
 }
 
 func (d *Driver) Close() (err error) {
@@ -48,23 +54,25 @@ func (d *Driver) Close() (err error) {
 		return
 	}
 	d.connection = nil
-	err = conn.Close()
-	return
+	if err = conn.Close(); err != nil {
+		return fmt.Errorf("%s.%s: %w", driverMsgPrefix, "Close", err)
+	}
+	return nil
 }
 
 var statementDelimiter = regexp.MustCompile(`;\s*\n`)
 
-func (d *Driver) Execute(ctx context.Context, query string, args ...any) (err error) {
+func (d *Driver) Execute(ctx context.Context, query string, args ...any) error {
 	// Attempt to support migrations with 1 or more statements. AFAIK, the
 	// standard library does not support executing multiple statements at once.
 	// As a workaround, break them up and apply them.
 	statements := statementDelimiter.Split(query, -1)
 	if len(statements) < 1 {
-		return
+		return nil
 	}
 	tx, err := d.connection.Begin()
 	if err != nil {
-		return
+		return fmt.Errorf("%s.%s: beginning tx: %w", driverMsgPrefix, "Execute", err)
 	}
 	for _, q := range statements {
 		if len(strings.TrimSpace(q)) < 1 {
@@ -73,18 +81,21 @@ func (d *Driver) Execute(ctx context.Context, query string, args ...any) (err er
 		_, err = tx.ExecContext(ctx, q)
 		if err != nil {
 			if rerr := tx.Rollback(); rerr != nil {
-				return fmt.Errorf("%w; %v", err, rerr)
+				return fmt.Errorf("%s.%s: rolling back tx: original error [%w], rollback error [%w]", driverMsgPrefix, "Execute", err, rerr)
 			}
-			return
+			return fmt.Errorf("%s.%s: %w", driverMsgPrefix, "Execute", err)
 		}
 	}
-	return tx.Commit()
+	if err = tx.Commit(); err != nil {
+		return fmt.Errorf("%s.%s: committing tx: %w", driverMsgPrefix, "Execute", err)
+	}
+	return nil
 }
 
-func (d *Driver) CreateSchemaMigrationsTable(ctx context.Context, migrationsTable string) (err error) {
+func (d *Driver) CreateSchemaMigrationsTable(ctx context.Context, migrationsTable string) error {
 	cleanedTableName, err := cleanIdentifier(migrationsTable)
 	if err != nil {
-		return
+		return fmt.Errorf("%s.%s: %w", driverMsgPrefix, "CreateSchemaMigrationsTable", err)
 	}
 
 	// #nosec G202 -- table name was sanitized
@@ -93,61 +104,70 @@ func (d *Driver) CreateSchemaMigrationsTable(ctx context.Context, migrationsTabl
 	label VARCHAR(255) DEFAULT '',
 	executed_at BIGINT DEFAULT 0
 )`
-	_, err = d.connection.ExecContext(ctx, q)
-	return
+	if _, err = d.connection.ExecContext(ctx, q); err != nil {
+		return fmt.Errorf("%s.%s: %w", driverMsgPrefix, "CreateSchemaMigrationsTable", err)
+	}
+	return nil
 }
 
-func (d *Driver) AppliedVersions(ctx context.Context, migrationsTable string) (out driver.AppliedVersions, err error) {
+func (d *Driver) AppliedVersions(ctx context.Context, migrationsTable string) (driver.AppliedVersions, error) {
 	cleanedTableName, err := cleanIdentifier(migrationsTable)
 	if err != nil {
-		return
+		return nil, fmt.Errorf("%s.%s: %w", driverMsgPrefix, "AppliedVersions", err)
 	}
 
 	metadata, err := checkSchemaMigrationMetadata(ctx, d, cleanedTableName)
 	if err != nil {
-		return
+		return nil, fmt.Errorf("%s.%s: checking schema migration metadata: %w", driverMsgPrefix, "AppliedVersions", err)
 	} else if !metadata.hasTable {
-		err = fmt.Errorf("%s.%s: %w", msgPrefix, "AppliedVersions", driver.ErrSchemaMigrationsDoesNotExist)
-		return
+		err = fmt.Errorf("%s.%s: %w", driverMsgPrefix, "AppliedVersions", driver.ErrSchemaMigrationsDoesNotExist)
+		return nil, err
 	} else if !metadata.hasColLabel || !metadata.hasColExecutedAt {
-		err = fmt.Errorf("%s.%s: %w", msgPrefix, "AppliedVersions", driver.ErrSchemaMigrationsMissingColumns)
-		return
+		err = fmt.Errorf("%s.%s: %w", driverMsgPrefix, "AppliedVersions", driver.ErrSchemaMigrationsMissingColumns)
+		return nil, err
 	}
 
 	// #nosec G202 -- table name was sanitized
 	q := `SELECT migration_id, label, executed_at FROM ` + cleanedTableName + ` ORDER BY migration_id ASC`
 	rows, err := d.connection.QueryContext(ctx, q)
-	out = driver.AppliedVersions(rows)
-	return
+	if err != nil {
+		return nil, fmt.Errorf("%s.%s: querying: %w", driverMsgPrefix, "AppliedVersions", err)
+	}
+
+	return driver.AppliedVersions(rows), nil
 }
 
-func (d *Driver) UpdateSchemaMigrations(ctx context.Context, migrationsTable string, forward bool, version, label string) (err error) {
+func (d *Driver) UpdateSchemaMigrations(ctx context.Context, migrationsTable string, forward bool, version, label string) error {
 	cleanedTableName, err := cleanIdentifier(migrationsTable)
 	if err != nil {
-		return
+		return fmt.Errorf("%s.%s: %w", driverMsgPrefix, "UpdateSchemaMigrations", err)
 	}
 
 	conn := d.connection
 	if !forward {
 		// #nosec G202 -- table name was sanitized
 		q := `DELETE FROM ` + cleanedTableName + ` WHERE migration_id = ?`
-		_, err = conn.ExecContext(ctx, q, version)
-		return
+		if _, err = conn.ExecContext(ctx, q, version); err != nil {
+			return fmt.Errorf("%s.%s: %w", driverMsgPrefix, "UpdateSchemaMigrations", err)
+		}
+		return nil
 	}
 
 	// #nosec G202 -- table name was sanitized
 	q := `INSERT INTO ` + cleanedTableName + ` (migration_id, label, executed_at) VALUES (?, ?, ?)`
 	now := time.Now().UTC()
-	_, err = conn.ExecContext(ctx, q, version, label, now.Unix())
-	return
+	if _, err = conn.ExecContext(ctx, q, version, label, now.Unix()); err != nil {
+		return fmt.Errorf("%s.%s: %w", driverMsgPrefix, "UpdateSchemaMigrations", err)
+	}
+	return nil
 }
 
 func (d *Driver) UpgradeSchemaMigrations(ctx context.Context, migrationsTable string) error {
 	cleanedTableName, err := cleanIdentifier(migrationsTable)
 	if err != nil {
-		return err
+		return fmt.Errorf("%s.%s: %w", driverMsgPrefix, "UpgradeSchemaMigrations", err)
 	}
-	const errMsgPrefix = msgPrefix + ".UpgradeSchemaMigrations: "
+	const errMsgPrefix = driverMsgPrefix + ".UpgradeSchemaMigrations"
 
 	// #nosec G202 -- table name was sanitized
 	q := `ALTER TABLE ` + cleanedTableName + `
@@ -155,10 +175,10 @@ func (d *Driver) UpgradeSchemaMigrations(ctx context.Context, migrationsTable st
 	ADD COLUMN executed_at BIGINT DEFAULT 0`
 
 	if _, err = d.connection.ExecContext(ctx, q); err != nil {
-		err = fmt.Errorf(errMsgPrefix+"exec failed; %w", err)
+		return fmt.Errorf(errMsgPrefix+": exec failed; %w", err)
 	}
 
-	return err
+	return nil
 }
 
 type metadataResult struct {
@@ -186,7 +206,7 @@ WHERE t.table_schema = DATABASE()
 `
 	args := []any{"label", "executed_at", tableName}
 	lgr.Debug(
-		msgPrefix+": checking for table, column existence",
+		"checking for table, column existence",
 		slog.String("query", query), slog.Any("args", args),
 	)
 	rows, err := d.connection.QueryContext(ctx, query, args...)
