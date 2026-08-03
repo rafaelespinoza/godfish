@@ -16,7 +16,7 @@ import (
 )
 
 const msgPrefix = "godfish/cassandra"
-const logMsgPrefix = msgPrefix + ": "
+const driverMsgPrefix = msgPrefix + ".Driver"
 
 // SampleDSN is an example data source name.
 const SampleDSN = `cassandra://server_host:9042/keyspace_name?timeout_ms=2000&connect_timeout_ms=2000` // #nosec G101 -- not real credentials.
@@ -31,57 +31,57 @@ type Driver struct {
 }
 
 func (d *Driver) Name() string { return "cassandra" }
-func (d *Driver) Connect(in string) (err error) {
+func (d *Driver) Connect(in string) error {
 	if d.connection != nil {
-		return
+		return nil
 	}
 
 	cluster, err := newClusterConfig(in)
 	if err != nil {
-		return
+		return fmt.Errorf("%s.%s: cluster config error: %w", driverMsgPrefix, "Connect", err)
 	}
 	d.keyspace = cluster.Keyspace
 	conn, err := cluster.CreateSession()
 	if err != nil {
-		return
+		return fmt.Errorf("%s.%s: creating session: %w", driverMsgPrefix, "Connect", err)
 	}
 	d.connection = conn
-	return
+	return nil
 }
 
-func (d *Driver) Close() (err error) {
+func (d *Driver) Close() error {
 	conn := d.connection
 	if conn == nil {
-		return
+		return nil
 	}
 	d.connection = nil
 	conn.Close()
-	return
+	return nil
 }
 
 var statementDelimiter = regexp.MustCompile(`;\s*\n`)
 
-func (d *Driver) Execute(ctx context.Context, query string, args ...any) (err error) {
+func (d *Driver) Execute(ctx context.Context, query string, args ...any) error {
 	statements := statementDelimiter.Split(query, -1)
 	if len(statements) < 1 {
-		return
+		return nil
 	}
 	for _, q := range statements {
 		if len(strings.TrimSpace(q)) < 1 {
 			continue
 		}
-		err = d.connection.Query(q).WithContext(ctx).Exec()
+		err := d.connection.Query(q).WithContext(ctx).Exec()
 		if err != nil {
-			return
+			return fmt.Errorf("%s.%s: %w", driverMsgPrefix, "Execute", err)
 		}
 	}
 	return nil
 }
 
-func (d *Driver) CreateSchemaMigrationsTable(ctx context.Context, migrationsTable string) (err error) {
+func (d *Driver) CreateSchemaMigrationsTable(ctx context.Context, migrationsTable string) error {
 	cleanedTableName, err := cleanIdentifier(migrationsTable)
 	if err != nil {
-		return
+		return fmt.Errorf("%s.%s: %w", driverMsgPrefix, "CreateSchemaMigrationsTable", err)
 	}
 
 	q := `CREATE TABLE IF NOT EXISTS ` + cleanedTableName + ` (
@@ -89,91 +89,93 @@ func (d *Driver) CreateSchemaMigrationsTable(ctx context.Context, migrationsTabl
 	label TEXT,
 	executed_at BIGINT
 )`
-	err = d.connection.Query(q).WithContext(ctx).Exec()
-	return
+	if err = d.connection.Query(q).WithContext(ctx).Exec(); err != nil {
+		return fmt.Errorf("%s.%s: %w", driverMsgPrefix, "CreateSchemaMigrationsTable", err)
+	}
+	return nil
 }
 
-func (d *Driver) AppliedVersions(ctx context.Context, migrationsTable string) (out driver.AppliedVersions, err error) {
+func (d *Driver) AppliedVersions(ctx context.Context, migrationsTable string) (driver.AppliedVersions, error) {
 	cleanedTableName, err := cleanIdentifier(migrationsTable)
 	if err != nil {
-		return
+		return nil, fmt.Errorf("%s.%s: %w", driverMsgPrefix, "AppliedVersions", err)
 	}
 
 	metadata, err := checkKeyspaceMetadata(ctx, d, cleanedTableName)
 	if err != nil {
-		return
+		return nil, fmt.Errorf("%s.%s: checking keyspace metadata: %w", driverMsgPrefix, "AppliedVersions", err)
 	} else if !metadata.hasTable {
-		err = fmt.Errorf("%s.%s: %w", msgPrefix, "AppliedVersions", driver.ErrSchemaMigrationsDoesNotExist)
-		return
+		err = fmt.Errorf("%s.%s: %w", driverMsgPrefix, "AppliedVersions", driver.ErrSchemaMigrationsDoesNotExist)
+		return nil, err
 	} else if !metadata.hasColLabel || !metadata.hasColExecutedAt {
-		err = fmt.Errorf("%s.%s: %w", msgPrefix, "AppliedVersions", driver.ErrSchemaMigrationsMissingColumns)
-		return
+		err = fmt.Errorf("%s.%s: %w", driverMsgPrefix, "AppliedVersions", driver.ErrSchemaMigrationsMissingColumns)
+		return nil, err
 	}
 
 	q := `SELECT migration_id, label, executed_at FROM ` + cleanedTableName
 	query := d.connection.Query(q).WithContext(ctx)
-	slog.Debug(logMsgPrefix+"(*driver).AppliedVersions query",
+	slog.Debug(driverMsgPrefix+".AppliedVersions query",
 		slog.String("keyspace", query.Keyspace()),
 		slog.String("statement", query.Statement()),
 	)
 
 	av := execAllAscending(query)
 	if av.closingErr == nil && av.scanningErr == nil {
-		out = av
-		return
+		return av, nil
 	}
 
 	// An error here is probably more serious, prioritize that one if it exists.
 	if av.closingErr != nil {
-		slog.Error(logMsgPrefix+"(*driver).AppliedVersions non-empty error(s) after executing query",
+		slog.Error(driverMsgPrefix+".AppliedVersions non-empty error(s) after executing query",
 			slog.Any("closing_err", av.closingErr),
 			slog.Any("scanning_err", av.scanningErr), // just in case there's another lingering error...
 		)
-		err = av.closingErr
-		return
+		return nil, fmt.Errorf("%s.%s: closing: %w", driverMsgPrefix, "AppliedVersions", av.closingErr)
 	}
 
-	slog.Error(logMsgPrefix+"(*driver).AppliedVersions non-empty scanning error",
+	slog.Error(driverMsgPrefix+".AppliedVersions non-empty scanning error",
 		slog.Any("scanning_err", av.scanningErr),
 		slog.String("type", fmt.Sprintf("%T", av.scanningErr)),
 	)
 	ierr, ok := av.scanningErr.(gocql.RequestError)
 	if !ok {
-		err = av.scanningErr
-		return
+		return nil, fmt.Errorf("%s.%s: scanning: %w", driverMsgPrefix, "AppliedVersions", av.scanningErr)
 	}
 
-	slog.Error(logMsgPrefix+"(*driver).AppliedVersions more details on the same scanning error",
+	slog.Error(driverMsgPrefix+".AppliedVersions more details on the same scanning error",
 		slog.String("type", fmt.Sprintf("%T", ierr)), slog.String("error", ierr.Error()),
 		slog.Int("code", ierr.Code()), slog.String("message", ierr.Message()),
 	)
-	err = ierr
-	return
+	return nil, fmt.Errorf("%s.%s: scanning (this is a RequestError): %w", driverMsgPrefix, "AppliedVersions", ierr)
 }
 
-func (d *Driver) UpdateSchemaMigrations(ctx context.Context, migrationsTable string, forward bool, version, label string) (err error) {
+func (d *Driver) UpdateSchemaMigrations(ctx context.Context, migrationsTable string, forward bool, version, label string) error {
 	cleanedTableName, err := cleanIdentifier(migrationsTable)
 	if err != nil {
-		return
+		return fmt.Errorf("%s.%s: %w", driverMsgPrefix, "UpdateSchemaMigrations", err)
 	}
 
 	conn := d.connection
 	if !forward {
 		q := `DELETE FROM ` + cleanedTableName + ` WHERE migration_id = ?`
-		err = conn.Query(q, version).WithContext(ctx).Exec()
-		return
+		if err = conn.Query(q, version).WithContext(ctx).Exec(); err != nil {
+			return fmt.Errorf("%s.%s: %w", driverMsgPrefix, "UpdateSchemaMigrations", err)
+		}
+		return nil
 	}
 
 	q := `INSERT INTO ` + cleanedTableName + ` (migration_id, label, executed_at) VALUES (?, ?, ?)`
 	now := time.Now().UTC()
-	err = conn.Query(q, version, label, now.Unix()).WithContext(ctx).Exec()
-	return
+	if err = conn.Query(q, version, label, now.Unix()).WithContext(ctx).Exec(); err != nil {
+		return fmt.Errorf("%s.%s: %w", driverMsgPrefix, "UpdateSchemaMigrations", err)
+	}
+	return nil
 }
 
 func (d *Driver) UpgradeSchemaMigrations(ctx context.Context, migrationsTable string) error {
 	cleanedTableName, err := cleanIdentifier(migrationsTable)
 	if err != nil {
-		return err
+		return fmt.Errorf("%s.%s: %w", driverMsgPrefix, "UpgradeSchemaMigrations", err)
 	}
 
 	// AFAIK, cassandra will not allow you to add multiple columns to the same
@@ -185,18 +187,18 @@ func (d *Driver) UpgradeSchemaMigrations(ctx context.Context, migrationsTable st
 	lgr := slog.With(slog.String("keyspace", d.keyspace), slog.String("table_name", cleanedTableName))
 	startTime := time.Now()
 	const timeSinceLogKey = "time_since_start_ms"
-	defer func() { lgr.Info(logMsgPrefix+"done", makeDurationMSAttr(timeSinceLogKey, startTime)) }()
+	defer func() { lgr.Info(driverMsgPrefix+": done", makeDurationMSAttr(timeSinceLogKey, startTime)) }()
 
-	lgr.Debug(logMsgPrefix+"starting check for keyspace metadata", makeDurationMSAttr(timeSinceLogKey, startTime))
+	lgr.Debug(driverMsgPrefix+": starting check for keyspace metadata", makeDurationMSAttr(timeSinceLogKey, startTime))
 	metadata, err := checkKeyspaceMetadata(ctx, d, cleanedTableName)
 	if err != nil {
-		return err
+		return fmt.Errorf("%s.%s: checking keyspace metadata: %w", driverMsgPrefix, "UpgradeSchemaMigrations", err)
 	} else if !metadata.hasTable {
-		return fmt.Errorf("%s.%s: %w", msgPrefix, "UpgradeSchemaMigrations", driver.ErrSchemaMigrationsDoesNotExist)
+		return fmt.Errorf("%s.%s: %w", driverMsgPrefix, "UpgradeSchemaMigrations", driver.ErrSchemaMigrationsDoesNotExist)
 	}
 	// Conditionally add the updates in case there's a need to retry 1 of them.
 	if metadata.hasColLabel {
-		lgr.Debug(logMsgPrefix+"column appears to already exist, skipping", slog.String("column", "label"))
+		lgr.Debug(driverMsgPrefix+".UpgradeSchemaMigrations: column appears to already exist, skipping", slog.String("column", "label"))
 	} else {
 		updates = append(
 			updates,
@@ -204,29 +206,29 @@ func (d *Driver) UpgradeSchemaMigrations(ctx context.Context, migrationsTable st
 		)
 	}
 	if metadata.hasColExecutedAt {
-		lgr.Debug(logMsgPrefix+"column appears to already exist, skipping", slog.String("column", "executed_at"))
+		lgr.Debug(driverMsgPrefix+".UpgradeSchemaMigrations: column appears to already exist, skipping", slog.String("column", "executed_at"))
 	} else {
 		updates = append(
 			updates,
 			update{columnName: "executed_at", query: `ALTER TABLE ` + cleanedTableName + ` ADD executed_at BIGINT`},
 		)
 	}
-	lgr.Debug(logMsgPrefix+"updates prepared", slog.Int("num_updates", len(updates)))
+	lgr.Debug(driverMsgPrefix+".UpgradeSchemaMigrations: updates prepared", slog.Int("num_updates", len(updates)))
 	for i, u := range updates {
 		ulgr := lgr.With(slog.Int("i", i), slog.String("column", u.columnName))
-		ulgr.Info(logMsgPrefix+"starting upgrade query", makeDurationMSAttr(timeSinceLogKey, startTime))
+		ulgr.Info(driverMsgPrefix+".UpgradeSchemaMigrations: starting upgrade query", makeDurationMSAttr(timeSinceLogKey, startTime))
 		if err = d.connection.Query(u.query).WithContext(ctx).Exec(); err != nil {
 			return fmt.Errorf(
-				logMsgPrefix+"upgrading schema migrations table for column %s; %w",
+				driverMsgPrefix+".UpgradeSchemaMigrations: upgrading schema migrations table for column %s: %w",
 				u.columnName, err,
 			)
 		}
-		ulgr.Info(logMsgPrefix+"query complete, now awaiting schema agreement...", makeDurationMSAttr(timeSinceLogKey, startTime))
+		ulgr.Info(driverMsgPrefix+".UpgradeSchemaMigrations: query complete, now awaiting schema agreement...", makeDurationMSAttr(timeSinceLogKey, startTime))
 		// Make sure all nodes know about the new column.
 		if err = d.connection.AwaitSchemaAgreement(ctx); err != nil {
-			return fmt.Errorf(logMsgPrefix+"awaiting schema agreement after adding column %s", u.columnName)
+			return fmt.Errorf("%s.%s: awaiting schema agreement after adding column: %s", driverMsgPrefix, "UpgradeSchemaMigrations", u.columnName)
 		}
-		ulgr.Info(logMsgPrefix+"cluster is in agreement", makeDurationMSAttr(timeSinceLogKey, startTime))
+		ulgr.Info(driverMsgPrefix+".UpgradeSchemaMigrations: cluster is in agreement", makeDurationMSAttr(timeSinceLogKey, startTime))
 	}
 
 	return nil
@@ -254,7 +256,7 @@ func checkKeyspaceMetadata(ctx context.Context, d *Driver, tableName string) (ou
 	lgr := slog.With(slog.String("driver", d.Name()), slog.String("keyspace", d.keyspace), slog.String("table_name", tableName))
 
 	defer func() {
-		lgr.Debug(logMsgPrefix+"checked keyspace metadata",
+		lgr.Debug(msgPrefix+": checked keyspace metadata",
 			slog.Group("result",
 				slog.Bool("has_table", out.hasTable),
 				slog.Bool("has_col_label", out.hasColLabel),
@@ -266,7 +268,7 @@ func checkKeyspaceMetadata(ctx context.Context, d *Driver, tableName string) (ou
 	const tableQuery = `SELECT table_name FROM system_schema.tables WHERE keyspace_name = ? AND table_name = ?`
 	tableArgs := []any{d.keyspace, tableName}
 	lgr.Debug(
-		logMsgPrefix+"checking for table existence",
+		msgPrefix+": checking for table existence",
 		slog.String("query", tableQuery), slog.Any("args", tableArgs),
 	)
 	tableScanner := d.connection.Query(tableQuery, tableArgs...).WithContext(ctx).Iter().Scanner()
@@ -275,7 +277,7 @@ func checkKeyspaceMetadata(ctx context.Context, d *Driver, tableName string) (ou
 		// used after this point.
 		cerr := tableScanner.Err()
 		if cerr != nil {
-			lgr.Error(logMsgPrefix+"closing table query scanner", slog.Any("error", cerr))
+			lgr.Error(msgPrefix+": closing table query scanner", slog.Any("error", cerr))
 		}
 	}()
 	for tableScanner.Next() {
@@ -294,7 +296,7 @@ WHERE keyspace_name = ?
 	AND column_name IN ?`
 	colArgs := []any{d.keyspace, tableName, []string{"label", "executed_at"}}
 	lgr.Debug(
-		logMsgPrefix+"checking for column existence",
+		msgPrefix+": checking for column existence",
 		slog.String("query", columnsQuery), slog.Any("args", colArgs),
 	)
 
@@ -304,7 +306,7 @@ WHERE keyspace_name = ?
 		// used after this point.
 		cerr := colScanner.Err()
 		if cerr != nil {
-			lgr.Error(logMsgPrefix+"closing column query scanner", slog.Any("error", cerr))
+			lgr.Error(msgPrefix+": closing column query scanner", slog.Any("error", cerr))
 		}
 	}()
 	for colScanner.Next() {
