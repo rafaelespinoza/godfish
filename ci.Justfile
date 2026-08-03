@@ -133,7 +133,7 @@ make-builder-img driver_basename:
 
 # Remove builder image
 rm-builder-img:
-    {{ CONTAINER_TOOL }} image rmi $({{ CONTAINER_TOOL }} image ls -aq {{ BASENAME }}/client_base)
+    {{ CONTAINER_TOOL }} image rm $({{ CONTAINER_TOOL }} image ls -aq {{ BASENAME }}/client_base)
 
 [private]
 _DELEGATOR_CMD_FILE := CI_DIR / "delegator_cmd" / "compose.yaml"

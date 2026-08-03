@@ -4,38 +4,58 @@
 package main
 
 import (
-	"log"
+	"context"
+	"flag"
+	"fmt"
+	"log/slog"
 	"os"
+	"path/filepath"
 
 	"github.com/gocql/gocql"
 )
 
 func init() {
-	log.SetOutput(os.Stderr)
+	flag.CommandLine.Usage = func() {
+		fmt.Fprintf(flag.CommandLine.Output(),
+			"Usage: %s dbhost keyspace\n",
+			filepath.Base(os.Args[0]),
+		)
+	}
 }
 
 func main() {
-	if len(os.Args) < 3 {
-		log.Printf("requires 2 positional args; got %d; %#v\n", len(os.Args), os.Args)
-		log.Fatalf("Usage: %s dbhost keyspace", os.Args[0])
+	err := run(context.Background(), os.Args[1:]...)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
 	}
-	host, keyspace := os.Args[1], os.Args[2]
+}
 
+func run(ctx context.Context, args ...string) error {
+	if len(args) < 2 {
+		return fmt.Errorf("requires 2 positional args; got %d; %q", len(args), args)
+	}
+
+	host, keyspace := args[0], args[1]
 	err := setupKeyspace(host, keyspace)
 	if err != nil {
-		log.Fatal(err)
+		return fmt.Errorf("setting up cassandra keyspace: %w", err)
 	}
-	log.Println("ok")
+	slog.Info("ok")
+	return nil
 }
 
 func setupKeyspace(dbhost, keyspace string) error {
 	cluster := gocql.NewCluster(dbhost)
 	session, err := cluster.CreateSession()
 	if err != nil {
-		return err
+		return fmt.Errorf("creating session: %w", err)
 	}
 	defer session.Close()
 
 	statement := `CREATE KEYSPACE IF NOT EXISTS ` + keyspace + ` WITH replication = {'class':'SimpleStrategy', 'replication_factor': 1}`
-	return session.Query(statement).Exec()
+	if err = session.Query(statement).Exec(); err != nil {
+		return fmt.Errorf("executing query: %w", err)
+	}
+	return nil
 }
