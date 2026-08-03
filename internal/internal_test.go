@@ -45,6 +45,20 @@ func TestIsInvalidDataError(t *testing.T) {
 			err:  fmt.Errorf("%w, bar", invalidDataErr{error: errors.New("oof"), invalid: true}),
 			exp:  true,
 		},
+		{
+			name: "wraps an error that wraps implemented interface but set to false",
+			err: fmt.Errorf("%w: foo", fmt.Errorf("%w, bar",
+				invalidDataErr{error: errors.New("oof"), invalid: false},
+			)),
+			exp: false,
+		},
+		{
+			name: "wraps an error that wraps implemented interface and set to true",
+			err: fmt.Errorf("%w: foo", fmt.Errorf("%w, bar",
+				invalidDataErr{error: errors.New("oof"), invalid: true},
+			)),
+			exp: true,
+		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			got := internal.IsInvalidDataError(test.err)

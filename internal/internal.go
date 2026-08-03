@@ -32,14 +32,12 @@ var (
 )
 
 // IsInvalidDataError checks if err is an [ErrDataInvalid], and if not then it
-// checks if the errors implements the interface:
+// checks if the error or a wrapped error implements the interface:
 //
 //	Invalid() bool
 //
-// and if it does not, then it checks if the error wraps an error implemnting
-// that interface. It's made for the core library to recognize error signals
-// returned by Drivers, without necessarily requiring them to know about one
-// another.
+// It's made for the core library to recognize error signals returned by
+// Drivers, without necessarily requiring them to know about one another.
 func IsInvalidDataError(err error) bool {
 	if err == nil {
 		return false
@@ -55,16 +53,8 @@ func IsInvalidDataError(err error) bool {
 		Invalid() bool
 	}
 
-	// Does this error itself implement the interface?
-	terr, ok := err.(invalidErr)
-	if ok && terr.Invalid() {
-		return true
-	}
-
-	// Does this error wrap another error that implements the interface?
-	uerr := errors.Unwrap(err)
-	verr, ok := uerr.(invalidErr)
-	return ok && verr.Invalid()
+	var ierr invalidErr
+	return errors.As(err, &ierr) && ierr.Invalid()
 }
 
 const (
