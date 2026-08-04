@@ -1,5 +1,6 @@
-FROM golang:alpine
+FROM golang:alpine3.24
 
+ENV CGO_ENABLED=0
 # Containers write test coverage data here
 ENV TEST_COVERAGE_BASE_DIR="/tmp/test_coverage"
 # GOCOVERDIR is required for capturing coverage from integration tests.
@@ -10,7 +11,7 @@ ENV GOCOVERDIR="${TEST_COVERAGE_BASE_DIR}/integration" TERM=xterm
 VOLUME "${TEST_COVERAGE_BASE_DIR}"
 
 WORKDIR /src
-RUN apk update && apk --no-cache add bats gcc g++ git just jq ncurses
-COPY go.mod /src
+RUN apk update && apk --no-cache add bats git just jq ncurses
+COPY go.mod go.sum .
 RUN go mod download && go mod verify && mkdir -pv "${GOCOVERDIR}"
-COPY . /src
+COPY . .
