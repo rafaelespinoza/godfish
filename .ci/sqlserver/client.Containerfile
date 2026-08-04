@@ -8,7 +8,6 @@ RUN just build-sqlserver && \
 # check if server is ready. Use it in the entrypoint.
 WORKDIR /src/.ci/sqlserver
 RUN go build -v -o /client_check_db .
-COPY .ci/sqlserver/client.sh /
 
 WORKDIR /src
-ENTRYPOINT /client.sh
+CMD ["sqlserver:all"]
