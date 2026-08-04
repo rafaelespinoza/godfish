@@ -9,7 +9,6 @@ services:
         env_file:
             - env
         environment:
-            CGO_ENABLED: 0
             GITHUB_TOKEN: # Mitigate rate limits.
         volumes:
           -

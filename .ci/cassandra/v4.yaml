@@ -7,7 +7,6 @@ services:
             - server
         entrypoint: /client.sh server
         environment:
-            CGO_ENABLED: 0
             # The default timeouts are 11s, but want to be explicit here.
             DB_DSN: "cassandra://server:9042/godfish_test?timeout_ms=11000&connect_timeout_ms=11000"
             GITHUB_TOKEN: # Mitigate rate limits.
