@@ -1,0 +1,88 @@
+version: '3'
+
+env:
+  DB_DRIVER: '{{.DB_DRIVER}}'
+
+vars:
+  DB_DRIVER: '{{.DB_DRIVER}}'
+  DB_HOST: '{{.DB_HOST | default "server"}}'
+  HAS_DB_SERVER: '{{.HAS_DB_SERVER | default "true"}}'
+  COVER_OUT: '{{.TEST_COVERAGE_BASE_DIR}}/cover.out'
+  COVER_DRIVER_OUT: '{{.TEST_COVERAGE_BASE_DIR}}/cover_driver.out'
+  INTEGRATION_OUT: '{{.TEST_COVERAGE_BASE_DIR}}/integration.out'
+
+tasks:
+  default:
+    desc: "Show tasks"
+    cmd: task --list
+
+  check-env:
+    desc: "Ensure required environment variables are set"
+    internal: true
+    requires:
+      vars:
+        - DB_DSN
+        - GOCOVERDIR
+        - TEST_COVERAGE_BASE_DIR
+    cmds:
+      - |
+        {{range .EXTRA_REQUIRED_VARS}}
+        if [ -z "${{.}}" ]; then
+          echo "Error: required environment variable '{{.}}' is not set for {{$.DB_DRIVER}}" >&2
+          exit 1
+        fi
+        {{end}}
+
+  mkdirs:
+    desc: "Ensure that directories exist"
+    internal: true
+    cmds:
+      - mkdir -pv "${GOCOVERDIR}" "${TEST_COVERAGE_BASE_DIR}"
+
+  sanity:
+    desc: "Sanity check {{.DB_DRIVER}} binary version"
+    deps: [check-env]
+    cmds:
+      - just build-{{.DB_DRIVER}}
+      - ./bin/godfish-{{.DB_DRIVER}} version
+
+  test-unit:
+    desc: "Run unit tests and collect coverage"
+    deps: [check-env, mkdirs]
+    cmds:
+      - just test -v -count=1 -coverprofile="{{.COVER_OUT}}"
+
+  wait-db:
+    desc: "Wait for DB server to accept connections"
+    deps: [check-env]
+    internal: true
+    # Skip execution if HAS_DB_SERVER is false (e.g. embedded sqlite3)
+    status:
+      - test "{{.HAS_DB_SERVER}}" = "false"
+    cmds:
+      - "{{ .WAIT_CMD | join \" \" }}"
+
+  test-cli:
+    desc: "Run CLI bats integration tests"
+    deps: [check-env, mkdirs, wait-db]
+    env:
+      DB_DRIVER: "{{.DB_DRIVER}}"
+    vars:
+      SCRIPTS: [./.ci/test_upgrade.sh, ./.ci/test_config.sh]
+    cmds:
+      - bats --abort --pretty --print-output-on-failure {{ .SCRIPTS | join " " }}
+      - go tool covdata textfmt -i="${GOCOVERDIR}" -o="{{.INTEGRATION_OUT}}"
+
+  test-driver:
+    desc: "Run driver integration tests against live DB"
+    deps: [check-env, mkdirs, wait-db]
+    cmds:
+      - just test-{{.DB_DRIVER}} -v -count=1 -coverprofile="{{.COVER_DRIVER_OUT}}"
+
+  all:
+    desc: "Run complete {{.DB_DRIVER}} test suite"
+    cmds:
+      - task: sanity
+      - task: test-unit
+      - task: test-cli
+      - task: test-driver

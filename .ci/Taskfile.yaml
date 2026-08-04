@@ -1,0 +1,49 @@
+version: '3'
+
+vars:
+  # DB_HOST default is "server" to match the service name for the DB server
+  # in the compose YAML files.
+  DB_HOST: '{{.DB_HOST | default "server"}}'
+
+includes:
+  cassandra:
+    taskfile: driver_test.Taskfile.yaml
+    dir: ..
+    vars:
+      DB_DRIVER: cassandra
+      WAIT_CMD: [./.ci/cassandra/wait_for_db.sh, '{{.DB_HOST}}', godfish_test]
+
+  mysql:
+    taskfile: driver_test.Taskfile.yaml
+    dir: ..
+    vars:
+      DB_DRIVER: mysql
+      EXTRA_REQUIRED_VARS: [MYSQL_PASSWORD]
+      WAIT_CMD: [./.ci/mysql/wait_for_db.sh, '{{.DB_HOST}}', godfish_test]
+
+  postgres:
+    taskfile: driver_test.Taskfile.yaml
+    dir: ..
+    vars:
+      DB_DRIVER: postgres
+      EXTRA_REQUIRED_VARS: [POSTGRES_PASSWORD]
+      WAIT_CMD: [./.ci/postgres/wait_for_db.sh, '{{.DB_HOST}}', godfish_test, godfish]
+
+  sqlite3:
+    taskfile: driver_test.Taskfile.yaml
+    dir: ..
+    vars:
+      DB_DRIVER: sqlite3
+      HAS_DB_SERVER: 'false'
+
+  sqlserver:
+    taskfile: driver_test.Taskfile.yaml
+    dir: ..
+    vars:
+      DB_DRIVER: sqlserver
+      WAIT_CMD: [./.ci/sqlserver/wait_for_db.sh]
+
+tasks:
+  default:
+    desc: "Show tasks"
+    cmd: task --list

@@ -6,5 +6,4 @@ RUN apk update && \
   just build-mysql && \
   just build-mysql-test
 
-COPY .ci/mysql/client.sh /
-ENTRYPOINT /client.sh
+CMD ["mysql:all"]

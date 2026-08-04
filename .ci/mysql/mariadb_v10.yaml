@@ -5,7 +5,6 @@ services:
             dockerfile: .ci/mysql/client.Containerfile
         depends_on:
             - server
-        entrypoint: /client.sh server
         env_file: env
         environment:
             CGO_ENABLED: 0
