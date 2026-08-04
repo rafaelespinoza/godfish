@@ -6,5 +6,4 @@ RUN apk update && \
   just build-sqlite3 && \
   just build-sqlite3-test
 
-COPY .ci/sqlite3/client.sh /
-ENTRYPOINT /client.sh
+CMD ["sqlite3:all"]

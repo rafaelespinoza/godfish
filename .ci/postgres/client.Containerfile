@@ -6,5 +6,4 @@ RUN apk update && \
   just build-postgres && \
   just build-postgres-test
 
-COPY .ci/postgres/client.sh /
-ENTRYPOINT /client.sh
+CMD ["postgres:all"]

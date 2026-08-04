@@ -5,7 +5,6 @@ services:
             dockerfile: .ci/mysql/client.Containerfile
         depends_on:
             - server
-        entrypoint: /client.sh server
         env_file: env
         environment:
             # Seems like existing env vars can't be used to create new env vars.
