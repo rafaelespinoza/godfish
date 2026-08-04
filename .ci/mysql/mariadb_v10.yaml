@@ -8,7 +8,6 @@ services:
         entrypoint: /client.sh server
         env_file: env
         environment:
-            CGO_ENABLED: 0
             # Seems like existing env vars can't be used to create new env vars.
             # The schema for a connection string is roughly:
             #   "$db_user:$db_password@tcp($db_host)/$db_name"
