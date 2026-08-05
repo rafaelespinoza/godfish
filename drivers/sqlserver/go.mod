@@ -19,11 +19,3 @@ require (
 	golang.org/x/text v0.25.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
-
-replace (
-	github.com/rafaelespinoza/godfish => ../../
-	github.com/rafaelespinoza/godfish/drivers/cassandra => ../cassandra
-	github.com/rafaelespinoza/godfish/drivers/mysql => ../mysql
-	github.com/rafaelespinoza/godfish/drivers/postgres => ../postgres
-	github.com/rafaelespinoza/godfish/drivers/sqlite3 => ../sqlite3
-)
