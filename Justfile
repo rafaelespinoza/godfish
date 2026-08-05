@@ -24,7 +24,7 @@ _DRIVERS := 'cassandra mysql postgres sqlite3 sqlserver'
     {{ justfile() }} --list --unsorted
 
 # Tidy up dependecies
-mod-tidy *args:
+mod-tidy *args: make-gowork
     #!/bin/sh
     set -eu
     printf >&2 'module: %s\n' $({{ GO }} list .)
@@ -35,13 +35,21 @@ mod-tidy *args:
         {{ GO }} -C "${mod_dir}" mod tidy {{ args }}
     done
 
+# inits go.work file if it already exists, and use local modules
+make-gowork:
+    #!/bin/sh
+    if [ ! -f go.work ]; then
+        {{ GO }} work init .
+    fi
+    {{ GO }} work use -r .
+
 # Run unit tests on core source packages
-test *args:
+test *args: make-gowork
     {{ GO }} test {{ args }} {{ _CORE_SRC_PKG_PATHS }}
 
 # Examine source code for suspicious constructs
 [group('static')]
-vet *args:
+vet *args: make-gowork
     #!/bin/sh
     set -eu
     printf >&2 'module: %s\n' $({{ GO }} list .)
@@ -68,7 +76,7 @@ GOSEC := "gosec"
 
 # Run a security scanner over the source code
 [group('static')]
-gosec *args:
+gosec *args: make-gowork
     #!/bin/sh
     set -eu
     # As of 2025-12, gosec does not work very well with multiple module
@@ -86,7 +94,7 @@ gosec *args:
 
 # Check for known vulnerabilities
 [group('static')]
-govulncheck *args:
+govulncheck *args: make-gowork
     #!/bin/sh
     set -eu
     printf >&2 'module: %s\n' $({{ GO }} list .)

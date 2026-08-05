@@ -12,4 +12,6 @@ VOLUME "${TEST_COVERAGE_BASE_DIR}"
 WORKDIR /src
 RUN apk update && apk --no-cache add bats gcc g++ git just jq ncurses
 COPY . /src
-RUN go mod download && go mod verify && mkdir -pv "${GOCOVERDIR}"
+RUN go mod download && go mod verify && \
+  just make-gowork && \
+  mkdir -pv "${GOCOVERDIR}"
