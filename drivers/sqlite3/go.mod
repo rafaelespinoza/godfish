@@ -3,7 +3,7 @@ module github.com/rafaelespinoza/godfish/drivers/sqlite3
 go 1.25.0
 
 require (
-	github.com/rafaelespinoza/godfish v0.0.0-00010101000000-000000000000
+	github.com/rafaelespinoza/godfish v0.17.0
 	modernc.org/sqlite v1.54.0
 )
 
@@ -21,12 +21,4 @@ require (
 	modernc.org/libc v1.74.1 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.11.0 // indirect
-)
-
-replace (
-	github.com/rafaelespinoza/godfish => ../../
-	github.com/rafaelespinoza/godfish/drivers/cassandra => ../cassandra
-	github.com/rafaelespinoza/godfish/drivers/mysql => ../mysql
-	github.com/rafaelespinoza/godfish/drivers/postgres => ../postgres
-	github.com/rafaelespinoza/godfish/drivers/sqlserver => ../sqlserver
 )
