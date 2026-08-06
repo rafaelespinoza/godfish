@@ -5,8 +5,9 @@ env:
 
 vars:
   DB_DRIVER: '{{.DB_DRIVER}}'
-  DB_HOST: '{{.DB_HOST | default "server"}}'
   HAS_DB_SERVER: '{{.HAS_DB_SERVER | default "true"}}'
+
+  # Write test coverage data to these locations.
   COVER_OUT: '{{.TEST_COVERAGE_BASE_DIR}}/cover.out'
   COVER_DRIVER_OUT: '{{.TEST_COVERAGE_BASE_DIR}}/cover_driver.out'
   INTEGRATION_OUT: '{{.TEST_COVERAGE_BASE_DIR}}/integration.out'
@@ -43,8 +44,9 @@ tasks:
     desc: "Sanity check {{.DB_DRIVER}} binary version"
     deps: [check-env]
     cmds:
-      - just build-{{.DB_DRIVER}}
+      # The Containerfile should build these.
       - ./bin/godfish-{{.DB_DRIVER}} version
+      - ./bin/godfish-{{.DB_DRIVER}}_test version
 
   test-unit:
     desc: "Run unit tests and collect coverage"
@@ -56,7 +58,7 @@ tasks:
     desc: "Wait for DB server to accept connections"
     deps: [check-env]
     internal: true
-    # Skip execution if HAS_DB_SERVER is false (e.g. embedded sqlite3)
+    # Skip execution if HAS_DB_SERVER is false (e.g. embedded sqlite3).
     status:
       - test "{{.HAS_DB_SERVER}}" = "false"
     cmds:
