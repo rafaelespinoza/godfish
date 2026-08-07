@@ -6,14 +6,9 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
-	"path/filepath"
 
 	"github.com/rafaelespinoza/godfish"
-	"github.com/rafaelespinoza/godfish/drivers/cassandra"
-	"github.com/rafaelespinoza/godfish/drivers/mysql"
-	"github.com/rafaelespinoza/godfish/drivers/postgres"
-	"github.com/rafaelespinoza/godfish/drivers/sqlite3"
-	"github.com/rafaelespinoza/godfish/drivers/sqlserver"
+	"github.com/rafaelespinoza/godfish/driver"
 )
 
 // migrationsFS is the embedded readonly file system.
@@ -21,6 +16,15 @@ import (
 //
 //go:embed testdata/default
 var migrationsFS embed.FS
+
+// DemoDriver is a stand-in for a [driver.Driver].
+// Real implementations can be seen in drivers/.
+type DemoDriver struct {
+	driver.Driver
+}
+
+func (d *DemoDriver) Connect(dsn string) error { return nil }
+func (d *DemoDriver) Close() error             { return nil }
 
 // Demonstrate sqlite3 driver with embedded migrations data.
 //
@@ -39,11 +43,9 @@ func Example_embed() {
 		migrationsDir fs.FS
 	)
 
-	// dsn is a database-specific connection string (data source name). In this
-	// sqlite3 example, it's a path to a file.
-	dsn := filepath.Join(os.TempDir(), "godfish_test.sqlite")
-	driver := sqlite3.NewDriver()
-	if err = driver.Connect(dsn); err != nil {
+	// driver can be one of the drivers in this project, see drivers/.
+	var driver DemoDriver
+	if err = driver.Connect("sample_dsn"); err != nil {
 		fmt.Println("connecting to DB", err)
 		return
 	}
@@ -75,8 +77,8 @@ func ExampleMigrateWith() {
 	var err error
 
 	// driver can be one of the drivers in this project, see drivers/.
-	driver := cassandra.NewDriver()
-	if err := driver.Connect(mysql.SampleDSN); err != nil {
+	var driver DemoDriver
+	if err := driver.Connect("sample_dsn"); err != nil {
 		fmt.Println("connecting to DB", err)
 		return
 	}
@@ -119,8 +121,8 @@ func ExampleRollbackWith() {
 	var err error
 
 	// driver can be one of the drivers in this project, see drivers/.
-	driver := postgres.NewDriver()
-	if err := driver.Connect(postgres.SampleDSN); err != nil {
+	var driver DemoDriver
+	if err := driver.Connect("sample_dsn"); err != nil {
 		fmt.Println("connecting to DB", err)
 		return
 	}
@@ -152,8 +154,8 @@ func ExampleApplyMigrationWith() {
 	var err error
 
 	// driver can be one of the drivers in this project, see drivers/.
-	driver := mysql.NewDriver()
-	if err := driver.Connect(mysql.SampleDSN); err != nil {
+	var driver DemoDriver
+	if err := driver.Connect("sample_dsn"); err != nil {
 		fmt.Println("connecting to DB", err)
 		return
 	}
@@ -196,8 +198,8 @@ func ExampleApplyRollbackWith() {
 	var err error
 
 	// driver can be one of the drivers in this project, see drivers/.
-	driver := sqlserver.NewDriver()
-	if err := driver.Connect(sqlserver.SampleDSN); err != nil {
+	var driver DemoDriver
+	if err := driver.Connect("sample_dsn"); err != nil {
 		fmt.Println("connecting to DB", err)
 		return
 	}
