@@ -225,7 +225,7 @@ _build_delegator_cmd *build_flags:
     bin={{ clean(BIN_DIR / "godfish") }}
     mkdir -pv {{ BIN_DIR }}
     ldflags="{{ _LDFLAGS }}"
-    {{ GO }} build -o="${bin}" -v -ldflags="${ldflags}" {{ build_flags }} ./cmd/godfish
+    {{ GO }} build -o="${bin}" -v -ldflags="${ldflags}" {{ build_flags }} ./all/cmd/godfish
     "${bin}" version
     echo "built godfish to ${bin}"
 
