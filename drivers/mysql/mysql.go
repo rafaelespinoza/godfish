@@ -27,6 +27,10 @@ func NewDriver() *Driver { return &Driver{} }
 // Driver implements the [driver.Driver] interface for mysql databases.
 type Driver struct {
 	connection *sql.DB
+	// connOwned signals whether this library made the DB connection or not.
+	// When true, then the Driver should close the connection. When false,
+	// presume that the caller's application will manage the connection.
+	connOwned bool
 }
 
 func (d *Driver) Name() string { return "mysql" }
@@ -39,16 +43,28 @@ func (d *Driver) Connect(dsn string) (err error) {
 		return
 	}
 	d.connection = conn
+	d.connOwned = true
 	return
 }
 
 func (d *Driver) Close() (err error) {
 	conn := d.connection
-	if conn == nil {
+	if conn == nil || !d.connOwned {
 		return
 	}
 	d.connection = nil
 	err = conn.Close()
+	return
+}
+
+// WithDriverOptions decorates d with opts and returns the first error
+// encountered, if necessary.
+func (d *Driver) WithDriverOptions(opts ...DriverOption) (err error) {
+	for _, opt := range opts {
+		if err = opt(d); err != nil {
+			return
+		}
+	}
 	return
 }
 
@@ -221,4 +237,17 @@ func quotePart(part string) string { return quote + part + quote }
 
 func cleanIdentifier(input string) (string, error) {
 	return internal.CleanNamespacedIdentifier(input, quotePart)
+}
+
+// A DriverOption configures a [*Driver] and returns an error if necessary.
+type DriverOption func(*Driver) error
+
+// WithDB attaches an existing *sql.DB. Attaching one to the Driver
+// makes the [Driver.Connect], [Driver.Close] methods no-op.
+func WithDB(db *sql.DB) DriverOption {
+	return func(d *Driver) error {
+		d.connection = db
+		d.connOwned = false
+		return nil
+	}
 }
