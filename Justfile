@@ -31,6 +31,7 @@ test *args:
     {{ GO }} test {{ args }} {{ _CORE_SRC_PKG_PATHS }}
 
 # Examine source code for suspicious constructs
+[group('static')]
 vet *args:
     {{ GO }} vet {{ args }} {{ _CORE_SRC_PKG_PATHS }} {{ _BASE_DRIVER_PATH }}/...
 
@@ -50,8 +51,14 @@ GOSEC := "gosec"
 #
 
 # Run a security scanner over the source code
+[group('static')]
 gosec *args:
     {{ GOSEC }} {{ args }} . ./internal/... ./drivers/...
+
+# Check for known vulnerabilities
+[group('static')]
+govulncheck *args:
+    {{ GO }} run golang.org/x/vuln/cmd/govulncheck@latest {{ args }} ./...
 
 GORELEASER := "goreleaser"
 
