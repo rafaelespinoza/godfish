@@ -330,39 +330,39 @@ actions.
 
 Docker (or equivalent) is used to create environments and run the tests against
 a live database. Each database has a separate configuration. All of this lives
-in `ci.Justfile` and the `.ci/` directory.
+in `ci.just` and the `.ci/` directory.
 
 Using an OCI-compatible tool other than `docker` (ie: `podman`)?
 ```sh
-just --set CONTAINER_TOOL podman -f ci.Justfile
+just --set CONTAINER_TOOL podman -f ci.just
 ```
 
 Build environments and run tests
 ```sh
-just -f ci.Justfile cassandra4-up
-just -f ci.Justfile cassandra5-up
+just -f ci.just cassandra4-up
+just -f ci.just cassandra5-up
 
-just -f ci.Justfile sqlserver-up
+just -f ci.just sqlserver-up
 
-just -f ci.Justfile mariadb-up
+just -f ci.just mariadb-up
 
-just -f ci.Justfile postgres15-up
-just -f ci.Justfile postgres16-up
+just -f ci.just postgres15-up
+just -f ci.just postgres16-up
 
-just -f ci.Justfile sqlite3-up
+just -f ci.just sqlite3-up
 ```
 
 Teardown
 ```sh
-just -f ci.Justfile cassandra4-down
-just -f ci.Justfile cassandra5-down
+just -f ci.just cassandra4-down
+just -f ci.just cassandra5-down
 
-just -f ci.Justfile sqlserver-down
+just -f ci.just sqlserver-down
 
-just -f ci.Justfile mariadb-down
+just -f ci.just mariadb-down
 
-just -f ci.Justfile postgres15-down
-just -f ci.Justfile postgres16-down
+just -f ci.just postgres15-down
+just -f ci.just postgres16-down
 
-just -f ci.Justfile sqlite3-down
+just -f ci.just sqlite3-down
 ```

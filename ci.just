@@ -12,7 +12,7 @@ CONTAINER_TOOL := 'docker'
 
 # List available recipes
 @default:
-    just --list --unsorted -f 'ci.Justfile'
+    just --list --unsorted -f {{ justfile() }}
 
 [private]
 _CASSANDRA_V4_FILE := CI_DIR / "cassandra" / "v4.yaml"
