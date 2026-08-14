@@ -36,6 +36,7 @@ jobs:
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: '1.25'
+          check-latest: true
 
       - name: Initialize CodeQL
         uses: github/codeql-action/init@e58424170fb0262c8d7ed60a2e84b9bffe205c67 # CodeQL Bundle v2.26.1
