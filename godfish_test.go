@@ -1409,7 +1409,7 @@ func testMigrationVersions(t *testing.T, gotMigrations []*internal.Migration, ex
 			break
 		} else {
 			gotVersion := gotMig.Version.String()
-			expVersion := expVersions[i]
+			expVersion := expVersions[i] // #nosec G602 -- a length check was done earlier in this func
 			if gotVersion != expVersion {
 				t.Errorf("wrong version at [%d]; got %q, expected %q", i, gotVersion, expVersion)
 			}
