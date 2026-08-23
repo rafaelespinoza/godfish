@@ -758,7 +758,10 @@ func scanAppliedVersions(ctx context.Context, d driver.Driver, migrationsTable s
 		}
 
 		if availableByVersion != nil {
-			if knownAvailableMigration, found := availableByVersion[ver.Value()]; found {
+			if knownAvailableMigration, found := availableByVersion[ver.Value()]; !found {
+				// Drift is detected.
+				slog.Warn("migration in DB but not found in FS", slog.Any("migration", &mig))
+			} else {
 				mig.Filename = knownAvailableMigration.Filename
 				// If this data was originally inserted before the label column was present,
 				// then it would be empty in the DB. Attempt to reconstruct the Label field
@@ -808,8 +811,16 @@ func (m *migrationFinder) filter(applied, available []*internal.Migration, infoM
 		for version, mig := range allVersions {
 			_, isApplied := uniqueToApplied[version]
 			_, isAvailable := uniqueToAvailable[version]
-			if !isApplied && isAvailable && (infoMode || version > highestAppliedVersion) {
-				out = append(out, mig)
+			if !isApplied && isAvailable {
+				if infoMode || version > highestAppliedVersion {
+					out = append(out, mig)
+				}
+				if version <= highestAppliedVersion {
+					slog.Warn("found possibly stale or out-of-order migration",
+						slog.Any("migration", mig),
+						slog.Int64("highest_applied_version", highestAppliedVersion),
+					)
+				}
 			}
 		}
 	} else {
