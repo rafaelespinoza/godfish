@@ -3,7 +3,7 @@ module github.com/rafaelespinoza/godfish/drivers/sqlite3
 go 1.25.0
 
 require (
-	github.com/rafaelespinoza/godfish v0.17.0
+	github.com/rafaelespinoza/godfish v0.18.0
 	modernc.org/sqlite v1.54.0
 )
 

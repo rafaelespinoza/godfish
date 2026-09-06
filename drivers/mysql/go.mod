@@ -4,7 +4,7 @@ go 1.25.0
 
 require (
 	github.com/go-sql-driver/mysql v1.10.0
-	github.com/rafaelespinoza/godfish v0.17.0
+	github.com/rafaelespinoza/godfish v0.18.0
 )
 
 require (

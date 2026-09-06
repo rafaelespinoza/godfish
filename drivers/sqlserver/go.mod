@@ -4,7 +4,7 @@ go 1.25.0
 
 require (
 	github.com/microsoft/go-mssqldb v1.9.5
-	github.com/rafaelespinoza/godfish v0.17.0
+	github.com/rafaelespinoza/godfish v0.18.0
 )
 
 require (
